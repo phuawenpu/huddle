@@ -1,0 +1,45 @@
+{
+  "name": "code-huddle",
+  "version": "1.0.0",
+  "description": "huddle reviews",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/phuawenpu/huddle.git"
+  },
+  "keywords": [],
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/phuawenpu/huddle/issues"
+  },
+  "homepage": "https://github.com/phuawenpu/huddle#readme",
+  "dependencies": {
+    "@prisma/client": "^7.9.1",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^26.1.2",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@types/uuid": "^10.0.0",
+    "@vitejs/plugin-react": "^6.0.5",
+    "next": "^16.3.0",
+    "playwright": "^1.62.1",
+    "postcss": "^8.5.25",
+    "prisma": "^7.9.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.9",
+    "typescript": "^7.0.2",
+    "uuid": "^14.0.1",
+    "vitest": "^4.1.10",
+    "ws": "^8.21.2"
+  },
+  "allowScripts": {
+    "@prisma/engines@7.9.1": true,
+    "prisma@7.9.1": true,
+    "esbuild@0.28.1": true
+  }
+}

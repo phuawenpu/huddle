@@ -1,0 +1,189 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Session {
+  id          String   @id @default(uuid())
+  title       String
+  objective   String
+  phase       String   @default("frame")
+  criteria    String   @default("[]")
+  speakerCount Int     @default(4)
+  status      String   @default("setup")
+  runMode     String   @default("live")
+  scenarioId  String?
+  scenario    Scenario? @relation(fields: [scenarioId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  participants      Participant[]
+  speakerMappings   SpeakerMapping[]
+  transcriptTurns   TranscriptTurn[]
+  intentRevisions   IntentRevision[]
+  corrections       Correction[]
+  discussionItems   DiscussionItem[]
+  promptRecords     PromptRecord[]
+  runs              Run[]
+}
+
+model Participant {
+  id          String  @id @default(uuid())
+  sessionId   String
+  session     Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  displayName String
+  role        String  @default("reviewer")
+  isHidden    Boolean @default(false)
+  speakerMappings   SpeakerMapping[]
+
+  @@unique([sessionId, displayName])
+}
+
+model SpeakerMapping {
+  id            String  @id @default(uuid())
+  sessionId     String
+  session       Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  speakerLabel  String
+  participantId String?
+  participant   Participant? @relation(fields: [participantId], references: [id])
+
+  @@unique([sessionId, speakerLabel])
+}
+
+model TranscriptTurn {
+  id                           String   @id @default(uuid())
+  sessionId                    String
+  session                      Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  providerSessionId            String
+  providerTurnOrder            Int
+  segmentIndex                 Int      @default(0)
+  providerSpeakerLabel         String
+  originalProviderSpeakerLabel String
+  participantId                String?
+  startMs                      Int
+  endMs                        Int
+  receivedAtMs                 Int
+  originalText                 String
+  currentText                  String
+  wordsJson                    String?
+  isCalibration                Boolean  @default(false)
+  isFinal                      Boolean  @default(false)
+  isSubstantive                Boolean  @default(false)
+  isUnknownSpeaker             Boolean  @default(false)
+  possibleOverlap              Boolean  @default(false)
+  wasSpeakerRevised            Boolean  @default(false)
+  isManuallyCorrected          Boolean  @default(false)
+  analysisJson                 String?
+  analysisReceivedAtMs         Int?
+
+  @@unique([providerSessionId, providerTurnOrder, segmentIndex])
+  @@index([sessionId, isFinal])
+  @@index([sessionId, receivedAtMs])
+}
+
+model IntentRevision {
+  id        String   @id @default(uuid())
+  sessionId String
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  objective String?
+  phase     String?
+  criteria  String?
+  createdAt DateTime @default(now())
+}
+
+model Correction {
+  id        String   @id @default(uuid())
+  sessionId String
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  turnId    String?
+  field     String
+  oldValue  String
+  newValue  String
+  createdAt DateTime @default(now())
+}
+
+model DiscussionItem {
+  id         String   @id @default(uuid())
+  sessionId  String
+  session    Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  category   String
+  text       String
+  status     String   @default("open")
+  turnIds    String   @default("[]")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model PromptRecord {
+  id               String   @id @default(uuid())
+  sessionId        String
+  session          Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  text             String
+  supportingTurnIds String  @default("[]")
+  confidence       Float
+  shown            Boolean  @default(false)
+  dismissed         Boolean  @default(false)
+  guardRejected    Boolean  @default(false)
+  rejectReason     String?
+  createdAt        DateTime @default(now())
+  expiresAt        DateTime?
+}
+
+model Scenario {
+  id                  String   @id @default(uuid())
+  title               String
+  description         String   @default("")
+  topic               String
+  domain              String   @default("")
+  workshopType        String   @default("concept_critique")
+  objective           String
+  phase               String   @default("evaluate")
+  criteria            String   @default("[]")
+  language            String   @default("en")
+  durationMinutes     Int      @default(8)
+  speakerCount        Int      @default(4)
+  difficulty          String   @default("realistic")
+  crossTalkLevel      String   @default("occasional")
+  participationProfile String  @default("even")
+  budgetJson          String?
+  realizedDurationMs  Int?
+  overlapRatioPct     Float?
+  speakersJson        String?
+  turnsJson           String?
+  expectedWindowOutcomeJson String?
+  status              String   @default("draft")
+  preflightJson       String?
+  approvedAt          DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  sessions Session[]
+  runs     Run[]
+}
+
+model Run {
+  id          String   @id @default(uuid())
+  sessionId   String
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  scenarioId  String?
+  scenario    Scenario? @relation(fields: [scenarioId], references: [id])
+  mode        String   @default("sim_injected")
+  stubbed     Boolean  @default(true)
+  status      String   @default("created")
+  playbackEventsJson String?
+  evaluationJson     String?
+  deviationsJson     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model TopicSuggestionCache {
+  id             String   @id @default(uuid())
+  seed           String   @default("")
+  excludeHash    String   @default("")
+  suggestionsJson String
+  createdAt      DateTime @default(now())
+}
