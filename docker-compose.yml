@@ -1,0 +1,131 @@
+version: "3.9"
+
+services:
+  # ── PostgreSQL ──────────────────────────────────────
+  postgres:
+    image: postgres:17-alpine
+    container_name: codehuddle-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: codehuddle
+      POSTGRES_PASSWORD: codehuddle
+      POSTGRES_DB: codehuddle
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codehuddle -d codehuddle"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Judge0 ──────────────────────────────────────────
+  judge0-redis:
+    image: redis:7-alpine
+    container_name: codehuddle-judge0-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - judge0-redis-data:/data
+
+  judge0-db:
+    image: postgres:17-alpine
+    container_name: codehuddle-judge0-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: judge0
+      POSTGRES_PASSWORD: judge0
+      POSTGRES_DB: judge0
+    volumes:
+      - judge0-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U judge0 -d judge0"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  judge0-server:
+    image: judge0/judge0:1.13.1
+    container_name: codehuddle-judge0-server
+    restart: unless-stopped
+    environment:
+      RAILS_ENV: production
+      REDIS_URL: redis://judge0-redis:6379/0
+      DATABASE_URL: postgresql://judge0:judge0@judge0-db:5432/judge0
+      JUDGE0_TOKEN: judge0-token-dev
+      JUDGE0_POINTS_PER_TESTCASE: 1
+      VIRTUAL_HOST: judge0-server.local
+    ports:
+      - "2358:2358"
+    depends_on:
+      judge0-redis:
+        condition: service_started
+      judge0-db:
+        condition: service_healthy
+
+  judge0-workers:
+    image: judge0/judge0:1.13.1
+    container_name: codehuddle-judge0-workers
+    restart: unless-stopped
+    entrypoint: ["./scripts/workers"]
+    environment:
+      RAILS_ENV: production
+      REDIS_URL: redis://judge0-redis:6379/0
+      DATABASE_URL: postgresql://judge0:judge0@judge0-db:5432/judge0
+      JUDGE0_TOKEN: judge0-token-dev
+    depends_on:
+      judge0-redis:
+        condition: service_started
+      judge0-db:
+        condition: service_healthy
+      judge0-server:
+        condition: service_started
+
+  # ── Backend (Hono API) ──────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: packages/backend/Dockerfile
+    container_name: codehuddle-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://codehuddle:codehuddle@postgres:5432/codehuddle
+      JUDGE0_URL: http://judge0-server:2358
+      JUDGE0_TOKEN: judge0-token-dev
+      NODE_ENV: development
+      PORT: "3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      judge0-server:
+        condition: service_started
+    volumes:
+      - ./packages/backend:/app/packages/backend
+      - /app/node_modules
+      - /app/packages/backend/node_modules
+
+  # ── Frontend (React + Vite) ─────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: packages/frontend/Dockerfile
+    container_name: codehuddle-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:3000
+    depends_on:
+      - backend
+    volumes:
+      - ./packages/frontend:/app/packages/frontend
+      - /app/node_modules
+      - /app/packages/frontend/node_modules
+
+volumes:
+  pgdata:
+  judge0-redis-data:
+  judge0-pgdata:
