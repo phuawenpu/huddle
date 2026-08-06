@@ -1,7 +1,7 @@
 # fly.toml — Critique HUD deployment configuration
 # See https://fly.io/docs/reference/configuration/ for details
 
-app = "critique-hud"
+app = "huddle-ti5ikw"
 primary_region = "lhr"
 
 [build]
