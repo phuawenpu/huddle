@@ -19,7 +19,7 @@ export async function POST(
       ? await prisma.scenario.findUnique({ where: { id: run.scenarioId } })
       : null;
 
-    const turns = safeParseJson(scenario?.turnsJson, []);
+    const turns = safeParseJson(scenario?.turnsJson ?? null, []);
     const actualTurns = run.session.transcriptTurns.map(t => ({
       ...t,
       wordsJson: safeParseJson(t.wordsJson, null),
@@ -61,7 +61,7 @@ export async function POST(
   }
 }
 
-function safeParseJson(val: string | null, fallback: any) {
+function safeParseJson(val: string | null | undefined, fallback: any) {
   if (!val) return fallback;
   try { return JSON.parse(val); } catch { return fallback; }
 }

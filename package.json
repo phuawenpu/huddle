@@ -1,29 +1,55 @@
 {
-  "name": "codehuddle",
+  "name": "critique-hud",
   "version": "1.0.0",
   "private": true,
-  "description": "CodeHuddle — Competitive Programming Collaboration Platform",
+  "description": "Critique HUD — A shared cognitive mirror for Design Thinking critiques",
   "scripts": {
-    "dev": "turbo dev",
-    "build": "turbo build",
-    "lint": "turbo lint",
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "lint": "next lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
-    "db:generate": "turbo db:generate",
-    "db:push": "turbo db:push",
-    "db:migrate": "turbo db:migrate",
-    "db:studio": "turbo db:studio",
-    "docker:up": "docker compose up -d",
-    "docker:down": "docker compose down",
-    "docker:build": "docker compose build"
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run --reporter=verbose",
+    "test:e2e": "echo 'E2E tests require Playwright — run: npx playwright test'",
+    "setup": "prisma generate && prisma db push && echo 'Setup complete'"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.15.0",
+    "next": "^15.5.7",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "ws": "^8.18.1"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.13",
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
     "@types/ws": "^8.18.1",
+    "postcss": "^8.5.3",
     "prettier": "^3.6.2",
-    "turbo": "^2.6.3",
-    "typescript": "^5.8.3"
+    "prisma": "^6.15.0",
+    "tailwindcss": "^4.1.13",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.3"
   },
-  "packageManager": "pnpm@11.20.0",
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=20.0.0"
+  },
+  "allowScripts": {
+    "@prisma/client@6.15.0": true,
+    "prisma@6.15.0": true,
+    "@prisma/engines@6.15.0": true,
+    "esbuild@0.28.1": true,
+    "sharp@0.34.5": true
   }
 }

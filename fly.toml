@@ -1,0 +1,40 @@
+# fly.toml — Critique HUD deployment configuration
+# See https://fly.io/docs/reference/configuration/ for details
+
+app = "critique-hud"
+primary_region = "lhr"
+
+[build]
+  builder = "dockerfile"
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3000"
+  DATABASE_URL = "file:/data/app.db"
+  ASSET_DIR = "/data/audio"
+  ROOM_IR_DIR = "/data/ir"
+  SIMULATION_ENABLED = "true"
+  IDLE_TERMINATE_SECONDS = "120"
+  TOPIC_SUGGESTION_TTL_SECONDS = "3600"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    method = "get"
+    path = "/api/time"
+
+[mounts]
+  source = "critique_hud_data"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

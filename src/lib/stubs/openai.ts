@@ -140,7 +140,7 @@ export function stubGenerateScenario(params: {
       const prevTurn = turns[i - 1];
       // Only overlap if no calibration turn and not already overlapping
       const overlapAmount = Math.floor(rng() * maxOverlapMs);
-      turn.startMs = Math.max(currentMs - overlapAmount, prevTurn.startMs + 500);
+      turn.startMs = Math.max(currentMs - overlapAmount, (prevTurn.startMs ?? currentMs) + 500);
       turn.overlapWith = [i - 1];
       prevTurn.overlapWith = [...(prevTurn.overlapWith || []), i];
     }
@@ -149,7 +149,7 @@ export function stubGenerateScenario(params: {
 
     // Add pause between turns (no overlap at end)
     const pauseMs = Math.floor(500 + rng() * 1500);
-    currentMs = turn.endMs + pauseMs;
+    currentMs = (turn.endMs ?? currentMs) + pauseMs;
   }
 
   // Budget estimation
