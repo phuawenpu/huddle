@@ -45,5 +45,9 @@ data/
 # Test
 coverage/
 
+# Python tooling
+__pycache__/
+*.py[cod]
+
 # Existing legacy
 node_modules/

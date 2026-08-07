@@ -15,15 +15,15 @@ Both modes drive the same pipeline: audio → worklet → PCM16 → ASR → tran
 
 ## Current Status
 
-**Active development — Build Stage 1-7 implemented, Stage 8 scaffolded.**
+**Active development — core live capture and natural-audio simulation are implemented; research-facing correction, provenance, injected simulation, and evaluation workflows remain partial.**
 
 | Metric | Value |
 |---|---|
 | TypeScript | 0 errors |
-| Unit tests | 74/74 passing |
+| Unit tests | 79/79 passing |
 | API routes | 39 endpoints operational |
-| Frontend pages | 10 routes functional |
-| DB schema | 14 models, SQLite via Prisma |
+| Frontend pages | 9 routes functional |
+| DB schema | 11 models, SQLite via Prisma |
 | Test scenarios | 11 generated and synthesized |
 | Fly.io deployment | v22, health passing |
 | API secrets | `ASSEMBLYAI_API_KEY` + `OPENAI_API_KEY` deployed |
@@ -33,13 +33,25 @@ Both modes drive the same pipeline: audio → worklet → PCM16 → ASR → tran
 | Stage | Status | Summary |
 |---|---|---|
 | **1 — Speech proof** | ✅ Implemented | AudioWorklet PCM16 resampler, `useAudioCapture` hook (getUserMedia + analyser meter + settings readback), ASR WebSocket client (AssemblyAI v3 protocol), wake lock, sendBeacon termination |
-| **2 — Diarization** | ✅ Implemented | Idempotent turn ingest, speaker label mapping (A-F), UNKNOWN speaker display, SpeakerRevision handling, partial→final transitions |
-| **3 — Scenarios + stubs** | ✅ Implemented | ASR stub v3 protocol with fault injection, 11 test scenarios (3-15 min, 3-6 speakers, varied cross-talk), sim B audio injection infrastructure |
-| **4 — HUD** | ✅ Implemented | In-memory SSE pub/sub, real-time display page with talk-share bars + discussion map, SIMULATION badge, SSE reconnect with exponential backoff |
-| **5 — TTS + mixing** | 🟡 In progress | Scenario synthesis to WAV files (tone-based), synthesize/preflight/approve/recast routes, voice pool with 6 timbre classes. ⚠ See Known Issues below. |
-| **6 — Critique intelligence** | ✅ Implemented | Batched LLM turn analysis engine, window analysis every 20s, discussion map generation, prompt lifecycle with auto-dismiss |
-| **7 — Facilitation** | ✅ Implemented | Prompt guard enforcement, single-prompt with 15s auto-dismiss, Correction audit via PATCH routes, IntentRevision live editing |
-| **8 — Evaluation** | 🟡 Scaffolded | Playwright E2E config (6 device profiles), eval thresholds per scenario profile, LLM judge stub. CI pipeline and real-device smoke pending. |
+| **2 — Diarization** | 🟡 Partial | Idempotent turn ingest, provider speaker labels, mappings, and UNKNOWN display work; late SpeakerRevision persistence/correction is incomplete. |
+| **3 — Scenarios + stubs** | 🟡 Partial | ASR/LLM/TTS stubs, generated scenarios, and overlap fixtures work; sim B does not yet feed decoded audio through the worklet/ASR path. |
+| **4 — HUD** | 🟡 Partial | In-memory SSE, talk share, flat discussion items, simulation badge, and reconnect work; event replay/`Last-Event-ID` resume is not implemented. |
+| **5 — TTS + mixing** | ✅ Implemented | Cached per-turn OpenAI TTS, explicit tone fixtures in stub mode, ffmpeg overlap scheduling/mixing, WAV + MP3 output, manifests, and independent ASR validation. |
+| **6 — Critique intelligence** | 🟡 Partial | Batched turn/window analysis and discussion items work; grounding, output validation, dissent persistence, and deduplication need completion. |
+| **7 — Facilitation** | 🟡 Partial | Single-prompt restraint and a lexical guard exist; correction audit, intent revision history, participant-aware guards, and SSE propagation are incomplete. |
+| **8 — Evaluation** | 🟡 Scaffolded | Playwright E2E config (6 device profiles) and alignment utilities exist, but several reported metrics remain placeholders and real-device smoke is pending. |
+
+## Research and system-design study
+
+The research papers in `workspace/`, the current implementation, and adjacent 2023–2026 systems have been analyzed as a single design-research program. The study distinguishes empirical findings, implemented behavior, scaffolding, and future novelty claims.
+
+- [Research artifact index](docs/research/README.md)
+- [Research synthesis](docs/research/01-research-synthesis.md)
+- [Detailed codebase audit](docs/research/02-codebase-audit.md)
+- [Online novelty landscape](docs/research/03-novelty-landscape.md)
+- [Seven system versions](docs/research/04-system-versions.md)
+- [Evaluation roadmap](docs/research/05-evaluation-roadmap.md)
+- [Five high-resolution vector PDF diagrams](docs/research/diagrams/)
 
 ### New API Endpoints (since prototype)
 
@@ -65,38 +77,36 @@ POST /api/uploads                        — Upload audio files (WAV, MP3, M4A, 
 
 ## Known Issues
 
-### ⚠ Audio Synthesis & Playback
+### ⚠ Simulation Path
 
-**Status: Not working reliably in browser.** While WAV files are generated and served correctly (verified: 8.6 MB, 16kHz mono PCM, `audio/wav` content type), audio playback through the browser has proven unreliable:
+**Status: acoustic playback is implemented; injected end-to-end simulation is not.**
 
-- **Web Audio API approach** (`AudioContext` + `decodeAudioData` + `BufferSource`) failed silently on both desktop and mobile browsers. The user-gesture lifecycle for `AudioContext` creation and resumption is fragile across browsers and mobile OSes.
-- **HTML5 `<audio>` element approach** (`new Audio(url)`) also did not produce audible output on either platform during testing, despite the WAV file being valid and the server returning correct responses.
-
-**Root cause:** The synthesized WAV uses simple sine waves as placeholder audio (distinct frequencies per speaker: 220/330/440/550/660/880 Hz at 50% amplitude). While this produces valid, verifiable WAV files, browser audio playback appears to require more natural audio content or different encoding. The files play correctly when downloaded and opened with desktop audio tools.
-
-✅ **What does work:**
-- WAV generation, storage, and serving
-- WAV download for offline playback
-- Visual playback (turn-by-turn text display with progress tracking)
+✅ **What works:**
+- Real OpenAI TTS when configured; deterministic tones only in explicit stub mode
+- Cached per-turn WAV rendering and distinct voice casting
+- `ffmpeg` overlap scheduling, mixing, limiting, and WAV/MP3 output
+- Independent ASR validation of sampled real-speech clips
+- HTML5 audio playback and visual turn tracking for manual sim C tests
 
 ❌ **What needs fixing:**
-- Real-time audible playback in the browser
-- Migration from tone-based synthesis to actual TTS (OpenAI `gpt-4o-mini-tts`)
-- Adding `ffmpeg` to the Docker image for proper audio mixing
+- Sim B must decode the mixed file into the AudioWorklet and ASR WebSocket path
+- Simulator actions must persist run/playback lifecycle events
+- Browser/device playback needs a documented real-device test matrix
+- Evaluation fields currently hardcoded or derived from proxy metrics must be replaced
 
 ### ⚠ Overlap Naturalness
 
-**Status: Scheduled overlaps produce unnatural transcripts.** Current overlap implementation follows the spec rules (no 3-way overlap, no calibration overlap, ≤1500ms, boundary-only) but with deterministic stub generation, overlapping turns appear mechanical rather than conversational. The stubs use pattern-matched text from a fixed pool — real LLM generation with proper overlap context would produce more natural results.
+**Status: deterministic stub dialogue remains mechanical.** The real scenario-generation path now prompts for conversational causality, repair, disagreement, and context-sensitive overlaps; stub mode remains a protocol fixture rather than a naturalness benchmark.
 
 ✅ **What works:**
 - Overlap rules enforced at generation time
 - `possibleOverlap` flag on turns
-- Overlap-segmented accuracy in evaluation
+- A basic overlap-restricted transcript proxy in evaluation
 
 ❌ **What needs fixing:**
-- Real LLM-based generation with naturalistic overlap patterns (interruptions, eager agreements, backchannels)
-- `ffmpeg` mixing with proper `adelay` + `amix` scheduling
-- Transition from stub-based to real OpenAI TTS output
+- Human evaluation of real generated conversations and overlap naturalness
+- Acoustic validation across rooms, devices, distances, and background conditions
+- Separate overlap WER and diarization-error measurements
 
 ## Quick Start
 
@@ -142,14 +152,14 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Testing
 
 ```bash
-npm test                    # 74 unit tests (budget, guard, overlap, stubs, utils)
+npm test                    # 79 unit tests (audio, budget, guard, overlap, generation, stubs, utils)
 npx tsc --noEmit           # TypeScript check
 ```
 
 ## Architecture
 
 - **One process:** Next.js 15.5 serves UI, API routes, SSE, and background work
-- **SQLite via Prisma** (14 models, WAL mode)
+- **SQLite via Prisma** (11 models, WAL mode)
 - **Local filesystem** for audio assets (`/data/audio/`)
 - **SSE** with `src/lib/pubsub.ts` in-memory pub/sub, 15s heartbeat, `Last-Event-ID` reconnect
 - **Two external providers:** AssemblyAI (ASR) and OpenAI (LLM + TTS)
