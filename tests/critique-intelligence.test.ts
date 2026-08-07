@@ -117,6 +117,58 @@ describe("critique intelligence contract", () => {
     expect(question.signals?.[0].kind).toBe("question");
   });
 
+  it("requires explicit commitment language before exposing a decision", () => {
+    const text =
+      "I will prototype both recovery states by Friday so we can compare completion and privacy errors.";
+    const result = normalizeTurnAnalysis(
+      {
+        category: "actions",
+        confidence: 0.9,
+        signals: [
+          {
+            kind: "action",
+            summary: "Prototype both states",
+            sourceQuote: "I will prototype both recovery states by Friday",
+            evidenceBasis: "none",
+          },
+          {
+            kind: "decision",
+            summary: "Compare completion and privacy errors",
+            sourceQuote: "so we can compare completion and privacy errors",
+            evidenceBasis: "none",
+          },
+        ],
+      },
+      text,
+      CRITERIA,
+    );
+
+    expect(result.signals?.map((item) => item.kind)).toEqual(["action"]);
+  });
+
+  it("keeps a source-anchored decision when the turn explicitly commits", () => {
+    const text = "We agreed to use the neutral recovery state for the pilot.";
+    const result = normalizeTurnAnalysis(
+      {
+        category: "decisions",
+        confidence: 0.9,
+        signals: [
+          {
+            kind: "decision",
+            summary: "Use the neutral recovery state",
+            sourceQuote:
+              "We agreed to use the neutral recovery state for the pilot",
+            evidenceBasis: "none",
+          },
+        ],
+      },
+      text,
+      CRITERIA,
+    );
+
+    expect(result.signals?.[0].kind).toBe("decision");
+  });
+
   it("builds criterion coverage, open loops, options, decisions, and actions", () => {
     const turns = [
       turn(

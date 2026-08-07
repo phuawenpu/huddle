@@ -225,6 +225,9 @@ function normalizeSignal(
   if (!isRecord(raw) || !isOneOf(raw.kind, SIGNAL_KINDS)) return null;
   const sourceQuote = exactSourceQuote(raw.sourceQuote, turnText);
   if (!sourceQuote) return null;
+  if (raw.kind === "decision" && !hasExplicitDecisionLanguage(sourceQuote)) {
+    return null;
+  }
 
   const criterion = matchCriterion(raw.criterion, criteria);
   const basis = isOneOf(raw.evidenceBasis, EVIDENCE_BASES)
@@ -259,7 +262,11 @@ function deriveSignal(
   criteria: string[],
   confidence: number,
 ): CritiqueSignal {
-  const kind = inferSignalKind(turnText, category);
+  const inferredKind = inferSignalKind(turnText, category);
+  const kind =
+    inferredKind === "decision" && !hasExplicitDecisionLanguage(turnText)
+      ? "position"
+      : inferredKind;
   const criterion = criteria.find((candidate) =>
     mentionsCriterion(turnText, candidate),
   );
@@ -271,6 +278,20 @@ function deriveSignal(
     evidenceBasis: inferEvidenceBasis(kind, turnText),
     confidence,
   };
+}
+
+function hasExplicitDecisionLanguage(text: string): boolean {
+  const lower = cleanText(text).toLowerCase();
+  if (
+    /\b(?:no|not|without|pending|awaiting)\b.{0,24}\b(?:decision|agreement|approval)\b/.test(
+      lower,
+    )
+  ) {
+    return false;
+  }
+  return /\b(?:decid(?:e|ed)|agreed?|settled|approved?|selected?|chose|chosen|committed?|converged|the decision is|go with|move forward with|proceed with|we(?:'ll| will) (?:use|adopt|ship|choose|select|proceed)|let's (?:use|adopt|go|proceed))\b/.test(
+    lower,
+  );
 }
 
 function inferSignalKind(
