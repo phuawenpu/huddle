@@ -1,6 +1,6 @@
 # Product and investor assessment: from meeting notes to a critique ledger
 
-**Assessment date:** 2026-08-07  
+**Assessment date:** 2026-08-07
 **Evidence standard:** current product documentation, vendor pricing, the local
 research corpus, source-code audit, automated tests, and a live Fly.io probe.
 
@@ -124,10 +124,10 @@ manual notes or wait for an incumbent integration.
 Target 20–200-person product-design teams and design agencies that run recurring,
 multi-stakeholder reviews of valuable work.
 
-**Economic user:** Head of Design, DesignOps lead, or agency delivery lead.  
-**Daily champion:** design lead or facilitator.  
+**Economic user:** Head of Design, DesignOps lead, or agency delivery lead.
+**Daily champion:** design lead or facilitator.
 **Participants:** product designers, researchers, product managers, engineers,
-clients, and accessibility specialists.  
+clients, and accessibility specialists.
 **High-cost failure:** a decision is repeated, evidence is detached from the
 claim, a dissenting risk disappears, or a later revision cannot be explained.
 
