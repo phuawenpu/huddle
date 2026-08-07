@@ -1,61 +1,61 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { readFileSync, existsSync, statSync } from "fs";
+import { join } from "path";
 
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   const { id } = await context.params;
+  const isMp3 = request.url.includes(".mp3");
+  const ext = isMp3 ? "mp3" : "wav";
+
+  const assetDir = process.env.ASSET_DIR || "./data/audio";
+  const filePath = join(process.cwd(), assetDir, id, `mixed.${ext}`);
+
   try {
-    const scenario = await prisma.scenario.findUnique({ where: { id } });
-    if (!scenario) return NextResponse.json({ error: "Scenario not found" }, { status: 404 });
+    if (!existsSync(filePath)) {
+      console.error(`Mixed audio not found: ${filePath}`);
+      return NextResponse.json({ error: "Audio not synthesized yet" }, { status: 404 });
+    }
 
-    // In stub mode, generate a minimal WAV header
-    const isStub = process.env.TTS_STUB === "1";
-    const isMp3 = request.url.includes(".mp3");
+    const stat = statSync(filePath);
+    const rangeHeader = request.headers.get("range");
+    const contentType = isMp3 ? "audio/mpeg" : "audio/wav";
 
-    if (isStub) {
-      // Generate a minimal valid WAV file (1 second of silence, 16kHz mono 16-bit)
-      const sampleRate = 16000;
-      const numChannels = 1;
-      const bitsPerSample = 16;
-      const durationSec = 1;
-      const dataSize = sampleRate * numChannels * (bitsPerSample / 8) * durationSec;
-      const buffer = new ArrayBuffer(44 + dataSize);
-      const view = new DataView(buffer);
+    if (rangeHeader) {
+      const parts = rangeHeader.replace("bytes=", "").split("-");
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
+      const chunkSize = end - start + 1;
 
-      // WAV header
-      writeString(view, 0, "RIFF");
-      view.setUint32(4, 36 + dataSize, true);
-      writeString(view, 8, "WAVE");
-      writeString(view, 12, "fmt ");
-      view.setUint32(16, 16, true);
-      view.setUint16(20, 1, true); // PCM
-      view.setUint16(22, numChannels, true);
-      view.setUint32(24, sampleRate, true);
-      view.setUint32(28, sampleRate * numChannels * (bitsPerSample / 8), true);
-      view.setUint16(32, numChannels * (bitsPerSample / 8), true);
-      view.setUint16(34, bitsPerSample, true);
-      writeString(view, 36, "data");
-      view.setUint32(40, dataSize, true);
+      const buffer = readFileSync(filePath);
+      const slice = buffer.subarray(start, end + 1);
 
-      return new NextResponse(buffer, {
+      return new NextResponse(slice, {
+        status: 206,
         headers: {
-          "Content-Type": isMp3 ? "audio/mpeg" : "audio/wav",
-          "Content-Disposition": `attachment; filename="${scenario.title.replace(/[^a-zA-Z0-9]/g, "_")}.${isMp3 ? "mp3" : "wav"}"`,
+          "Content-Type": contentType,
+          "Content-Range": `bytes ${start}-${end}/${stat.size}`,
+          "Content-Length": String(chunkSize),
           "Accept-Ranges": "bytes",
+          "Cache-Control": "public, max-age=3600",
         },
       });
     }
 
-    return NextResponse.json({ error: "Mixed audio not available (TTS stub not active)" }, { status: 404 });
-  } catch {
-    return NextResponse.json({ error: "Failed to get mixed audio" }, { status: 500 });
-  }
-}
-
-function writeString(view: DataView, offset: number, str: string) {
-  for (let i = 0; i < str.length; i++) {
-    view.setUint8(offset + i, str.charCodeAt(i));
+    const buffer = readFileSync(filePath);
+    return new NextResponse(buffer, {
+      headers: {
+        "Content-Type": contentType,
+        "Content-Length": String(stat.size),
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "public, max-age=3600",
+        "Content-Disposition": `inline; filename="mixed.${ext}"`,
+      },
+    });
+  } catch (error) {
+    console.error("Error serving mixed audio:", error);
+    return NextResponse.json({ error: "Failed to serve audio" }, { status: 500 });
   }
 }
