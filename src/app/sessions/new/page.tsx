@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 type DesignThinkingPhase =
@@ -18,6 +18,22 @@ const PHASES: { value: DesignThinkingPhase; label: string }[] = [
   { value: "reflect", label: "Reflect" },
 ];
 
+interface Recording {
+  id: string;
+  title: string;
+  description: string;
+  durationMinutes: number;
+  speakerCount: number;
+  crossTalkLevel: string;
+  difficulty: string;
+  status: string;
+  speakers?: Array<{ index: number; name: string; voiceId: string }>;
+  turnCount: number;
+  mixedUrl: string | null;
+  source?: string;
+  createdAt: string;
+}
+
 export default function NewSessionPage() {
   const router = useRouter();
   const [title, setTitle] = useState("");
@@ -28,6 +44,34 @@ export default function NewSessionPage() {
   const [participants, setParticipants] = useState<string[]>(["", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  
+  // Audio upload
+  const [audioSource, setAudioSource] = useState<"mic" | "upload" | "recording">("mic");
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Recordings library
+  const [recordings, setRecordings] = useState<Recording[]>([]);
+  const [selectedRecordingId, setSelectedRecordingId] = useState<string>("");
+  const [loadingRecordings, setLoadingRecordings] = useState(false);
+
+  // Synthesize a recording from the library
+  const [synthesizingId, setSynthesizingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (audioSource === "recording") {
+      setLoadingRecordings(true);
+      fetch("/api/recordings")
+        .then(r => r.json())
+        .then(data => {
+          if (Array.isArray(data)) setRecordings(data);
+        })
+        .catch(() => {})
+        .finally(() => setLoadingRecordings(false));
+    }
+  }, [audioSource]);
 
   const updateParticipant = (idx: number, value: string) => {
     const next = [...participants];
@@ -39,9 +83,13 @@ export default function NewSessionPage() {
     const next = [...criteria];
     next[idx] = value;
     setCriteria(next);
+    
+    // Auto-add empty row if last is filled
+    if (idx === next.length - 1 && value.trim()) {
+      setCriteria([...next, ""]);
+    }
   };
 
-  const addCriterion = () => setCriteria([...criteria, ""]);
   const removeCriterion = (idx: number) => {
     if (criteria.length <= 1) return;
     setCriteria(criteria.filter((_, i) => i !== idx));
@@ -50,172 +98,308 @@ export default function NewSessionPage() {
   const handleSpeakerCountChange = (count: number) => {
     setSpeakerCount(count);
     setParticipants(prev => {
-      const next = [...prev];
-      while (next.length < count) next.push("");
-      return next.slice(0, count);
+      if (count > prev.length) {
+        return [...prev, ...Array(count - prev.length).fill("")];
+      }
+      return prev.slice(0, count);
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const validTypes = ["audio/wav", "audio/mpeg", "audio/mp4", "audio/webm", "audio/ogg"];
+      if (!validTypes.includes(file.type) && !file.name.match(/\.(wav|mp3|m4a|webm|ogg)$/i)) {
+        setError("Unsupported format. Use WAV, MP3, M4A, WebM, or OGG.");
+        return;
+      }
+      if (file.size > 500 * 1024 * 1024) {
+        setError("File too large. Max 500 MB.");
+        return;
+      }
+      setUploadedFile(file);
+      setError("");
+      setUploadProgress(`${(file.size / (1024 * 1024)).toFixed(1)} MB ready`);
+    }
+  };
+
+  const handleSynthesizeRecording = async (recordingId: string) => {
+    setSynthesizingId(recordingId);
+    try {
+      const res = await fetch(`/api/scenarios/${recordingId}/synthesize`, { method: "POST" });
+      const data = await res.json();
+      if (data.synthesized) {
+        // Refresh recordings list
+        const refreshed = await fetch("/api/recordings").then(r => r.json());
+        if (Array.isArray(refreshed)) setRecordings(refreshed);
+      }
+    } catch {
+      setError("Synthesis failed");
+    } finally {
+      setSynthesizingId(null);
+    }
+  };
+
+  const handleSubmit = async () => {
     setLoading(true);
     setError("");
 
     try {
-      const res = await fetch("/api/sessions", {
+      let scenarioId: string | null = null;
+
+      // If using a recording, we may need to synthesize it first
+      if (audioSource === "recording" && selectedRecordingId) {
+        const rec = recordings.find(r => r.id === selectedRecordingId);
+        if (rec && !rec.mixedUrl && rec.status !== "ready") {
+          // Synthesize first
+          const synRes = await fetch(`/api/scenarios/${selectedRecordingId}/synthesize`, { method: "POST" });
+          const synData = await synRes.json();
+          if (!synData.synthesized) {
+            throw new Error("Failed to synthesize recording");
+          }
+        }
+        scenarioId = selectedRecordingId;
+      }
+
+      // Handle uploaded file
+      let uploadedRecordingId: string | null = null;
+      if (audioSource === "upload" && uploadedFile) {
+        setUploading(true);
+        const formData = new FormData();
+        formData.append("file", uploadedFile);
+        formData.append("title", title || uploadedFile.name);
+
+        const uploadRes = await fetch("/api/uploads", { method: "POST", body: formData });
+        const uploadData = await uploadRes.json();
+        
+        if (uploadData.error) throw new Error(uploadData.error);
+        uploadedRecordingId = uploadData.id;
+        setUploading(false);
+      }
+
+      // Create the session
+      const sessionRes = await fetch("/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: title || "Design Critique",
-          objective,
-          phase,
-          criteria: criteria.filter(Boolean),
-          speakerCount,
-          runMode: "live",
+          title: title || "Untitled Critique",
+          objective: objective,
+          phase: phase,
+          criteria: criteria.filter(c => c.trim()),
+          speakerCount: speakerCount,
+          runMode: audioSource === "mic" ? "live" : "sim_injected",
+          scenarioId: scenarioId || uploadedRecordingId || null,
         }),
       });
 
-      if (!res.ok) throw new Error("Failed to create session");
-      const session = await res.json();
+      const sessionData = await sessionRes.json();
+      if (sessionData.error) throw new Error(sessionData.error);
 
-      // Create participants
-      for (const name of participants.filter(Boolean)) {
-        await fetch("/api/sessions/" + session.id + "/participants", {
+      // Create participants if named
+      const namedParticipants = participants.filter(p => p.trim());
+      for (const name of namedParticipants) {
+        await fetch(`/api/sessions/${sessionData.id}/participants`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ displayName: name, role: "reviewer" }),
-        }).catch(() => {});
+        });
       }
 
-      router.push(`/facilitator/${session.id}`);
-    } catch (err: any) {
-      setError(err.message || "Failed to create session");
+      router.push(`/facilitator/${sessionData.id}`);
+    } catch (e: any) {
+      setError(e.message || "Failed to create session");
     } finally {
       setLoading(false);
+      setUploading(false);
     }
   };
 
   return (
-    <main className="min-h-dvh p-4 safe-top safe-bottom safe-left safe-right">
-      <div className="max-w-lg mx-auto space-y-6">
-        <header className="flex items-center gap-3 pt-4">
-          <button
-            onClick={() => router.push("/")}
-            className="text-hud-muted hover:text-hud-text transition-colors touch-manipulation"
-            style={{ minWidth: 44, minHeight: 44 }}
-            aria-label="Back"
-          >
-            ←
+    <main className="min-h-dvh safe-top safe-bottom safe-left safe-right bg-hud-bg text-hud-text">
+      <div className="max-w-lg mx-auto p-4 space-y-6">
+        <header className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">New Critique Session</h1>
+          <button onClick={() => router.push("/")} className="text-sm text-hud-muted hover:text-hud-text">
+            ← Home
           </button>
-          <div>
-            <h1 className="text-2xl font-bold text-hud-text">New Session</h1>
-            <p className="text-hud-muted text-sm">Live critique setup</p>
-          </div>
         </header>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-hud-text mb-1">Title</label>
-            <input
-              type="text"
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder="Design Critique"
-              className="w-full px-4 py-3 bg-hud-surface border border-hud-border rounded-xl text-hud-text placeholder:text-hud-muted
-                focus:outline-none focus:border-hud-accent transition-colors"
-              style={{ minHeight: 48 }}
-            />
+        {/* Audio Source Selection */}
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-hud-muted uppercase tracking-wider">
+            Audio Source
+          </h2>
+          <div className="flex gap-2">
+            {(["mic", "upload", "recording"] as const).map(src => (
+              <button
+                key={src}
+                onClick={() => setAudioSource(src)}
+                className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-medium border transition-all touch-manipulation ${
+                  audioSource === src
+                    ? "bg-hud-accent border-hud-accent text-white"
+                    : "bg-hud-surface border-hud-border text-hud-muted hover:border-hud-accent/50"
+                }`}
+                style={{ minHeight: 44 }}
+              >
+                {src === "mic" && "🎤 Live Mic"}
+                {src === "upload" && "📁 Upload File"}
+                {src === "recording" && "📼 Past Recording"}
+              </button>
+            ))}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-hud-text mb-1">Objective</label>
-            <textarea
-              value={objective}
-              onChange={e => setObjective(e.target.value)}
-              placeholder="What are we evaluating? e.g., 'Evaluate the new user onboarding flow for clarity and completion rate.'"
-              rows={3}
-              className="w-full px-4 py-3 bg-hud-surface border border-hud-border rounded-xl text-hud-text placeholder:text-hud-muted
-                focus:outline-none focus:border-hud-accent transition-colors resize-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-hud-text mb-1">Phase</label>
-            <div className="grid grid-cols-2 gap-2">
-              {PHASES.map(p => (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => setPhase(p.value)}
-                  className={`px-4 py-3 rounded-xl text-sm font-medium border transition-all touch-manipulation
-                    ${phase === p.value
-                      ? "bg-hud-accent text-white border-hud-accent"
-                      : "bg-hud-surface text-hud-text border-hud-border hover:border-hud-accent"
-                    }`}
-                  style={{ minHeight: 44 }}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-hud-text mb-1">
-              Criteria ({criteria.filter(Boolean).length})
-            </label>
-            <div className="space-y-2">
-              {criteria.map((c, i) => (
-                <div key={i} className="flex gap-2">
-                  <input
-                    type="text"
-                    value={c}
-                    onChange={e => updateCriterion(i, e.target.value)}
-                    placeholder={`Criterion ${i + 1}`}
-                    className="flex-1 px-4 py-3 bg-hud-surface border border-hud-border rounded-xl text-hud-text placeholder:text-hud-muted
-                      focus:outline-none focus:border-hud-accent transition-colors"
-                    style={{ minHeight: 44 }}
-                  />
-                  {criteria.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeCriterion(i)}
-                      className="px-3 text-hud-muted hover:text-hud-danger transition-colors touch-manipulation"
-                      style={{ minWidth: 44, minHeight: 44 }}
-                    >
-                      ✕
-                    </button>
-                  )}
+          {/* Upload file area */}
+          {audioSource === "upload" && (
+            <div className="p-4 border-2 border-dashed border-hud-border rounded-xl bg-hud-surface/50 text-center">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="audio/wav,audio/mpeg,audio/mp4,audio/webm,audio/ogg,.wav,.mp3,.m4a,.webm,.ogg"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              {uploadedFile ? (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-green-400">✓ {uploadedFile.name}</p>
+                  <p className="text-xs text-hud-muted">{uploadProgress}</p>
+                  <button
+                    onClick={() => { setUploadedFile(null); setUploadProgress(""); }}
+                    className="text-xs text-hud-muted underline"
+                  >
+                    Remove
+                  </button>
                 </div>
-              ))}
-              {criteria.length < 3 && (
+              ) : (
                 <button
-                  type="button"
-                  onClick={addCriterion}
-                  className="text-sm text-hud-accent hover:text-hud-text transition-colors touch-manipulation"
-                  style={{ minHeight: 44 }}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="py-6 w-full text-hud-muted hover:text-hud-text transition-colors"
+                  style={{ minHeight: 80 }}
                 >
-                  + Add criterion
+                  <p className="text-lg mb-1">📁</p>
+                  <p className="text-sm">Tap to select an audio file</p>
+                  <p className="text-xs text-hud-muted mt-1">WAV, MP3, M4A, WebM, OGG — max 500 MB</p>
                 </button>
               )}
             </div>
+          )}
+
+          {/* Past recordings browser */}
+          {audioSource === "recording" && (
+            <div className="space-y-2">
+              {loadingRecordings && (
+                <p className="text-sm text-hud-muted py-4 text-center">Loading recordings…</p>
+              )}
+              {!loadingRecordings && recordings.length === 0 && (
+                <div className="p-4 border border-hud-border rounded-xl bg-hud-surface/50 text-center">
+                  <p className="text-sm text-hud-muted">No recordings yet.</p>
+                  <p className="text-xs text-hud-muted mt-1">
+                    Generate scenarios from the Scenarios page first, then synthesize them to create recordings.
+                  </p>
+                </div>
+              )}
+              <div className="max-h-64 overflow-y-auto space-y-1">
+                {recordings.map((rec) => (
+                  <button
+                    key={rec.id}
+                    onClick={() => {
+                      setSelectedRecordingId(rec.id);
+                      setTitle(rec.title);
+                      setSpeakerCount(rec.speakerCount || 4);
+                      setParticipants(Array(rec.speakerCount || 4).fill(""));
+                    }}
+                    className={`w-full text-left p-3 rounded-lg border transition-all ${
+                      selectedRecordingId === rec.id
+                        ? "border-hud-accent bg-hud-accent/10"
+                        : "border-hud-border bg-hud-surface hover:border-hud-accent/50"
+                    }`}
+                    style={{ minHeight: 44 }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{rec.title}</p>
+                        <p className="text-xs text-hud-muted">
+                          {rec.durationMinutes}min · {rec.speakerCount} speakers · {rec.turnCount} turns · {rec.crossTalkLevel}
+                          {rec.source === "upload" && " · Uploaded"}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 ml-2">
+                        {rec.mixedUrl ? (
+                          <span className="text-xs text-green-400">✓ Ready</span>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSynthesizeRecording(rec.id);
+                            }}
+                            disabled={synthesizingId === rec.id}
+                            className="text-xs px-2 py-1 rounded bg-hud-accent/20 text-hud-accent hover:bg-hud-accent/40 disabled:opacity-50"
+                          >
+                            {synthesizingId === rec.id ? "..." : "Generate Audio"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Session details */}
+        <section className="space-y-4">
+          <h2 className="text-sm font-semibold text-hud-muted uppercase tracking-wider">
+            Session Details
+          </h2>
+          
+          <div>
+            <label className="block text-xs text-hud-muted mb-1">Session Title</label>
+            <input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="e.g. Onboarding Flow Critique"
+              className="w-full bg-hud-surface border border-hud-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-hud-accent"
+              style={{ minHeight: 44 }}
+            />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-hud-text mb-1">
-              Speakers: {speakerCount}
-            </label>
+            <label className="block text-xs text-hud-muted mb-1">Design Thinking Phase</label>
+            <select
+              value={phase}
+              onChange={e => setPhase(e.target.value as DesignThinkingPhase)}
+              className="w-full bg-hud-surface border border-hud-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-hud-accent appearance-none"
+              style={{ minHeight: 44 }}
+            >
+              {PHASES.map(p => (
+                <option key={p.value} value={p.value}>{p.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs text-hud-muted mb-1">Objective</label>
+            <textarea
+              value={objective}
+              onChange={e => setObjective(e.target.value)}
+              placeholder="What is this critique trying to achieve?"
+              rows={2}
+              className="w-full bg-hud-surface border border-hud-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-hud-accent resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs text-hud-muted mb-1">Speaker Count</label>
             <div className="flex gap-2">
               {[3, 4, 5, 6].map(n => (
                 <button
                   key={n}
-                  type="button"
                   onClick={() => handleSpeakerCountChange(n)}
-                  className={`flex-1 py-3 rounded-xl text-sm font-medium border transition-all touch-manipulation
-                    ${speakerCount === n
-                      ? "bg-hud-accent text-white border-hud-accent"
-                      : "bg-hud-surface text-hud-text border-hud-border hover:border-hud-accent"
-                    }`}
+                  className={`w-12 h-11 rounded-lg text-sm font-medium border transition-all touch-manipulation ${
+                    speakerCount === n
+                      ? "bg-hud-accent border-hud-accent text-white"
+                      : "bg-hud-surface border-hud-border text-hud-muted"
+                  }`}
                   style={{ minHeight: 44 }}
                 >
                   {n}
@@ -225,40 +409,71 @@ export default function NewSessionPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-hud-text mb-1">Participants (optional)</label>
-            <div className="space-y-2">
+            <label className="block text-xs text-hud-muted mb-1">Participants (optional)</label>
+            <div className="space-y-1">
               {participants.map((name, i) => (
                 <input
                   key={i}
-                  type="text"
                   value={name}
                   onChange={e => updateParticipant(i, e.target.value)}
-                  placeholder={`Participant ${i + 1}`}
-                  className="w-full px-4 py-3 bg-hud-surface border border-hud-border rounded-xl text-hud-text placeholder:text-hud-muted
-                    focus:outline-none focus:border-hud-accent transition-colors"
+                  placeholder={`Speaker ${String.fromCharCode(65 + i)}`}
+                  className="w-full bg-hud-surface border border-hud-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-hud-accent"
                   style={{ minHeight: 44 }}
                 />
               ))}
             </div>
           </div>
 
-          {error && (
-            <div className="p-3 bg-hud-danger/10 border border-hud-danger/30 rounded-xl text-hud-danger text-sm">
-              {error}
+          <div>
+            <label className="block text-xs text-hud-muted mb-1">Success Criteria</label>
+            <div className="space-y-1">
+              {criteria.map((criterion, i) => (
+                <div key={i} className="flex gap-1">
+                  <input
+                    value={criterion}
+                    onChange={e => updateCriterion(i, e.target.value)}
+                    placeholder="e.g. All major claims are evidence-backed"
+                    className="flex-1 bg-hud-surface border border-hud-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-hud-accent"
+                    style={{ minHeight: 44 }}
+                  />
+                  {criteria.length > 1 && (
+                    <button
+                      onClick={() => removeCriterion(i)}
+                      className="w-10 h-11 flex items-center justify-center text-hud-muted hover:text-red-400 text-lg"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
-          )}
+          </div>
+        </section>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-4 bg-hud-accent text-white rounded-xl font-semibold text-lg
-              hover:bg-hud-accent-dim active:scale-[0.98] transition-all touch-manipulation
-              disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ minHeight: 56 }}
-          >
-            {loading ? "Creating…" : "Start Session"}
-          </button>
-        </form>
+        {error && (
+          <div className="p-3 bg-red-900/20 border border-red-700/50 rounded-lg text-sm text-red-300">
+            {error}
+          </div>
+        )}
+
+        <button
+          onClick={handleSubmit}
+          disabled={loading || uploading}
+          className="w-full py-3.5 bg-hud-accent text-white text-center rounded-xl font-semibold text-lg
+            hover:bg-hud-accent-dim active:scale-[0.98] transition-all touch-manipulation
+            disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{ minHeight: 56 }}
+        >
+          {uploading ? "Uploading…" : loading ? "Creating…" : audioSource === "mic" ? "🎤 Start Live Critique" : "▶ Start Critique Session"}
+        </button>
+
+        <p className="text-xs text-hud-muted text-center">
+          {audioSource === "mic"
+            ? "Browser microphone will be used for live transcription."
+            : audioSource === "upload"
+            ? "Your uploaded audio will be processed through the critique pipeline."
+            : "Selected recording will be used for playback-based critique."}
+        </p>
       </div>
     </main>
   );
