@@ -2,7 +2,7 @@
 # See https://fly.io/docs/reference/configuration/ for details
 
 app = "huddle-ti5ikw"
-primary_region = "lhr"
+primary_region = "sin"
 
 [build]
   builder = "dockerfile"
