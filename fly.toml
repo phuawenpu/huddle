@@ -5,7 +5,6 @@ app = "huddle-ti5ikw"
 primary_region = "sin"
 
 [build]
-  builder = "dockerfile"
   dockerfile = "Dockerfile"
 
 [env]
