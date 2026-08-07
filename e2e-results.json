@@ -3,12 +3,7 @@
     "argv": [
       "/.sprite/languages/node/nvm/versions/node/v24.18.0/bin/node",
       "/home/sprite/workspaces/Code-huddle/node_modules/.bin/playwright",
-      "test",
-      "e2e/critique-hud.spec.ts",
-      "--project=chromium-desktop",
-      "--retries=0",
-      "--grep",
-      "homepage loads|simulator page loads"
+      "test"
     ],
     "configFile": "/home/sprite/workspaces/Code-huddle/playwright.config.ts",
     "rootDir": "/home/sprite/workspaces/Code-huddle/e2e",
@@ -29,7 +24,7 @@
       {
         "outputDir": "/home/sprite/workspaces/Code-huddle/test-results",
         "repeatEach": 1,
-        "retries": 0,
+        "retries": 1,
         "metadata": {
           "actualWorkers": 1
         },
@@ -45,7 +40,7 @@
       {
         "outputDir": "/home/sprite/workspaces/Code-huddle/test-results",
         "repeatEach": 1,
-        "retries": 0,
+        "retries": 1,
         "metadata": {
           "actualWorkers": 1
         },
@@ -61,7 +56,7 @@
       {
         "outputDir": "/home/sprite/workspaces/Code-huddle/test-results",
         "repeatEach": 1,
-        "retries": 0,
+        "retries": 1,
         "metadata": {
           "actualWorkers": 1
         },
@@ -77,7 +72,7 @@
       {
         "outputDir": "/home/sprite/workspaces/Code-huddle/test-results",
         "repeatEach": 1,
-        "retries": 0,
+        "retries": 1,
         "metadata": {
           "actualWorkers": 1
         },
@@ -93,7 +88,7 @@
       {
         "outputDir": "/home/sprite/workspaces/Code-huddle/test-results",
         "repeatEach": 1,
-        "retries": 0,
+        "retries": 1,
         "metadata": {
           "actualWorkers": 1
         },
@@ -109,7 +104,7 @@
       {
         "outputDir": "/home/sprite/workspaces/Code-huddle/test-results",
         "repeatEach": 1,
-        "retries": 0,
+        "retries": 1,
         "metadata": {
           "actualWorkers": 1
         },
@@ -146,12 +141,7 @@
     "updateSourceMethod": "patch",
     "version": "1.62.1",
     "workers": 1,
-    "webServer": {
-      "command": "npm run dev",
-      "port": 3000,
-      "reuseExistingServer": true,
-      "timeout": 30000
-    }
+    "webServer": null
   },
   "suites": [
     {
@@ -183,12 +173,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 438,
+                      "duration": 847,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T09:31:13.853Z",
+                      "startTime": "2026-08-07T16:20:11.764Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -198,7 +188,177 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-b5d425194ce4d4e680b4",
               "file": "critique-hud.spec.ts",
-              "line": 7,
+              "line": 6,
+              "column": 7
+            },
+            {
+              "title": "homepage mobile: no horizontal overflow, touch targets ≥ 44px",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 333,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:14.187Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-40a4bf82b5892ba19f96",
+              "file": "critique-hud.spec.ts",
+              "line": 15,
+              "column": 7
+            },
+            {
+              "title": "scenario generation flow: create → generate → approve",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3446,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:14.537Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-08d583befbd2a949f212",
+              "file": "critique-hud.spec.ts",
+              "line": 42,
+              "column": 7
+            },
+            {
+              "title": "session create → facilitator page loads → display page loads",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 390,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:17.995Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-b0fc095fc7a36a40064b",
+              "file": "critique-hud.spec.ts",
+              "line": 79,
+              "column": 7
+            },
+            {
+              "title": "display page connects via SSE and shows HUD layout",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 466,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:18.400Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-4a39fc23abd4d56ee3fd",
+              "file": "critique-hud.spec.ts",
+              "line": 114,
+              "column": 7
+            },
+            {
+              "title": "scenario library page loads",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 263,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:18.879Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-0728ca5d84be79061545",
+              "file": "critique-hud.spec.ts",
+              "line": 156,
               "column": 7
             },
             {
@@ -217,12 +377,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2439,
+                      "duration": 2239,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T09:31:14.433Z",
+                      "startTime": "2026-08-07T16:20:19.155Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -232,7 +392,1613 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-856b11071c045fb8432a",
               "file": "critique-hud.spec.ts",
-              "line": 133,
+              "line": 163,
+              "column": 7
+            },
+            {
+              "title": "homepage loads and shows navigation options",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox-desktop",
+                  "projectName": "firefox-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3518,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:22.617Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-a2e6e4adb55975430f32",
+              "file": "critique-hud.spec.ts",
+              "line": 6,
+              "column": 7
+            },
+            {
+              "title": "homepage mobile: no horizontal overflow, touch targets ≥ 44px",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox-desktop",
+                  "projectName": "firefox-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 786,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:27.174Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-ff80a15595f399331bda",
+              "file": "critique-hud.spec.ts",
+              "line": 15,
+              "column": 7
+            },
+            {
+              "title": "scenario generation flow: create → generate → approve",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox-desktop",
+                  "projectName": "firefox-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3773,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:27.980Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-dd1f4b3d823b99aa6108",
+              "file": "critique-hud.spec.ts",
+              "line": 42,
+              "column": 7
+            },
+            {
+              "title": "session create → facilitator page loads → display page loads",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox-desktop",
+                  "projectName": "firefox-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 773,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:31.771Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-4fc30847fbeffb034e4e",
+              "file": "critique-hud.spec.ts",
+              "line": 79,
+              "column": 7
+            },
+            {
+              "title": "display page connects via SSE and shows HUD layout",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox-desktop",
+                  "projectName": "firefox-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 914,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:32.557Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-a9c8fcc2f2b1a1eda3a8",
+              "file": "critique-hud.spec.ts",
+              "line": 114,
+              "column": 7
+            },
+            {
+              "title": "scenario library page loads",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox-desktop",
+                  "projectName": "firefox-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 534,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:33.483Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-3cc710c678be7c7a3c1e",
+              "file": "critique-hud.spec.ts",
+              "line": 156,
+              "column": 7
+            },
+            {
+              "title": "simulator page loads for a run",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox-desktop",
+                  "projectName": "firefox-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2463,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:34.032Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-9b2e57c39253ffd0ef77",
+              "file": "critique-hud.spec.ts",
+              "line": 163,
+              "column": 7
+            },
+            {
+              "title": "homepage loads and shows navigation options",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit-desktop",
+                  "projectName": "webkit-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3062,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:38.761Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-027e40fbe9451d539642",
+              "file": "critique-hud.spec.ts",
+              "line": 6,
+              "column": 7
+            },
+            {
+              "title": "homepage mobile: no horizontal overflow, touch targets ≥ 44px",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit-desktop",
+                  "projectName": "webkit-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 775,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:44.808Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-7bc3a8fb299943330ad3",
+              "file": "critique-hud.spec.ts",
+              "line": 15,
+              "column": 7
+            },
+            {
+              "title": "scenario generation flow: create → generate → approve",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit-desktop",
+                  "projectName": "webkit-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4137,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:45.599Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-f775feefb31547df1999",
+              "file": "critique-hud.spec.ts",
+              "line": 42,
+              "column": 7
+            },
+            {
+              "title": "session create → facilitator page loads → display page loads",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit-desktop",
+                  "projectName": "webkit-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1017,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:49.752Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-3b6ddaeb384b1ec63a9d",
+              "file": "critique-hud.spec.ts",
+              "line": 79,
+              "column": 7
+            },
+            {
+              "title": "display page connects via SSE and shows HUD layout",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit-desktop",
+                  "projectName": "webkit-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1363,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:50.784Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-6349c9d8100dee8d7bf3",
+              "file": "critique-hud.spec.ts",
+              "line": 114,
+              "column": 7
+            },
+            {
+              "title": "scenario library page loads",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit-desktop",
+                  "projectName": "webkit-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 796,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:52.160Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-dd7e774bee011170edd1",
+              "file": "critique-hud.spec.ts",
+              "line": 156,
+              "column": 7
+            },
+            {
+              "title": "simulator page loads for a run",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit-desktop",
+                  "projectName": "webkit-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2665,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:52.969Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-3de4d5f5eff657d75161",
+              "file": "critique-hud.spec.ts",
+              "line": 163,
+              "column": 7
+            },
+            {
+              "title": "homepage loads and shows navigation options",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "iphone",
+                  "projectName": "iphone",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 685,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:58.002Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-38d7d72bbbc2ff6dee9c",
+              "file": "critique-hud.spec.ts",
+              "line": 6,
+              "column": 7
+            },
+            {
+              "title": "homepage mobile: no horizontal overflow, touch targets ≥ 44px",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "iphone",
+                  "projectName": "iphone",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 695,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:58.875Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-538053ff73e08ebe2458",
+              "file": "critique-hud.spec.ts",
+              "line": 15,
+              "column": 7
+            },
+            {
+              "title": "scenario generation flow: create → generate → approve",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "iphone",
+                  "projectName": "iphone",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3940,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:59.587Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-e1fdf953bef5371205a4",
+              "file": "critique-hud.spec.ts",
+              "line": 42,
+              "column": 7
+            },
+            {
+              "title": "session create → facilitator page loads → display page loads",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "iphone",
+                  "projectName": "iphone",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 909,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:03.551Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-09dc526b152092a8112b",
+              "file": "critique-hud.spec.ts",
+              "line": 79,
+              "column": 7
+            },
+            {
+              "title": "display page connects via SSE and shows HUD layout",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "iphone",
+                  "projectName": "iphone",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1065,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:04.485Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-b817f6649d94d34e8e39",
+              "file": "critique-hud.spec.ts",
+              "line": 114,
+              "column": 7
+            },
+            {
+              "title": "scenario library page loads",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "iphone",
+                  "projectName": "iphone",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 770,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:05.563Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-b97f121f81c9524a30e9",
+              "file": "critique-hud.spec.ts",
+              "line": 156,
+              "column": 7
+            },
+            {
+              "title": "simulator page loads for a run",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "iphone",
+                  "projectName": "iphone",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2622,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:06.352Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-e34f695404aced3ecaf2",
+              "file": "critique-hud.spec.ts",
+              "line": 163,
+              "column": 7
+            },
+            {
+              "title": "homepage loads and shows navigation options",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "android-phone",
+                  "projectName": "android-phone",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 474,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:11.117Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-805ec6884fb89dc2b060",
+              "file": "critique-hud.spec.ts",
+              "line": 6,
+              "column": 7
+            },
+            {
+              "title": "homepage mobile: no horizontal overflow, touch targets ≥ 44px",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "android-phone",
+                  "projectName": "android-phone",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 373,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:11.853Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-aa88fc7c02fb1c604239",
+              "file": "critique-hud.spec.ts",
+              "line": 15,
+              "column": 7
+            },
+            {
+              "title": "scenario generation flow: create → generate → approve",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "android-phone",
+                  "projectName": "android-phone",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3515,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:12.243Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-c68188b199cd0617ffb0",
+              "file": "critique-hud.spec.ts",
+              "line": 42,
+              "column": 7
+            },
+            {
+              "title": "session create → facilitator page loads → display page loads",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "android-phone",
+                  "projectName": "android-phone",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 458,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:15.779Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-4e09c95eeb20ca1bbc14",
+              "file": "critique-hud.spec.ts",
+              "line": 79,
+              "column": 7
+            },
+            {
+              "title": "display page connects via SSE and shows HUD layout",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "android-phone",
+                  "projectName": "android-phone",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 540,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:16.262Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-6f6f575a0457dc7d89cd",
+              "file": "critique-hud.spec.ts",
+              "line": 114,
+              "column": 7
+            },
+            {
+              "title": "scenario library page loads",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "android-phone",
+                  "projectName": "android-phone",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 358,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:16.813Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-9e849a274d3e1e7fe8f6",
+              "file": "critique-hud.spec.ts",
+              "line": 156,
+              "column": 7
+            },
+            {
+              "title": "simulator page loads for a run",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "android-phone",
+                  "projectName": "android-phone",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2314,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:17.185Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-83610412005bc95efa96",
+              "file": "critique-hud.spec.ts",
+              "line": 163,
+              "column": 7
+            },
+            {
+              "title": "homepage loads and shows navigation options",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "ipad",
+                  "projectName": "ipad",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 819,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:20.936Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-fbccb716df6ece812990",
+              "file": "critique-hud.spec.ts",
+              "line": 6,
+              "column": 7
+            },
+            {
+              "title": "homepage mobile: no horizontal overflow, touch targets ≥ 44px",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "ipad",
+                  "projectName": "ipad",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 784,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:21.933Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-d29bd15764c8e0c7f1a1",
+              "file": "critique-hud.spec.ts",
+              "line": 15,
+              "column": 7
+            },
+            {
+              "title": "scenario generation flow: create → generate → approve",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "ipad",
+                  "projectName": "ipad",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4022,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:22.737Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-2ddc8ada0efd3d0faa04",
+              "file": "critique-hud.spec.ts",
+              "line": 42,
+              "column": 7
+            },
+            {
+              "title": "session create → facilitator page loads → display page loads",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "ipad",
+                  "projectName": "ipad",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1005,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:26.782Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-0ea5ce5d77a1ca4e0ddc",
+              "file": "critique-hud.spec.ts",
+              "line": 79,
+              "column": 7
+            },
+            {
+              "title": "display page connects via SSE and shows HUD layout",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "ipad",
+                  "projectName": "ipad",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1214,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:27.812Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-82dadbbc814d202dce1a",
+              "file": "critique-hud.spec.ts",
+              "line": 114,
+              "column": 7
+            },
+            {
+              "title": "scenario library page loads",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "ipad",
+                  "projectName": "ipad",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 779,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:29.036Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-9821dbfb415f33ee4631",
+              "file": "critique-hud.spec.ts",
+              "line": 156,
+              "column": 7
+            },
+            {
+              "title": "simulator page loads for a run",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "ipad",
+                  "projectName": "ipad",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2605,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:29.829Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-e85d1e994f7744c9491f",
+              "file": "critique-hud.spec.ts",
+              "line": 163,
+              "column": 7
+            }
+          ]
+        },
+        {
+          "title": "Mobile-specific assertions",
+          "file": "critique-hud.spec.ts",
+          "line": 173,
+          "column": 6,
+          "specs": [
+            {
+              "title": "iPhone: safe area insets applied",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 238,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:21.410Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-8720b3409725029584e8",
+              "file": "critique-hud.spec.ts",
+              "line": 174,
+              "column": 7
+            },
+            {
+              "title": "no hover-only interactions on mobile",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 252,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:21.666Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-6ebf0cf0d73c4678617d",
+              "file": "critique-hud.spec.ts",
+              "line": 183,
+              "column": 7
+            },
+            {
+              "title": "iPhone: safe area insets applied",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox-desktop",
+                  "projectName": "firefox-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 468,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:36.513Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-4d8f92e7e7a14df7aa92",
+              "file": "critique-hud.spec.ts",
+              "line": 174,
+              "column": 7
+            },
+            {
+              "title": "no hover-only interactions on mobile",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "firefox-desktop",
+                  "projectName": "firefox-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 446,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:36.998Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-f7c6bfd74eb5e608eabd",
+              "file": "critique-hud.spec.ts",
+              "line": 183,
+              "column": 7
+            },
+            {
+              "title": "iPhone: safe area insets applied",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit-desktop",
+                  "projectName": "webkit-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 748,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:55.652Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-400ddc0aa78c4c57a071",
+              "file": "critique-hud.spec.ts",
+              "line": 174,
+              "column": 7
+            },
+            {
+              "title": "no hover-only interactions on mobile",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "webkit-desktop",
+                  "projectName": "webkit-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 750,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:20:56.414Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-e86209b06a59fbd85eec",
+              "file": "critique-hud.spec.ts",
+              "line": 183,
+              "column": 7
+            },
+            {
+              "title": "iPhone: safe area insets applied",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "iphone",
+                  "projectName": "iphone",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 665,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:08.991Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-facfdd4c89cb2f66fd12",
+              "file": "critique-hud.spec.ts",
+              "line": 174,
+              "column": 7
+            },
+            {
+              "title": "no hover-only interactions on mobile",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "iphone",
+                  "projectName": "iphone",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 708,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:09.670Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-7989951a6a7b93efa067",
+              "file": "critique-hud.spec.ts",
+              "line": 183,
+              "column": 7
+            },
+            {
+              "title": "iPhone: safe area insets applied",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "android-phone",
+                  "projectName": "android-phone",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 334,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:19.515Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-7d404c8f1b7c16d0eb3f",
+              "file": "critique-hud.spec.ts",
+              "line": 174,
+              "column": 7
+            },
+            {
+              "title": "no hover-only interactions on mobile",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "android-phone",
+                  "projectName": "android-phone",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 360,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:19.867Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-d3ac4f8afd7174925b7d",
+              "file": "critique-hud.spec.ts",
+              "line": 183,
+              "column": 7
+            },
+            {
+              "title": "iPhone: safe area insets applied",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "ipad",
+                  "projectName": "ipad",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 688,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:32.451Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-c446b2531527496d7dbb",
+              "file": "critique-hud.spec.ts",
+              "line": 174,
+              "column": 7
+            },
+            {
+              "title": "no hover-only interactions on mobile",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "ipad",
+                  "projectName": "ipad",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 757,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-08-07T16:21:33.154Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0bdf1120eeaf4284cbb7-8727423c7be8cf6d48e7",
+              "file": "critique-hud.spec.ts",
+              "line": 183,
               "column": 7
             }
           ]
@@ -242,9 +2008,9 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-08-07T09:31:13.251Z",
-    "duration": 3742.052,
-    "expected": 2,
+    "startTime": "2026-08-07T16:20:11.187Z",
+    "duration": 82853.11300000001,
+    "expected": 54,
     "skipped": 0,
     "unexpected": 0,
     "flaky": 0

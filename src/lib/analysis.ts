@@ -4,7 +4,13 @@
 // Handles batched LLM turn analysis, window analysis,
 // discussion map generation, and facilitation prompts.
 
-import type { TurnAnalysis, DiscussionCategory, SSEPatch, WindowAnalysis, PromptData } from "./types";
+import type {
+  TurnAnalysis,
+  DiscussionCategory,
+  WindowAnalysis,
+  PromptData,
+} from "./types";
+import { normalizeTurnAnalysis } from "./critique-intelligence";
 
 export interface AnalysisConfig {
   sessionObjective: string;
@@ -53,15 +59,27 @@ interface LLMWindowResponse {
  */
 export async function analyzeTurnBatch(
   turns: TurnContext[],
-  config: AnalysisConfig
+  config: AnalysisConfig,
 ): Promise<Map<string, TurnAnalysis>> {
   const isStub = process.env.LLM_STUB === "1";
-  
+
   if (isStub) {
     const { stubAnalyzeTurn } = await import("@/lib/stubs/openai");
     const results = new Map<string, TurnAnalysis>();
     for (const turn of turns) {
-      results.set(turn.id, stubAnalyzeTurn(turn.text, config.sessionObjective, [], turn.text.length));
+      results.set(
+        turn.id,
+        normalizeTurnAnalysis(
+          stubAnalyzeTurn(
+            turn.text,
+            config.sessionObjective,
+            [],
+            turn.text.length,
+          ),
+          turn.text,
+          config.sessionCriteria,
+        ),
+      );
     }
     return results;
   }
@@ -72,13 +90,25 @@ export async function analyzeTurnBatch(
     const { stubAnalyzeTurn } = await import("@/lib/stubs/openai");
     const results = new Map<string, TurnAnalysis>();
     for (const turn of turns) {
-      results.set(turn.id, stubAnalyzeTurn(turn.text, config.sessionObjective, [], turn.text.length));
+      results.set(
+        turn.id,
+        normalizeTurnAnalysis(
+          stubAnalyzeTurn(
+            turn.text,
+            config.sessionObjective,
+            [],
+            turn.text.length,
+          ),
+          turn.text,
+          config.sessionCriteria,
+        ),
+      );
     }
     return results;
   }
 
   try {
-    const turnContexts = turns.map(t => ({
+    const turnContexts = turns.map((t) => ({
       id: t.id,
       speaker: t.speakerLabel,
       text: t.text,
@@ -97,6 +127,15 @@ For each turn, determine:
 - intent: what the speaker is trying to achieve
 - stance: "supports", "opposes", "qualifies", "requests_evidence", "alternative", "neutral", "unclear"
 - theme: one-line theme summary
+- signals: at most 3 critique-relevant signals, each with:
+  - kind: "observation", "evidence", "question", "concern", "position", "alternative", "constraint", "decision", "action", or "reference"
+  - summary: a concise description of the critique move
+  - sourceQuote: an exact verbatim substring from this turn
+  - target: the design element, experience, assumption, or issue being discussed
+  - criterion: one exact criterion from the session list, or omit it
+  - stance: "supports", "challenges", "qualifies", or "neutral"
+  - evidenceBasis: "direct_observation", "reported_evidence", "inference", or "none"
+  - confidence: 0.0-1.0
 
 Return JSON: { "analyses": [{ "id": "<turn_id>", ... }] }`;
 
@@ -125,19 +164,16 @@ Return JSON: { "analyses": [{ "id": "<turn_id>", ... }] }`;
 
     const parsed = JSON.parse(content);
     const results = new Map<string, TurnAnalysis>();
-    
+
     const analyses = parsed.analyses || [];
     for (const a of analyses) {
       if (a.id) {
-        results.set(a.id, {
-          category: a.category || "themes",
-          confidence: a.confidence || 0.5,
-          evidence: a.evidence,
-          rationale: a.rationale,
-          intent: a.intent,
-          stance: a.stance,
-          theme: a.theme,
-        });
+        const sourceTurn = turns.find((turn) => turn.id === a.id);
+        if (!sourceTurn) continue;
+        results.set(
+          a.id,
+          normalizeTurnAnalysis(a, sourceTurn.text, config.sessionCriteria),
+        );
       }
     }
 
@@ -148,7 +184,19 @@ Return JSON: { "analyses": [{ "id": "<turn_id>", ... }] }`;
     const { stubAnalyzeTurn } = await import("@/lib/stubs/openai");
     const results = new Map<string, TurnAnalysis>();
     for (const turn of turns) {
-      results.set(turn.id, stubAnalyzeTurn(turn.text, config.sessionObjective, [], turn.text.length));
+      results.set(
+        turn.id,
+        normalizeTurnAnalysis(
+          stubAnalyzeTurn(
+            turn.text,
+            config.sessionObjective,
+            [],
+            turn.text.length,
+          ),
+          turn.text,
+          config.sessionCriteria,
+        ),
+      );
     }
     return results;
   }
@@ -161,10 +209,10 @@ Return JSON: { "analyses": [{ "id": "<turn_id>", ... }] }`;
 export async function analyzeWindow(
   recentTurns: TurnContext[],
   existingItems: Array<{ id: string; category: string; text: string }>,
-  config: AnalysisConfig
+  config: AnalysisConfig,
 ): Promise<WindowAnalysis> {
   const isStub = process.env.LLM_STUB === "1";
-  
+
   if (isStub || !process.env.OPENAI_API_KEY) {
     return stubWindowAnalysis(recentTurns, config);
   }
@@ -183,7 +231,7 @@ export async function analyzeWindow(
             role: "system",
             content: `Analyze this window of a Design Thinking critique discussion.
 Session: ${config.sessionObjective} (${config.sessionPhase})
-Recent turns: ${JSON.stringify(recentTurns.map(t => ({ speaker: t.speakerLabel, text: t.text, category: t.category })))}
+Recent turns: ${JSON.stringify(recentTurns.map((t) => ({ speaker: t.speakerLabel, text: t.text, category: t.category })))}
 
 Return JSON with:
 - theme: overarching theme of this window
@@ -203,7 +251,7 @@ Return JSON with:
     });
 
     if (!res.ok) throw new Error(`Window analysis failed: ${res.status}`);
-    
+
     const data = await res.json();
     return JSON.parse(data.choices?.[0]?.message?.content || "{}");
   } catch {
@@ -211,13 +259,17 @@ Return JSON with:
   }
 }
 
-function stubWindowAnalysis(turns: TurnContext[], config: AnalysisConfig): WindowAnalysis {
-  const categories = turns.map(t => t.category || "themes");
+function stubWindowAnalysis(
+  turns: TurnContext[],
+  config: AnalysisConfig,
+): WindowAnalysis {
+  const categories = turns.map((t) => t.category || "themes");
   const themeCounts: Record<string, number> = {};
   for (const c of categories) {
     themeCounts[c] = (themeCounts[c] || 0) + 1;
   }
-  const dominantTheme = Object.entries(themeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "mixed";
+  const dominantTheme =
+    Object.entries(themeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "mixed";
 
   return {
     theme: `${dominantTheme} — ${config.sessionObjective.slice(0, 50)}`,
@@ -229,7 +281,9 @@ function stubWindowAnalysis(turns: TurnContext[], config: AnalysisConfig): Windo
       decisionsAndActions: 20,
     },
     openQuestions: ["What evidence supports the main claims?"],
-    positions: turns.slice(0, 3).map(t => ({ label: t.speakerLabel, gist: t.text.slice(0, 60) })),
+    positions: turns
+      .slice(0, 3)
+      .map((t) => ({ label: t.speakerLabel, gist: t.text.slice(0, 60) })),
     decisions: [],
     actions: [],
     agreementState: "emerging",
@@ -240,15 +294,22 @@ function stubWindowAnalysis(turns: TurnContext[], config: AnalysisConfig): Windo
  * Generate a discussion map update from analyzed turns.
  */
 export function generateDiscussionMap(
-  turns: Array<TurnContext & { analysis?: TurnAnalysis }>
+  turns: Array<TurnContext & { analysis?: TurnAnalysis }>,
 ): Array<{ category: DiscussionCategory; text: string; turnIds: string[] }> {
-  const items: Array<{ category: DiscussionCategory; text: string; turnIds: string[] }> = [];
+  const items: Array<{
+    category: DiscussionCategory;
+    text: string;
+    turnIds: string[];
+  }> = [];
   const seen = new Set<string>();
 
   for (const turn of turns) {
     if (!turn.analysis?.category) continue;
     const cat = turn.analysis.category;
-    const text = turn.analysis.evidence || turn.analysis.rationale || turn.text.slice(0, 100);
+    const text =
+      turn.analysis.evidence ||
+      turn.analysis.rationale ||
+      turn.text.slice(0, 100);
     const key = `${cat}:${text.slice(0, 40)}`;
 
     if (seen.has(key)) continue;
@@ -270,7 +331,7 @@ export function generateDiscussionMap(
  */
 export function generatePrompt(
   windowAnalysis: WindowAnalysis,
-  config: AnalysisConfig
+  config: AnalysisConfig,
 ): PromptData | null {
   // Only generate prompts when there are open questions or minority positions
   if (windowAnalysis.openQuestions.length > 0) {

@@ -11,7 +11,10 @@ const HEARTBEAT_INTERVAL_MS = 15000;
  * Handles heartbeat and Last-Event-ID.
  */
 export function createSSEResponse(
-  onConnect: (send: (patch: SSEPatch, eventId?: string) => void, close: () => void) => void
+  onConnect: (
+    send: (patch: SSEPatch, eventId?: string) => void,
+    close: () => void,
+  ) => void,
 ): Response {
   let encoder = new TextEncoder();
   let stream: ReadableStream<Uint8Array>;
@@ -33,13 +36,19 @@ export function createSSEResponse(
     if (eventId) lines.push(`id: ${eventId}`);
     lines.push(`event: ${patch.type}`);
     lines.push(`data: ${JSON.stringify(patch.data)}`);
-    lines.push("");
+    // SSE events end with a blank line. A single trailing newline leaves the
+    // browser waiting for the heartbeat before it dispatches the event.
+    lines.push("", "");
     controller.enqueue(encoder.encode(lines.join("\n")));
   };
 
   const close = () => {
     closed = true;
-    try { controller.close(); } catch { /* already closed */ }
+    try {
+      controller.close();
+    } catch {
+      /* already closed */
+    }
   };
 
   // Heartbeat
@@ -99,6 +108,13 @@ export function turnUpdatedPatch(turn: unknown): SSEPatch {
  */
 export function metricsPatch(metrics: unknown): SSEPatch {
   return { type: "metrics", data: metrics };
+}
+
+/**
+ * Format a critique-intelligence update.
+ */
+export function intelligencePatch(intelligence: unknown): SSEPatch {
+  return { type: "intelligence", data: intelligence };
 }
 
 /**

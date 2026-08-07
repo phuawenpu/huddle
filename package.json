@@ -16,7 +16,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:unit": "vitest run --reporter=verbose",
-    "test:e2e": "echo 'E2E tests require Playwright — run: npx playwright test'",
+    "test:e2e": "playwright test",
     "setup": "prisma generate && prisma db push && echo 'Setup complete'"
   },
   "dependencies": {

@@ -13,12 +13,43 @@ export type ScenarioStatus =
   | "ready"
   | "approved"
   | "archived";
-export type RunStatus = "created" | "playing" | "completed" | "incomplete" | "evaluated";
+export type RunStatus =
+  "created" | "playing" | "completed" | "incomplete" | "evaluated";
 export type CrossTalkLevel = "none" | "occasional" | "frequent";
 export type Difficulty = "simple" | "realistic" | "challenging";
-export type WorkshopType = "concept_critique" | "design_review" | "retrospective" | "brainstorming" | "other";
-export type DiscussionCategory = "evidence" | "questions" | "positions" | "decisions" | "actions" | "themes";
+export type WorkshopType =
+  | "concept_critique"
+  | "design_review"
+  | "retrospective"
+  | "brainstorming"
+  | "other";
+export type DiscussionCategory =
+  "evidence" | "questions" | "positions" | "decisions" | "actions" | "themes";
 export type ParticipationProfile = "even" | "dominant_facilitator" | "mixed";
+export type CritiqueSignalKind =
+  | "observation"
+  | "evidence"
+  | "question"
+  | "concern"
+  | "position"
+  | "alternative"
+  | "constraint"
+  | "decision"
+  | "action"
+  | "reference";
+export type EvidenceBasis =
+  "direct_observation" | "reported_evidence" | "inference" | "none";
+
+export interface CritiqueSignal {
+  kind: CritiqueSignalKind;
+  summary: string;
+  sourceQuote: string;
+  target?: string;
+  criterion?: string;
+  stance?: "supports" | "challenges" | "qualifies" | "neutral";
+  evidenceBasis: EvidenceBasis;
+  confidence: number;
+}
 
 export interface TurnAnalysis {
   category: DiscussionCategory;
@@ -31,6 +62,8 @@ export interface TurnAnalysis {
   isDistortion?: boolean;
   distortionSourcePhrase?: string;
   distortionConfidence?: number;
+  signals?: CritiqueSignal[];
+  targetCriteria?: string[];
 }
 
 export interface WordsJson {
@@ -66,6 +99,7 @@ export interface TranscriptTurnData {
   participantId?: string;
   startMs: number;
   endMs: number;
+  /** Milliseconds since the ASR/session connection began (never Unix epoch). */
   receivedAtMs: number;
   originalText: string;
   currentText: string;
@@ -78,6 +112,7 @@ export interface TranscriptTurnData {
   wasSpeakerRevised: boolean;
   isManuallyCorrected: boolean;
   analysis?: TurnAnalysis;
+  /** Session-relative milliseconds, in the same clock domain as receivedAtMs. */
   analysisReceivedAtMs?: number;
 }
 
@@ -259,7 +294,17 @@ export interface ScenarioProfile {
 }
 
 export interface SSEPatch {
-  type: "turn.final" | "turn.updated" | "metrics" | "map.patch" | "prompt.show" | "prompt.clear" | "status" | "playback" | "snapshot";
+  type:
+    | "turn.final"
+    | "turn.updated"
+    | "metrics"
+    | "intelligence"
+    | "map.patch"
+    | "prompt.show"
+    | "prompt.clear"
+    | "status"
+    | "playback"
+    | "snapshot";
   data: unknown;
   id?: string;
 }
@@ -272,6 +317,33 @@ export interface SessionMetrics {
   categoryCounts: Record<string, number>;
   streamingMinutesUsed: number;
   analysisLatencyMs: number[];
+}
+
+export interface CritiqueTrace {
+  turnId: string;
+  speakerLabel: string;
+  summary: string;
+  sourceQuote: string;
+  criterion?: string;
+}
+
+export interface CriterionCoverage {
+  criterion: string;
+  status: "unaddressed" | "discussed" | "evidenced";
+  signalCount: number;
+  sourceTurnIds: string[];
+}
+
+export interface CritiqueIntelligenceSnapshot {
+  analyzedTurnCount: number;
+  lastUpdatedAtMs: number | null;
+  signalCounts: Record<CritiqueSignalKind, number>;
+  criteriaCoverage: CriterionCoverage[];
+  openLoops: CritiqueTrace[];
+  alternatives: CritiqueTrace[];
+  decisions: CritiqueTrace[];
+  actions: CritiqueTrace[];
+  evidenceGaps: CritiqueTrace[];
 }
 
 export interface TopicSuggestion {

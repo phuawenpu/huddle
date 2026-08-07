@@ -6,11 +6,22 @@
 // 5 new analyzed substantive turns.
 
 import { prisma } from "./db";
-import { analyzeTurnBatch, analyzeWindow, generateDiscussionMap, generatePrompt } from "./analysis";
+import { analyzeTurnBatch, analyzeWindow, generatePrompt } from "./analysis";
 import { publish } from "./pubsub";
-import { turnUpdatedPatch, mapPatch, promptShowPatch, metricsPatch, promptClearPatch } from "./sse";
+import {
+  turnUpdatedPatch,
+  mapPatch,
+  promptShowPatch,
+  metricsPatch,
+  intelligencePatch,
+  promptClearPatch,
+} from "./sse";
 import { checkPromptGuard } from "./guard";
 import { calculateMetrics } from "./metrics";
+import {
+  buildCritiqueIntelligence,
+  discussionItemsForAnalysis,
+} from "./critique-intelligence";
 
 const BATCH_WINDOW_MS = 1500;
 const WINDOW_INTERVAL_MS = 20000;
@@ -23,18 +34,23 @@ interface PendingTurn {
   sessionId: string;
   speakerLabel: string;
   text: string;
+  receivedAtMs: number;
+  enqueuedAtEpochMs: number;
 }
 
 // Per-session state
-const sessionQueues = new Map<string, {
-  pending: PendingTurn[];
-  timer: ReturnType<typeof setTimeout> | null;
-  windowTimer: ReturnType<typeof setInterval> | null;
-  analyzedSinceWindow: number;
-  activeAnalyses: number;
-  lastPromptId: string | null;
-  promptTimer: ReturnType<typeof setTimeout> | null;
-}>();
+const sessionQueues = new Map<
+  string,
+  {
+    pending: PendingTurn[];
+    timer: ReturnType<typeof setTimeout> | null;
+    windowTimer: ReturnType<typeof setInterval> | null;
+    analyzedSinceWindow: number;
+    activeAnalyses: number;
+    lastPromptId: string | null;
+    promptTimer: ReturnType<typeof setTimeout> | null;
+  }
+>();
 
 function getSessionQueue(sessionId: string) {
   if (!sessionQueues.has(sessionId)) {
@@ -70,7 +86,10 @@ export function startWindowAnalysis(sessionId: string): void {
   const q = getSessionQueue(sessionId);
   if (q.windowTimer) return;
 
-  q.windowTimer = setInterval(() => runWindowAnalysis(sessionId), WINDOW_INTERVAL_MS);
+  q.windowTimer = setInterval(
+    () => runWindowAnalysis(sessionId),
+    WINDOW_INTERVAL_MS,
+  );
 }
 
 /**
@@ -118,51 +137,81 @@ async function flushBatch(sessionId: string): Promise<void> {
     // Analyze turns
     const results = await Promise.race([
       analyzeTurnBatch(
-        batch.map(t => ({ id: t.id, speakerLabel: t.speakerLabel, text: t.text, isSubstantive: true })),
-        config
+        batch.map((t) => ({
+          id: t.id,
+          speakerLabel: t.speakerLabel,
+          text: t.text,
+          isSubstantive: true,
+        })),
+        config,
       ),
-      new Promise<Map<string, any>>((_, reject) => 
-        setTimeout(() => reject(new Error("Analysis timeout")), ANALYSIS_TIMEOUT_MS)
+      new Promise<Map<string, any>>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Analysis timeout")),
+          ANALYSIS_TIMEOUT_MS,
+        ),
       ),
     ]);
 
     // Store results
     for (const [turnId, analysis] of results) {
+      const pendingTurn = batch.find((turn) => turn.id === turnId);
+      const analysisLatencyMs = pendingTurn
+        ? Math.max(0, Date.now() - pendingTurn.enqueuedAtEpochMs)
+        : 0;
       await prisma.transcriptTurn.update({
         where: { id: turnId },
         data: {
           analysisJson: JSON.stringify(analysis),
-          analysisReceivedAtMs: Date.now(),
+          // Both timestamps are session-relative milliseconds. Storing epoch
+          // milliseconds in a Prisma Int overflows and makes latency invalid.
+          analysisReceivedAtMs:
+            (pendingTurn?.receivedAtMs ?? 0) + analysisLatencyMs,
         },
       });
 
-      // Update discussion items from analysis
-      const turn = batch.find(t => t.id === turnId);
-      if (turn && analysis.evidence) {
-        await prisma.discussionItem.create({
-          data: {
+      // Update discussion items from the bounded, source-linked signals.
+      const turn = batch.find((t) => t.id === turnId);
+      if (turn) {
+        const candidates = discussionItemsForAnalysis(
+          turnId,
+          analysis,
+          turn.text,
+        );
+        for (const candidate of candidates) {
+          const turnIds = JSON.stringify(candidate.turnIds);
+          const existing = await prisma.discussionItem.findFirst({
+            where: {
+              sessionId,
+              category: candidate.category,
+              text: candidate.text,
+              turnIds,
+            },
+          });
+          if (existing) continue;
+          const item = await prisma.discussionItem.create({
+            data: {
+              sessionId,
+              category: candidate.category,
+              text: candidate.text,
+              status: "open",
+              turnIds,
+            },
+          });
+          publish(
             sessionId,
-            category: analysis.category || "themes",
-            text: analysis.evidence,
-            status: "open",
-            turnIds: JSON.stringify([turnId]),
-          },
-        });
-        const items = await prisma.discussionItem.findMany({
-          where: { sessionId },
-          orderBy: { createdAt: "desc" },
-          take: 1,
-        });
-        if (items[0]) {
-          publish(sessionId, mapPatch({
-            ...items[0],
-            turnIds: safeParseJson(items[0].turnIds, []),
-          }));
+            mapPatch({
+              ...item,
+              turnIds: candidate.turnIds,
+            }),
+          );
         }
       }
 
       // Broadcast turn update with analysis
-      const updated = await prisma.transcriptTurn.findUnique({ where: { id: turnId } });
+      const updated = await prisma.transcriptTurn.findUnique({
+        where: { id: turnId },
+      });
       if (updated) {
         publish(sessionId, turnUpdatedPatch(serializeTurn(updated)));
       }
@@ -179,14 +228,26 @@ async function flushBatch(sessionId: string): Promise<void> {
     const allTurns = await prisma.transcriptTurn.findMany({
       where: { sessionId, isFinal: true },
     });
-    const metrics = calculateMetrics(allTurns.map(t => ({
-      ...t,
-      participantId: t.participantId ?? undefined,
-      wordsJson: safeParseJson(t.wordsJson, undefined),
-      analysis: safeParseJson(t.analysisJson, undefined),
-    })) as any);
+    const metrics = calculateMetrics(
+      allTurns.map((t) => ({
+        ...t,
+        participantId: t.participantId ?? undefined,
+        wordsJson: safeParseJson(t.wordsJson, undefined),
+        analysis: safeParseJson(t.analysisJson, undefined),
+      })) as any,
+    );
     publish(sessionId, metricsPatch(metrics));
-
+    const intelligence = buildCritiqueIntelligence(
+      allTurns.map((t) => ({
+        ...t,
+        participantId: t.participantId ?? undefined,
+        wordsJson: safeParseJson(t.wordsJson, undefined),
+        analysis: safeParseJson(t.analysisJson, undefined),
+        analysisReceivedAtMs: t.analysisReceivedAtMs ?? undefined,
+      })) as any,
+      config.sessionCriteria,
+    );
+    publish(sessionId, intelligencePatch(intelligence));
   } catch (err) {
     console.error("Analysis batch failed:", err);
   } finally {
@@ -204,7 +265,13 @@ async function runWindowAnalysis(sessionId: string): Promise<void> {
   try {
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
-      select: { objective: true, phase: true, criteria: true, runMode: true },
+      select: {
+        objective: true,
+        phase: true,
+        criteria: true,
+        runMode: true,
+        participants: true,
+      },
     });
     if (!session) return;
 
@@ -230,7 +297,7 @@ async function runWindowAnalysis(sessionId: string): Promise<void> {
     };
 
     const windowAnalysis = await analyzeWindow(
-      recentTurns.map(t => ({
+      recentTurns.map((t) => ({
         id: t.id,
         speakerLabel: t.providerSpeakerLabel,
         text: t.currentText,
@@ -242,34 +309,31 @@ async function runWindowAnalysis(sessionId: string): Promise<void> {
     );
 
     // Generate discussion map items from window analysis
+    const supportingTurnIds = recentTurns.map((turn) => turn.id);
     for (const decision of windowAnalysis.decisions || []) {
-      await prisma.discussionItem.create({
-        data: {
-          sessionId,
-          category: "decisions",
-          text: decision,
-          status: "open",
-          turnIds: JSON.stringify([]),
-        },
-      });
+      await persistWindowItem(
+        sessionId,
+        "decisions",
+        decision,
+        supportingTurnIds,
+      );
     }
     for (const action of windowAnalysis.actions || []) {
-      await prisma.discussionItem.create({
-        data: {
-          sessionId,
-          category: "actions",
-          text: action,
-          status: "open",
-          turnIds: JSON.stringify([]),
-        },
-      });
+      await persistWindowItem(sessionId, "actions", action, supportingTurnIds);
     }
 
     // Generate facilitation prompt
     const prompt = generatePrompt(windowAnalysis, config);
     if (prompt) {
       // Check guard
-      const guardResult = checkPromptGuard(prompt.text, [], config.sessionObjective);
+      const guardResult = checkPromptGuard(
+        prompt.text,
+        session.participants.map((participant) => ({
+          ...participant,
+          sessionId,
+        })),
+        config.sessionObjective,
+      );
       if (guardResult.allowed) {
         const promptRecord = await prisma.promptRecord.create({
           data: {
@@ -291,11 +355,14 @@ async function runWindowAnalysis(sessionId: string): Promise<void> {
         q.lastPromptId = promptRecord.id;
 
         // Show the prompt
-        publish(sessionId, promptShowPatch({
-          id: promptRecord.id,
-          text: prompt.text,
-          confidence: prompt.confidence,
-        }));
+        publish(
+          sessionId,
+          promptShowPatch({
+            id: promptRecord.id,
+            text: prompt.text,
+            confidence: prompt.confidence,
+          }),
+        );
 
         // Auto-dismiss after 15s
         if (q.promptTimer) clearTimeout(q.promptTimer);
@@ -325,10 +392,33 @@ async function runWindowAnalysis(sessionId: string): Promise<void> {
     }
 
     q.analyzedSinceWindow = 0;
-
   } catch (err) {
     console.error("Window analysis failed:", err);
   }
+}
+
+async function persistWindowItem(
+  sessionId: string,
+  category: "decisions" | "actions",
+  text: string,
+  turnIds: string[],
+): Promise<void> {
+  const normalizedText = text.trim().slice(0, 180);
+  if (!normalizedText) return;
+  const existing = await prisma.discussionItem.findFirst({
+    where: { sessionId, category, text: normalizedText },
+  });
+  if (existing) return;
+  const item = await prisma.discussionItem.create({
+    data: {
+      sessionId,
+      category,
+      text: normalizedText,
+      status: "open",
+      turnIds: JSON.stringify(turnIds),
+    },
+  });
+  publish(sessionId, mapPatch({ ...item, turnIds }));
 }
 
 function serializeTurn(t: any) {
@@ -344,5 +434,9 @@ function serializeTurn(t: any) {
 
 function safeParseJson(val: string | null, fallback: any) {
   if (!val) return fallback;
-  try { return JSON.parse(val); } catch { return fallback; }
+  try {
+    return JSON.parse(val);
+  } catch {
+    return fallback;
+  }
 }

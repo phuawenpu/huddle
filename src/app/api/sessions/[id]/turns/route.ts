@@ -11,7 +11,7 @@ let eventIdCounter = 0;
 
 export async function GET(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
   try {
@@ -19,20 +19,25 @@ export async function GET(
       where: { sessionId: id },
       orderBy: { receivedAtMs: "asc" },
     });
-    return NextResponse.json(turns.map(t => ({
-      ...t,
-      wordsJson: safeParseJson(t.wordsJson, null),
-      analysis: safeParseJson(t.analysisJson, null),
-      analysisJson: undefined,
-    })));
+    return NextResponse.json(
+      turns.map((t) => ({
+        ...t,
+        wordsJson: safeParseJson(t.wordsJson, null),
+        analysis: safeParseJson(t.analysisJson, null),
+        analysisJson: undefined,
+      })),
+    );
   } catch {
-    return NextResponse.json({ error: "Failed to fetch turns" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch turns" },
+      { status: 500 },
+    );
   }
 }
 
 export async function POST(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   const { id: sessionId } = await context.params;
   try {
@@ -51,14 +56,17 @@ export async function POST(
     if (existing) {
       if (body.isFinal && !existing.isFinal) {
         const text = body.currentText || existing.currentText;
-        const durationMs = (body.endMs || existing.endMs) - (body.startMs || existing.startMs);
-        
+        const durationMs =
+          (body.endMs || existing.endMs) - (body.startMs || existing.startMs);
+
         const updated = await prisma.transcriptTurn.update({
           where: { id: existing.id },
           data: {
             isFinal: true,
             currentText: text,
-            wordsJson: body.wordsJson ? JSON.stringify(body.wordsJson) : existing.wordsJson,
+            wordsJson: body.wordsJson
+              ? JSON.stringify(body.wordsJson)
+              : existing.wordsJson,
             endMs: body.endMs || existing.endMs,
             isSubstantive: isSubstantiveTurn(text, durationMs),
           },
@@ -67,7 +75,14 @@ export async function POST(
         broadcast(sessionId, turnUpdatedPatch(serializeTurn(updated)));
         // Enqueue if newly substantive
         if (updated.isSubstantive && updated.isFinal) {
-          enqueueTurn({ id: updated.id, sessionId, speakerLabel: updated.providerSpeakerLabel, text: updated.currentText });
+          enqueueTurn({
+            id: updated.id,
+            sessionId,
+            speakerLabel: updated.providerSpeakerLabel,
+            text: updated.currentText,
+            receivedAtMs: updated.receivedAtMs,
+            enqueuedAtEpochMs: Date.now(),
+          });
         }
         broadcastMetrics(sessionId);
         return NextResponse.json(serializeTurn(updated));
@@ -77,6 +92,7 @@ export async function POST(
 
     const text = body.currentText || body.originalText || "";
     const durationMs = (body.endMs || 0) - (body.startMs || 0);
+    const receivedAtMs = sessionRelativeMs(body.receivedAtMs, body.endMs || 0);
 
     const turn = await prisma.transcriptTurn.create({
       data: {
@@ -88,7 +104,7 @@ export async function POST(
         originalProviderSpeakerLabel: body.providerSpeakerLabel || "",
         startMs: body.startMs || 0,
         endMs: body.endMs || 0,
-        receivedAtMs: body.receivedAtMs || Date.now(),
+        receivedAtMs,
         originalText: text,
         currentText: text,
         wordsJson: body.wordsJson ? JSON.stringify(body.wordsJson) : null,
@@ -104,11 +120,18 @@ export async function POST(
 
     if (body.isFinal) {
       broadcast(sessionId, turnFinalPatch(serializeTurn(turn)));
-    // Enqueue for LLM analysis if substantive
-    if (turn.isSubstantive && turn.isFinal) {
-      enqueueTurn({ id: turn.id, sessionId, speakerLabel: turn.providerSpeakerLabel, text: turn.currentText });
-      startWindowAnalysis(sessionId);
-    }
+      // Enqueue for LLM analysis if substantive
+      if (turn.isSubstantive && turn.isFinal) {
+        enqueueTurn({
+          id: turn.id,
+          sessionId,
+          speakerLabel: turn.providerSpeakerLabel,
+          text: turn.currentText,
+          receivedAtMs: turn.receivedAtMs,
+          enqueuedAtEpochMs: Date.now(),
+        });
+        startWindowAnalysis(sessionId);
+      }
       broadcastMetrics(sessionId);
     }
 
@@ -117,7 +140,15 @@ export async function POST(
     if (error?.code === "P2002") {
       return NextResponse.json({ ingested: true, duplicate: true });
     }
-    return NextResponse.json({ error: "Failed to ingest turn" }, { status: 500 });
+    console.error("Turn ingest failed", {
+      sessionId,
+      code: error?.code,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return NextResponse.json(
+      { error: "Failed to ingest turn" },
+      { status: 500 },
+    );
   }
 }
 
@@ -130,8 +161,8 @@ async function broadcastMetrics(sessionId: string) {
     const turns = await prisma.transcriptTurn.findMany({
       where: { sessionId, isFinal: true },
     });
-    
-    const typedTurns = turns.map(t => ({
+
+    const typedTurns = turns.map((t) => ({
       ...t,
       participantId: t.participantId ?? undefined,
       wordsJson: safeParseJson(t.wordsJson, undefined) as any,
@@ -141,7 +172,9 @@ async function broadcastMetrics(sessionId: string) {
 
     const metrics = calculateMetrics(typedTurns);
     publish(sessionId, metricsPatch(metrics), String(++eventIdCounter));
-  } catch { /* metrics are best-effort */ }
+  } catch {
+    /* metrics are best-effort */
+  }
 }
 
 function serializeTurn(t: any) {
@@ -157,5 +190,19 @@ function serializeTurn(t: any) {
 
 function safeParseJson(val: string | null, fallback: any) {
   if (!val) return fallback;
-  try { return JSON.parse(val); } catch { return fallback; }
+  try {
+    return JSON.parse(val);
+  } catch {
+    return fallback;
+  }
+}
+
+function sessionRelativeMs(value: unknown, fallback: number): number {
+  const numeric = value == null ? fallback : Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0 || numeric > 2_147_483_647) {
+    throw new Error(
+      "receivedAtMs must be non-negative session-relative milliseconds",
+    );
+  }
+  return Math.round(numeric);
 }

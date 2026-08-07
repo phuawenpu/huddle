@@ -3,19 +3,20 @@ import { test, expect } from "@playwright/test";
 const SESSION_TIMEOUT = 45000;
 
 test.describe("Critique HUD — E2E", () => {
-  
   test("homepage loads and shows navigation options", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator("h1")).toContainText("Critique HUD");
-    
+
     // Three navigation links should be visible
     const links = page.locator("nav a[href]");
     await expect(links).toHaveCount(3);
   });
 
-  test("homepage mobile: no horizontal overflow, touch targets ≥ 44px", async ({ page }) => {
+  test("homepage mobile: no horizontal overflow, touch targets ≥ 44px", async ({
+    page,
+  }) => {
     await page.goto("/");
-    
+
     // Check no horizontal overflow
     const body = page.locator("body");
     const box = await body.boundingBox();
@@ -38,50 +39,66 @@ test.describe("Critique HUD — E2E", () => {
     }
   });
 
-  test("scenario generation flow: create → generate → approve", async ({ page }) => {
-    await page.goto("/scenarios/new");
-    await expect(page.locator("h1")).toContainText("Generate", { timeout: 10000 });
-    
-    // Select topic suggestion (should be loaded)
-    const chips = page.locator("button").filter({ hasText: /critique|design|review|app/i });
-    const chipCount = await chips.count();
-    if (chipCount > 0) {
-      await chips.first().click();
-    }
-    
-    // Duration is a touch-friendly segmented control, not a select.
-    await page
-      .getByText(/^Duration:/)
-      .locator("..")
-      .getByRole("button", { name: "5", exact: true })
-      .click();
-    
-    // Click generate
-    const generateBtn = page.getByRole("button", { name: "Generate Scenario" });
-    if (await generateBtn.isVisible()) {
-      await generateBtn.click();
-      // Wait for results
-      await page.waitForTimeout(3000);
-    }
-  }, SESSION_TIMEOUT);
+  test(
+    "scenario generation flow: create → generate → approve",
+    async ({ page }) => {
+      await page.goto("/scenarios/new");
+      await expect(page.locator("h1")).toContainText("Generate", {
+        timeout: 10000,
+      });
 
-  test("session create → facilitator page loads → display page loads", async ({ page }) => {
+      // Select topic suggestion (should be loaded)
+      const chips = page
+        .locator("button")
+        .filter({ hasText: /critique|design|review|app/i });
+      const chipCount = await chips.count();
+      if (chipCount > 0) {
+        await chips.first().click();
+      }
+
+      // Duration is a touch-friendly segmented control, not a select.
+      await page
+        .getByText(/^Duration:/)
+        .locator("..")
+        .getByRole("button", { name: "5", exact: true })
+        .click();
+
+      // Click generate
+      const generateBtn = page.getByRole("button", {
+        name: "Generate Scenario",
+      });
+      if (await generateBtn.isVisible()) {
+        await generateBtn.click();
+        // Wait for results
+        await page.waitForTimeout(3000);
+      }
+    },
+    SESSION_TIMEOUT,
+  );
+
+  test("session create → facilitator page loads → display page loads", async ({
+    page,
+  }) => {
     // Create a session
     await page.goto("/sessions/new");
-    await expect(page.locator("h1")).toContainText("New Critique Session", { timeout: 10000 });
-    
+    await expect(page.locator("h1")).toContainText("New Critique Session", {
+      timeout: 10000,
+    });
+
     // Fill in title
     const titleInput = page.locator("input").first();
     if (await titleInput.isVisible()) {
       await titleInput.fill("E2E Test Session");
     }
-    
+
     // Submit
-    const createBtn = page.getByRole("button", { name: /Start (Live Critique|Critique Session)/ });
+    const createBtn = page.getByRole("button", {
+      name: /Start (Live Critique|Critique Session)/,
+    });
     if (await createBtn.isVisible()) {
       await createBtn.click();
     }
-    
+
     // Should redirect to facilitator page
     await page.waitForURL(/\/facilitator\//, { timeout: 10000 });
     await expect(page.locator("h1")).toBeVisible();
@@ -94,40 +111,53 @@ test.describe("Critique HUD — E2E", () => {
     }
   });
 
-  test("display page connects via SSE and shows HUD layout", async ({ page }) => {
+  test("display page connects via SSE and shows HUD layout", async ({
+    page,
+  }) => {
     // First create a session
     await page.goto("/sessions/new");
     const titleInput = page.locator("input").first();
     if (await titleInput.isVisible()) {
       await titleInput.fill("Display Test");
     }
-    const createBtn = page.getByRole("button", { name: /Start (Live Critique|Critique Session)/ });
+    const createBtn = page.getByRole("button", {
+      name: /Start (Live Critique|Critique Session)/,
+    });
     if (await createBtn.isVisible()) {
       await createBtn.click();
     }
     await page.waitForURL(/\/facilitator\//, { timeout: 10000 });
-    
+
     // Extract session ID from URL
     const url = page.url();
     const sessionId = url.split("/facilitator/")[1]?.split(/[?#]/)[0];
-    
+
     if (sessionId) {
       // Open display in same page
       await page.goto(`/display/${sessionId}`);
       await expect(page.locator("h1")).toBeVisible({ timeout: 10000 });
-      
+
       // Should show SIMULATION badge or status indicator
       const statusIndicator = page.locator("[class*='rounded-full']").first();
       await expect(statusIndicator).toBeVisible();
-      
+
       // Should have Participation panel
-      await expect(page.getByText("Participation")).toBeVisible({ timeout: 5000 });
+      await expect(page.getByText("Participation")).toBeVisible({
+        timeout: 5000,
+      });
+      // Critique-specific intelligence is a first-class surface, not a generic summary.
+      await expect(page.getByText("Critique Radar")).toBeVisible();
+      await expect(
+        page.getByText("Source-linked signals, never participant scores"),
+      ).toBeVisible();
     }
   });
 
   test("scenario library page loads", async ({ page }) => {
     await page.goto("/scenarios");
-    await expect(page.locator("h1")).toContainText("Scenarios", { timeout: 10000 });
+    await expect(page.locator("h1")).toContainText("Scenarios", {
+      timeout: 10000,
+    });
   });
 
   test("simulator page loads for a run", async ({ page }) => {
@@ -143,7 +173,7 @@ test.describe("Critique HUD — E2E", () => {
 test.describe("Mobile-specific assertions", () => {
   test("iPhone: safe area insets applied", async ({ page }) => {
     await page.goto("/");
-    
+
     // Check that main has safe-area padding classes or styles
     const main = page.locator("main");
     const className = await main.getAttribute("class");
@@ -152,7 +182,7 @@ test.describe("Mobile-specific assertions", () => {
 
   test("no hover-only interactions on mobile", async ({ page }) => {
     await page.goto("/scenarios/new");
-    
+
     // All interactive elements should be reachable by tap
     // Verify buttons exist with sufficient size
     const buttons = page.locator("button, a[href]");

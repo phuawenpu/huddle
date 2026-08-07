@@ -2,12 +2,14 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { createSSEResponse, snapshotPatch } from "@/lib/sse";
 import { subscribe } from "@/lib/pubsub";
+import { buildCritiqueIntelligence } from "@/lib/critique-intelligence";
+import { calculateMetrics } from "@/lib/metrics";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
 
@@ -37,14 +39,23 @@ export async function GET(
           return;
         }
 
-        send(snapshotPatch(id, {
-          session: serializeSession(session),
-          participants: session.participants,
-          speakerMappings: session.speakerMappings,
-          turns: session.transcriptTurns.map(serializeTurn),
+        const serializedTurns = session.transcriptTurns.map(serializeTurn);
+        send(
+          snapshotPatch(id, {
+            session: serializeSession(session),
+            participants: session.participants,
+            speakerMappings: session.speakerMappings,
+            turns: serializedTurns,
           items: session.discussionItems.map(serializeItem),
           intent: session.intentRevisions[0] || null,
-        }), String(++sequenceId));
+          metrics: calculateMetrics(serializedTurns),
+          intelligence: buildCritiqueIntelligence(
+              serializedTurns,
+              safeParseJson(session.criteria, []),
+            ),
+          }),
+          String(++sequenceId),
+        );
       } catch {
         close();
       }
@@ -60,11 +71,19 @@ export async function GET(
 }
 
 function serializeSession(s: any) {
+  const {
+    participants,
+    speakerMappings,
+    transcriptTurns,
+    discussionItems,
+    intentRevisions,
+    ...session
+  } = s;
   return {
-    ...s,
-    criteria: safeParseJson(s.criteria, []),
-    createdAt: s.createdAt?.toISOString(),
-    updatedAt: s.updatedAt?.toISOString(),
+    ...session,
+    criteria: safeParseJson(session.criteria, []),
+    createdAt: session.createdAt?.toISOString(),
+    updatedAt: session.updatedAt?.toISOString(),
   };
 }
 
@@ -88,5 +107,9 @@ function serializeItem(i: any) {
 
 function safeParseJson(val: string | null, fallback: any) {
   if (!val) return fallback;
-  try { return JSON.parse(val); } catch { return fallback; }
+  try {
+    return JSON.parse(val);
+  } catch {
+    return fallback;
+  }
 }

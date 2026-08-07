@@ -17,29 +17,30 @@ Both modes drive the same pipeline: audio → worklet → PCM16 → ASR → tran
 
 **Active development — core live capture and natural-audio simulation are implemented; research-facing correction, provenance, injected simulation, and evaluation workflows remain partial.**
 
-| Metric | Value |
-|---|---|
-| TypeScript | 0 errors |
-| Unit tests | 79/79 passing |
-| API routes | 39 endpoints operational |
-| Frontend pages | 9 routes functional |
-| DB schema | 11 models, SQLite via Prisma |
-| Test scenarios | 11 generated and synthesized |
-| Fly.io deployment | v22, health passing |
-| API secrets | `ASSEMBLYAI_API_KEY` + `OPENAI_API_KEY` deployed |
+| Metric            | Value                                            |
+| ----------------- | ------------------------------------------------ |
+| TypeScript        | 0 errors                                         |
+| Unit tests        | 88/88 passing                                    |
+| Browser tests     | 54/54 passing across 6 desktop/mobile profiles   |
+| API routes        | 39 endpoints operational                         |
+| Frontend pages    | 9 routes functional                              |
+| DB schema         | 11 models, SQLite via Prisma                     |
+| Test scenarios    | 11 generated and synthesized                     |
+| Fly.io deployment | v22, health passing                              |
+| API secrets       | `ASSEMBLYAI_API_KEY` + `OPENAI_API_KEY` deployed |
 
 ### Build Stage Progress
 
-| Stage | Status | Summary |
-|---|---|---|
-| **1 — Speech proof** | ✅ Implemented | AudioWorklet PCM16 resampler, `useAudioCapture` hook (getUserMedia + analyser meter + settings readback), ASR WebSocket client (AssemblyAI v3 protocol), wake lock, sendBeacon termination |
-| **2 — Diarization** | 🟡 Partial | Idempotent turn ingest, provider speaker labels, mappings, and UNKNOWN display work; late SpeakerRevision persistence/correction is incomplete. |
-| **3 — Scenarios + stubs** | 🟡 Partial | ASR/LLM/TTS stubs, generated scenarios, and overlap fixtures work; sim B does not yet feed decoded audio through the worklet/ASR path. |
-| **4 — HUD** | 🟡 Partial | In-memory SSE, talk share, flat discussion items, simulation badge, and reconnect work; event replay/`Last-Event-ID` resume is not implemented. |
-| **5 — TTS + mixing** | ✅ Implemented | Cached per-turn OpenAI TTS, explicit tone fixtures in stub mode, ffmpeg overlap scheduling/mixing, WAV + MP3 output, manifests, and independent ASR validation. |
-| **6 — Critique intelligence** | 🟡 Partial | Batched turn/window analysis and discussion items work; grounding, output validation, dissent persistence, and deduplication need completion. |
-| **7 — Facilitation** | 🟡 Partial | Single-prompt restraint and a lexical guard exist; correction audit, intent revision history, participant-aware guards, and SSE propagation are incomplete. |
-| **8 — Evaluation** | 🟡 Scaffolded | Playwright E2E config (6 device profiles) and alignment utilities exist, but several reported metrics remain placeholders and real-device smoke is pending. |
+| Stage                         | Status         | Summary                                                                                                                                                                                                                                   |
+| ----------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1 — Speech proof**          | ✅ Implemented | AudioWorklet PCM16 resampler, `useAudioCapture` hook (getUserMedia + analyser meter + settings readback), ASR WebSocket client (AssemblyAI v3 protocol), wake lock, sendBeacon termination                                                |
+| **2 — Diarization**           | 🟡 Partial     | Idempotent turn ingest, provider speaker labels, mappings, and UNKNOWN display work; late SpeakerRevision persistence/correction is incomplete.                                                                                           |
+| **3 — Scenarios + stubs**     | 🟡 Partial     | ASR/LLM/TTS stubs, generated scenarios, and overlap fixtures work; sim B does not yet feed decoded audio through the worklet/ASR path.                                                                                                    |
+| **4 — HUD**                   | 🟡 Partial     | In-memory SSE, talk share, flat discussion items, simulation badge, and reconnect work; event replay/`Last-Event-ID` resume is not implemented.                                                                                           |
+| **5 — TTS + mixing**          | ✅ Implemented | Cached per-turn OpenAI TTS, explicit tone fixtures in stub mode, ffmpeg overlap scheduling/mixing, WAV + MP3 output, manifests, and independent ASR validation.                                                                           |
+| **6 — Critique intelligence** | 🟡 Partial     | Batched turn/window analysis, bounded source-quote validation, Critique Radar, criterion coverage, open loops, commitments, and deduplicated source-linked items work; cross-turn relation persistence and human disposition remain next. |
+| **7 — Facilitation**          | 🟡 Partial     | Single-prompt restraint and a lexical guard exist; correction audit, intent revision history, participant-aware guards, and SSE propagation are incomplete.                                                                               |
+| **8 — Evaluation**            | 🟡 Scaffolded  | Playwright E2E config (6 device profiles) and alignment utilities exist, but several reported metrics remain placeholders and real-device smoke is pending.                                                                               |
 
 ## Research and system-design study
 
@@ -67,13 +68,13 @@ POST /api/uploads                        — Upload audio files (WAV, MP3, M4A, 
 
 ### New Frontend Features
 
-| Page | Features |
-|---|---|
-| `/sessions/new` | Three audio source modes: Live Mic, Upload File, Past Recording. Browse and select from synthesized scenarios. |
-| `/facilitator/[sessionId]` | Full capture pipeline: mic → AudioWorklet → ASR WebSocket. Live partial transcripts, speaker mapping (A-F labels), intent editor, corrections. |
-| `/display/[sessionId]` | Live SSE-driven HUD: last 5 turns, talk-share bars, discussion map (color-coded categories), prompt banner, SIMULATION badge. |
-| `/simulator/[runId]` | Playback controller with speed control (0.5×–2.0×), progress bar, current speaker/turn display, WAV download. |
-| `/scenarios` | Library with duplicate, delete, launch-to-simulator actions. |
+| Page                       | Features                                                                                                                                                                                                        |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/sessions/new`            | Three audio source modes: Live Mic, Upload File, Past Recording. Browse and select from synthesized scenarios.                                                                                                  |
+| `/facilitator/[sessionId]` | Full capture pipeline: mic → AudioWorklet → ASR WebSocket. Live partial transcripts, speaker mapping (A-F labels), intent editor, corrections.                                                                  |
+| `/display/[sessionId]`     | Live SSE-driven HUD: last 5 turns, Critique Radar (criterion coverage, open loops, options, decisions, actions, evidence gaps), talk-share bars, source-linked discussion map, prompt banner, SIMULATION badge. |
+| `/simulator/[runId]`       | Playback controller with speed control (0.5×–2.0×), progress bar, current speaker/turn display, WAV download.                                                                                                   |
+| `/scenarios`               | Library with duplicate, delete, launch-to-simulator actions.                                                                                                                                                    |
 
 ## Known Issues
 
@@ -82,6 +83,7 @@ POST /api/uploads                        — Upload audio files (WAV, MP3, M4A, 
 **Status: acoustic playback is implemented; injected end-to-end simulation is not.**
 
 ✅ **What works:**
+
 - Real OpenAI TTS when configured; deterministic tones only in explicit stub mode
 - Cached per-turn WAV rendering and distinct voice casting
 - `ffmpeg` overlap scheduling, mixing, limiting, and WAV/MP3 output
@@ -89,6 +91,7 @@ POST /api/uploads                        — Upload audio files (WAV, MP3, M4A, 
 - HTML5 audio playback and visual turn tracking for manual sim C tests
 
 ❌ **What needs fixing:**
+
 - Sim B must decode the mixed file into the AudioWorklet and ASR WebSocket path
 - Simulator actions must persist run/playback lifecycle events
 - Browser/device playback needs a documented real-device test matrix
@@ -99,11 +102,13 @@ POST /api/uploads                        — Upload audio files (WAV, MP3, M4A, 
 **Status: deterministic stub dialogue remains mechanical.** The real scenario-generation path now prompts for conversational causality, repair, disagreement, and context-sensitive overlaps; stub mode remains a protocol fixture rather than a naturalness benchmark.
 
 ✅ **What works:**
+
 - Overlap rules enforced at generation time
 - `possibleOverlap` flag on turns
 - A basic overlap-restricted transcript proxy in evaluation
 
 ❌ **What needs fixing:**
+
 - Human evaluation of real generated conversations and overlap naturalness
 - Acoustic validation across rooms, devices, distances, and background conditions
 - Separate overlap WER and diarization-error measurements
@@ -126,34 +131,36 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Configuration
 
-| Variable | Purpose | Default |
-|---|---|---|
-| `ASSEMBLYAI_API_KEY` | AssemblyAI streaming ASR | (required for live mode) |
-| `OPENAI_API_KEY` | OpenAI for analysis, generation, TTS | (required for non-stub) |
-| `DATABASE_URL` | SQLite database path | `file:./data/app.db` |
-| `LLM_STUB` | Use deterministic stubs | `1` |
-| `TTS_STUB` | Use tone-based TTS stubs | `1` |
-| `ASR_STUB` | Use in-process ASR stub | `1` |
+| Variable             | Purpose                              | Default                  |
+| -------------------- | ------------------------------------ | ------------------------ |
+| `ASSEMBLYAI_API_KEY` | AssemblyAI streaming ASR             | (required for live mode) |
+| `OPENAI_API_KEY`     | OpenAI for analysis, generation, TTS | (required for non-stub)  |
+| `DATABASE_URL`       | SQLite database path                 | `file:./data/app.db`     |
+| `LLM_STUB`           | Use deterministic stubs              | `1`                      |
+| `TTS_STUB`           | Use tone-based TTS stubs             | `1`                      |
+| `ASR_STUB`           | Use in-process ASR stub              | `1`                      |
 
 ## Routes
 
-| Route | Purpose |
-|---|---|
-| `/` | Home — start live critique, browse scenarios |
-| `/sessions/new` | Session setup with audio source selection (mic / upload / past recording) |
-| `/facilitator/[sessionId]` | Facilitator controls, live transcript, mic capture, speaker mapping |
-| `/display/[sessionId]` | Read-only HUD with talk-share, discussion map, prompt banner |
-| `/scenarios` | Scenario library |
-| `/scenarios/new` | Generate scenario with topic suggestions |
-| `/scenarios/[scenarioId]` | Review script, synthesize audio, launch simulator |
-| `/simulator/[runId]` | Playback controller with SIMULATION badge |
-| `/runs/[runId]/results` | Evaluation results, export |
+| Route                      | Purpose                                                                   |
+| -------------------------- | ------------------------------------------------------------------------- |
+| `/`                        | Home — start live critique, browse scenarios                              |
+| `/sessions/new`            | Session setup with audio source selection (mic / upload / past recording) |
+| `/facilitator/[sessionId]` | Facilitator controls, live transcript, mic capture, speaker mapping       |
+| `/display/[sessionId]`     | Read-only HUD with talk-share, discussion map, prompt banner              |
+| `/scenarios`               | Scenario library                                                          |
+| `/scenarios/new`           | Generate scenario with topic suggestions                                  |
+| `/scenarios/[scenarioId]`  | Review script, synthesize audio, launch simulator                         |
+| `/simulator/[runId]`       | Playback controller with SIMULATION badge                                 |
+| `/runs/[runId]/results`    | Evaluation results, export                                                |
 
 ## Testing
 
 ```bash
-npm test                    # 79 unit tests (audio, budget, guard, overlap, generation, stubs, utils)
+npm test                    # 88 unit tests (including critique intelligence and SSE framing)
 npx tsc --noEmit           # TypeScript check
+npm run build              # production Next.js build
+npm run test:e2e           # 54 cases across Chromium, Firefox, WebKit, iPhone, Android, iPad
 ```
 
 ## Architecture

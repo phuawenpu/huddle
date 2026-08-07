@@ -1,14 +1,16 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const externalBaseURL = process.env.BASE_URL;
+
 export default defineConfig({
   testDir: "./e2e",
   timeout: 60000,
   retries: 1,
   workers: 1,
   reporter: [["list"], ["json", { outputFile: "e2e-results.json" }]],
-  
+
   use: {
-    baseURL: process.env.BASE_URL || "http://localhost:3000",
+    baseURL: externalBaseURL || "http://localhost:3000",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
@@ -22,10 +24,12 @@ export default defineConfig({
     { name: "ipad", use: { ...devices["iPad (gen 7)"] } },
   ],
 
-  webServer: {
-    command: "npm run dev",
-    port: 3000,
-    reuseExistingServer: !process.env.CI,
-    timeout: 30000,
-  },
+  webServer: externalBaseURL
+    ? undefined
+    : {
+        command: "npm run dev",
+        port: 3000,
+        reuseExistingServer: !process.env.CI,
+        timeout: 30000,
+      },
 });
