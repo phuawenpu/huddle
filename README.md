@@ -20,7 +20,7 @@ Both modes drive the same pipeline: audio → worklet → PCM16 → ASR → tran
 | Metric            | Value                                            |
 | ----------------- | ------------------------------------------------ |
 | TypeScript        | 0 errors                                         |
-| Unit tests        | 90/90 passing                                    |
+| Unit tests        | 91/91 passing                                    |
 | Browser tests     | 54/54 passing across 6 desktop/mobile profiles   |
 | API routes        | 39 endpoints operational                         |
 | Frontend pages    | 9 routes functional                              |
@@ -131,14 +131,16 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Configuration
 
-| Variable             | Purpose                              | Default                  |
-| -------------------- | ------------------------------------ | ------------------------ |
-| `ASSEMBLYAI_API_KEY` | AssemblyAI streaming ASR             | (required for live mode) |
-| `OPENAI_API_KEY`     | OpenAI for analysis, generation, TTS | (required for non-stub)  |
-| `DATABASE_URL`       | SQLite database path                 | `file:./data/app.db`     |
-| `LLM_STUB`           | Use deterministic stubs              | `1`                      |
-| `TTS_STUB`           | Use tone-based TTS stubs             | `1`                      |
-| `ASR_STUB`           | Use in-process ASR stub              | `1`                      |
+| Variable                    | Purpose                                  | Default                  |
+| --------------------------- | ---------------------------------------- | ------------------------ |
+| `ASSEMBLYAI_API_KEY`        | AssemblyAI streaming ASR                 | (required for live mode) |
+| `OPENAI_API_KEY`            | OpenAI for analysis, generation, TTS     | (required for non-stub)  |
+| `DATABASE_URL`              | SQLite database path                     | `file:./data/app.db`     |
+| `LLM_STUB`                  | Use deterministic stubs                  | `1`                      |
+| `ANALYSIS_TIMEOUT_MS`       | Provider deadline before safe fallback   | `12000`                  |
+| `ANALYSIS_REASONING_EFFORT` | GPT reasoning effort for live extraction | `low`                    |
+| `TTS_STUB`                  | Use tone-based TTS stubs                 | `1`                      |
+| `ASR_STUB`                  | Use in-process ASR stub                  | `1`                      |
 
 ## Routes
 
@@ -157,7 +159,7 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Testing
 
 ```bash
-npm test                    # 90 unit tests (including OpenAI request compatibility)
+npm test                    # 91 unit tests (including OpenAI deadline fallback)
 npx tsc --noEmit           # TypeScript check
 npm run build              # production Next.js build
 npm run test:e2e           # 54 cases across Chromium, Firefox, WebKit, iPhone, Android, iPad

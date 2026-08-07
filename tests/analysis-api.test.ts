@@ -72,6 +72,7 @@ describe("OpenAI analysis request compatibility", () => {
       String(fetchMock.mock.calls[0]?.[1]?.body),
     ) as Record<string, unknown>;
     expect(body.max_completion_tokens).toBe(2000);
+    expect(body.reasoning_effort).toBe("low");
     expect(body).not.toHaveProperty("max_tokens");
     expect(result.get("turn-1")?.signals).toHaveLength(1);
   });
@@ -113,6 +114,38 @@ describe("OpenAI analysis request compatibility", () => {
       String(fetchMock.mock.calls[0]?.[1]?.body),
     ) as Record<string, unknown>;
     expect(body.max_completion_tokens).toBe(1500);
+    expect(body.reasoning_effort).toBe("low");
     expect(body).not.toHaveProperty("max_tokens");
+  });
+
+  it("falls back to bounded local analysis when the provider misses its deadline", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "test-only");
+    vi.stubEnv("ANALYSIS_TIMEOUT_MS", "1000");
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      (_input, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            reject(
+              new DOMException("Analysis deadline exceeded", "AbortError"),
+            );
+          });
+        }),
+    );
+
+    const result = await analyzeTurnBatch(
+      [
+        {
+          id: "turn-timeout",
+          speakerLabel: "Speaker A",
+          text: "The data shows that users could not recover their account.",
+          isSubstantive: true,
+        },
+      ],
+      config,
+    );
+
+    expect(result.get("turn-timeout")?.category).toBe("evidence");
+    expect(result.get("turn-timeout")?.signals).not.toHaveLength(0);
   });
 });

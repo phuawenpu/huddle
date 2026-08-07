@@ -27,7 +27,6 @@ const BATCH_WINDOW_MS = 1500;
 const WINDOW_INTERVAL_MS = 20000;
 const WINDOW_TURN_THRESHOLD = 5;
 const MAX_CONCURRENCY = 2;
-const ANALYSIS_TIMEOUT_MS = 3000;
 
 interface PendingTurn {
   id: string;
@@ -135,23 +134,15 @@ async function flushBatch(sessionId: string): Promise<void> {
     };
 
     // Analyze turns
-    const results = await Promise.race([
-      analyzeTurnBatch(
-        batch.map((t) => ({
-          id: t.id,
-          speakerLabel: t.speakerLabel,
-          text: t.text,
-          isSubstantive: true,
-        })),
-        config,
-      ),
-      new Promise<Map<string, any>>((_, reject) =>
-        setTimeout(
-          () => reject(new Error("Analysis timeout")),
-          ANALYSIS_TIMEOUT_MS,
-        ),
-      ),
-    ]);
+    const results = await analyzeTurnBatch(
+      batch.map((t) => ({
+        id: t.id,
+        speakerLabel: t.speakerLabel,
+        text: t.text,
+        isSubstantive: true,
+      })),
+      config,
+    );
 
     // Store results
     for (const [turnId, analysis] of results) {

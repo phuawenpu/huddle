@@ -54,6 +54,32 @@ interface LLMWindowResponse {
   minorityPosition?: string;
 }
 
+const DEFAULT_ANALYSIS_TIMEOUT_MS = 12_000;
+
+function configuredAnalysisTimeoutMs(): number {
+  const configured = Number(process.env.ANALYSIS_TIMEOUT_MS);
+  if (!Number.isFinite(configured) || configured < 1_000) {
+    return DEFAULT_ANALYSIS_TIMEOUT_MS;
+  }
+  return Math.min(configured, 60_000);
+}
+
+async function fetchAnalysis(
+  input: string,
+  init: RequestInit,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(),
+    configuredAnalysisTimeoutMs(),
+  );
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Analyze a batch of turns using the OpenAI LLM.
  */
@@ -139,22 +165,26 @@ For each turn, determine:
 
 Return JSON: { "analyses": [{ "id": "<turn_id>", ... }] }`;
 
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+    const res = await fetchAnalysis(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: process.env.ANALYSIS_MODEL || "gpt-5-mini-2025-08-07",
+          messages: [
+            { role: "system", content: prompt },
+            { role: "user", content: JSON.stringify({ turns: turnContexts }) },
+          ],
+          response_format: { type: "json_object" },
+          max_completion_tokens: 2000,
+          reasoning_effort: process.env.ANALYSIS_REASONING_EFFORT || "low",
+        }),
       },
-      body: JSON.stringify({
-        model: process.env.ANALYSIS_MODEL || "gpt-5-mini-2025-08-07",
-        messages: [
-          { role: "system", content: prompt },
-          { role: "user", content: JSON.stringify({ turns: turnContexts }) },
-        ],
-        response_format: { type: "json_object" },
-        max_completion_tokens: 2000,
-      }),
-    });
+    );
 
     if (!res.ok) throw new Error(`OpenAI API error: ${res.status}`);
 
@@ -218,18 +248,20 @@ export async function analyzeWindow(
   }
 
   try {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: process.env.ANALYSIS_MODEL || "gpt-5-mini-2025-08-07",
-        messages: [
-          {
-            role: "system",
-            content: `Analyze this window of a Design Thinking critique discussion.
+    const res = await fetchAnalysis(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: process.env.ANALYSIS_MODEL || "gpt-5-mini-2025-08-07",
+          messages: [
+            {
+              role: "system",
+              content: `Analyze this window of a Design Thinking critique discussion.
 Session: ${config.sessionObjective} (${config.sessionPhase})
 Recent turns: ${JSON.stringify(recentTurns.map((t) => ({ speaker: t.speakerLabel, text: t.text, category: t.category })))}
 
@@ -243,12 +275,14 @@ Return JSON with:
 - actions: array of action items
 - agreementState: "consensus" | "majority" | "divided" | "emerging"
 - minorityPosition: a minority view that should be preserved, or null`,
-          },
-        ],
-        response_format: { type: "json_object" },
-        max_completion_tokens: 1500,
-      }),
-    });
+            },
+          ],
+          response_format: { type: "json_object" },
+          max_completion_tokens: 1500,
+          reasoning_effort: process.env.ANALYSIS_REASONING_EFFORT || "low",
+        }),
+      },
+    );
 
     if (!res.ok) throw new Error(`Window analysis failed: ${res.status}`);
 
