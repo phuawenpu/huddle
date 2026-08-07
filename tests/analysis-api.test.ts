@@ -133,7 +133,9 @@ describe("OpenAI analysis request compatibility", () => {
   it("falls back to bounded local analysis when the provider misses its deadline", async () => {
     vi.stubEnv("OPENAI_API_KEY", "test-only");
     vi.stubEnv("ANALYSIS_TIMEOUT_MS", "1000");
-    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const warning = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
     vi.spyOn(globalThis, "fetch").mockImplementation(
       (_input, init) =>
         new Promise<Response>((_resolve, reject) => {
@@ -159,5 +161,8 @@ describe("OpenAI analysis request compatibility", () => {
 
     expect(result.get("turn-timeout")?.category).toBe("evidence");
     expect(result.get("turn-timeout")?.signals).not.toHaveLength(0);
+    expect(warning).toHaveBeenCalledWith(
+      "Turn analysis deadline exceeded; using bounded local fallback.",
+    );
   });
 });

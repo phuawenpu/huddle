@@ -16,7 +16,11 @@ interface TranscriptTurn {
   isUnknownSpeaker: boolean;
   possibleOverlap: boolean;
   wasSpeakerRevised?: boolean;
-  analysis?: { category?: string; evidence?: string };
+  analysis?: {
+    category?: string;
+    evidence?: string;
+    signals?: Array<{ kind?: string }>;
+  };
 }
 
 interface SpeakerMapping {
@@ -276,9 +280,11 @@ export default function DisplayPage() {
                       ? "Unassigned"
                       : getSpeakerName(turn.providerSpeakerLabel)}
                   </span>
-                  {turn.analysis?.category && (
+                  {(turn.analysis?.signals?.[0]?.kind ||
+                    turn.analysis?.category) && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-hud-accent/5 text-hud-accent/60">
-                      {turn.analysis.category}
+                      {turn.analysis?.signals?.[0]?.kind ||
+                        turn.analysis?.category}
                     </span>
                   )}
                   {turn.possibleOverlap && (

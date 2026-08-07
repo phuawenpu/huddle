@@ -209,7 +209,20 @@ Return JSON: { "analyses": [{ "id": "<turn_id>", ... }] }`;
 
     return results;
   } catch (error) {
-    console.error("Turn analysis failed:", error);
+    if (
+      error instanceof Error &&
+      (error.name === "AbortError" ||
+        error.message.toLowerCase().includes("aborted"))
+    ) {
+      console.warn(
+        "Turn analysis deadline exceeded; using bounded local fallback.",
+      );
+    } else {
+      console.error(
+        "Turn analysis failed:",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
     // Fall back to stubs
     const { stubAnalyzeTurn } = await import("@/lib/stubs/openai");
     const results = new Map<string, TurnAnalysis>();

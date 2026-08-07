@@ -147,6 +147,7 @@ test.describe("Critique HUD — E2E", () => {
       });
       // Critique-specific intelligence is a first-class surface, not a generic summary.
       await expect(page.getByText("Critique Radar")).toBeVisible();
+      await expect(page.getByText("Source Map")).toBeVisible();
       await expect(
         page.getByText("Source-linked signals, never participant scores"),
       ).toBeVisible();

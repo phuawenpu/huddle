@@ -173,12 +173,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 975,
+                      "duration": 929,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:27:52.100Z",
+                      "startTime": "2026-08-07T17:36:58.950Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -207,12 +207,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 401,
+                      "duration": 320,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:27:54.757Z",
+                      "startTime": "2026-08-07T17:37:01.113Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -241,12 +241,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3498,
+                      "duration": 3454,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:27:55.175Z",
+                      "startTime": "2026-08-07T17:37:01.455Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -275,12 +275,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 471,
+                      "duration": 705,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:27:58.685Z",
+                      "startTime": "2026-08-07T17:37:04.936Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -309,12 +309,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 486,
+                      "duration": 520,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:27:59.173Z",
+                      "startTime": "2026-08-07T17:37:05.654Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -343,12 +343,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 268,
+                      "duration": 260,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:27:59.674Z",
+                      "startTime": "2026-08-07T17:37:06.187Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -358,7 +358,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-0728ca5d84be79061545",
               "file": "critique-hud.spec.ts",
-              "line": 156,
+              "line": 157,
               "column": 7
             },
             {
@@ -377,12 +377,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2234,
+                      "duration": 2227,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:27:59.955Z",
+                      "startTime": "2026-08-07T17:37:06.459Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -392,7 +392,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-856b11071c045fb8432a",
               "file": "critique-hud.spec.ts",
-              "line": 163,
+              "line": 164,
               "column": 7
             },
             {
@@ -411,12 +411,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2395,
+                      "duration": 2908,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:03.420Z",
+                      "startTime": "2026-08-07T17:37:09.940Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -445,12 +445,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 834,
+                      "duration": 779,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:09.332Z",
+                      "startTime": "2026-08-07T17:37:15.963Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -479,12 +479,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3737,
+                      "duration": 3761,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:10.180Z",
+                      "startTime": "2026-08-07T17:37:16.759Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -513,12 +513,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 846,
+                      "duration": 937,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:13.932Z",
+                      "startTime": "2026-08-07T17:37:20.537Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -547,12 +547,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 926,
+                      "duration": 925,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:14.794Z",
+                      "startTime": "2026-08-07T17:37:21.489Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -581,12 +581,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 527,
+                      "duration": 477,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:15.736Z",
+                      "startTime": "2026-08-07T17:37:22.428Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -596,7 +596,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-3cc710c678be7c7a3c1e",
               "file": "critique-hud.spec.ts",
-              "line": 156,
+              "line": 157,
               "column": 7
             },
             {
@@ -615,12 +615,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2741,
+                      "duration": 2494,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:16.275Z",
+                      "startTime": "2026-08-07T17:37:22.919Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -630,7 +630,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-9b2e57c39253ffd0ef77",
               "file": "critique-hud.spec.ts",
-              "line": 163,
+              "line": 164,
               "column": 7
             },
             {
@@ -649,12 +649,12 @@
                       "workerIndex": 2,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2501,
+                      "duration": 1906,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:21.760Z",
+                      "startTime": "2026-08-07T17:37:27.728Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -683,12 +683,12 @@
                       "workerIndex": 2,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1384,
+                      "duration": 1298,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:29.250Z",
+                      "startTime": "2026-08-07T17:37:31.361Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -717,12 +717,12 @@
                       "workerIndex": 2,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 4074,
+                      "duration": 4030,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:30.655Z",
+                      "startTime": "2026-08-07T17:37:32.677Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -751,12 +751,12 @@
                       "workerIndex": 2,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1046,
+                      "duration": 1027,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:34.747Z",
+                      "startTime": "2026-08-07T17:37:36.725Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -785,12 +785,12 @@
                       "workerIndex": 2,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1149,
+                      "duration": 1283,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:35.809Z",
+                      "startTime": "2026-08-07T17:37:37.767Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -819,12 +819,12 @@
                       "workerIndex": 2,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 734,
+                      "duration": 769,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:36.970Z",
+                      "startTime": "2026-08-07T17:37:39.066Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -834,7 +834,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-dd7e774bee011170edd1",
               "file": "critique-hud.spec.ts",
-              "line": 156,
+              "line": 157,
               "column": 7
             },
             {
@@ -853,12 +853,12 @@
                       "workerIndex": 2,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2615,
+                      "duration": 2667,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:37.718Z",
+                      "startTime": "2026-08-07T17:37:39.849Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -868,7 +868,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-3de4d5f5eff657d75161",
               "file": "critique-hud.spec.ts",
-              "line": 163,
+              "line": 164,
               "column": 7
             },
             {
@@ -887,12 +887,12 @@
                       "workerIndex": 3,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 649,
+                      "duration": 669,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:42.579Z",
+                      "startTime": "2026-08-07T17:37:44.734Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -921,12 +921,12 @@
                       "workerIndex": 3,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 716,
+                      "duration": 762,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:43.427Z",
+                      "startTime": "2026-08-07T17:37:45.627Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -955,12 +955,12 @@
                       "workerIndex": 3,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3894,
+                      "duration": 3846,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:44.160Z",
+                      "startTime": "2026-08-07T17:37:46.407Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -989,12 +989,12 @@
                       "workerIndex": 3,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 869,
+                      "duration": 913,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:48.082Z",
+                      "startTime": "2026-08-07T17:37:50.275Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1023,12 +1023,12 @@
                       "workerIndex": 3,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1359,
+                      "duration": 1172,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:48.973Z",
+                      "startTime": "2026-08-07T17:37:51.205Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1057,12 +1057,12 @@
                       "workerIndex": 3,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 787,
+                      "duration": 666,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:50.346Z",
+                      "startTime": "2026-08-07T17:37:52.389Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1072,7 +1072,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-b97f121f81c9524a30e9",
               "file": "critique-hud.spec.ts",
-              "line": 156,
+              "line": 157,
               "column": 7
             },
             {
@@ -1091,12 +1091,12 @@
                       "workerIndex": 3,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2574,
+                      "duration": 2596,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:51.148Z",
+                      "startTime": "2026-08-07T17:37:53.072Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1106,7 +1106,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-e34f695404aced3ecaf2",
               "file": "critique-hud.spec.ts",
-              "line": 163,
+              "line": 164,
               "column": 7
             },
             {
@@ -1125,12 +1125,12 @@
                       "workerIndex": 4,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 661,
+                      "duration": 489,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:55.898Z",
+                      "startTime": "2026-08-07T17:37:57.890Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1159,12 +1159,12 @@
                       "workerIndex": 4,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 401,
+                      "duration": 449,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:57.041Z",
+                      "startTime": "2026-08-07T17:37:58.857Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1193,12 +1193,12 @@
                       "workerIndex": 4,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3663,
+                      "duration": 3619,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:57.459Z",
+                      "startTime": "2026-08-07T17:37:59.323Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1227,12 +1227,12 @@
                       "workerIndex": 4,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 688,
+                      "duration": 456,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:29:01.143Z",
+                      "startTime": "2026-08-07T17:38:02.966Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1261,12 +1261,12 @@
                       "workerIndex": 4,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1240,
+                      "duration": 559,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:29:01.843Z",
+                      "startTime": "2026-08-07T17:38:03.447Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1295,12 +1295,12 @@
                       "workerIndex": 4,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 397,
+                      "duration": 346,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:29:03.097Z",
+                      "startTime": "2026-08-07T17:38:04.019Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1310,7 +1310,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-9e849a274d3e1e7fe8f6",
               "file": "critique-hud.spec.ts",
-              "line": 156,
+              "line": 157,
               "column": 7
             },
             {
@@ -1329,12 +1329,12 @@
                       "workerIndex": 4,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2315,
+                      "duration": 2350,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:29:03.507Z",
+                      "startTime": "2026-08-07T17:38:04.381Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1344,7 +1344,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-83610412005bc95efa96",
               "file": "critique-hud.spec.ts",
-              "line": 163,
+              "line": 164,
               "column": 7
             },
             {
@@ -1363,12 +1363,12 @@
                       "workerIndex": 5,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 807,
+                      "duration": 724,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:29:07.508Z",
+                      "startTime": "2026-08-07T17:38:08.272Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1397,12 +1397,12 @@
                       "workerIndex": 5,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 805,
+                      "duration": 796,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:29:08.537Z",
+                      "startTime": "2026-08-07T17:38:09.206Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1431,12 +1431,12 @@
                       "workerIndex": 5,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3922,
+                      "duration": 3914,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:29:09.361Z",
+                      "startTime": "2026-08-07T17:38:10.020Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1465,12 +1465,12 @@
                       "workerIndex": 5,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 988,
+                      "duration": 968,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:29:13.306Z",
+                      "startTime": "2026-08-07T17:38:13.955Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1499,12 +1499,12 @@
                       "workerIndex": 5,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1143,
+                      "duration": 1166,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:29:14.309Z",
+                      "startTime": "2026-08-07T17:38:14.943Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1533,12 +1533,12 @@
                       "workerIndex": 5,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 767,
+                      "duration": 754,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:29:15.464Z",
+                      "startTime": "2026-08-07T17:38:16.120Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1548,7 +1548,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-9821dbfb415f33ee4631",
               "file": "critique-hud.spec.ts",
-              "line": 156,
+              "line": 157,
               "column": 7
             },
             {
@@ -1567,12 +1567,12 @@
                       "workerIndex": 5,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2642,
+                      "duration": 2615,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:29:16.245Z",
+                      "startTime": "2026-08-07T17:38:16.888Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1582,7 +1582,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-e85d1e994f7744c9491f",
               "file": "critique-hud.spec.ts",
-              "line": 163,
+              "line": 164,
               "column": 7
             }
           ]
@@ -1590,7 +1590,7 @@
         {
           "title": "Mobile-specific assertions",
           "file": "critique-hud.spec.ts",
-          "line": 173,
+          "line": 174,
           "column": 6,
           "specs": [
             {
@@ -1609,12 +1609,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 241,
+                      "duration": 243,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:02.207Z",
+                      "startTime": "2026-08-07T17:37:08.700Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1624,7 +1624,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-8720b3409725029584e8",
               "file": "critique-hud.spec.ts",
-              "line": 174,
+              "line": 175,
               "column": 7
             },
             {
@@ -1643,12 +1643,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 255,
+                      "duration": 271,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:02.466Z",
+                      "startTime": "2026-08-07T17:37:08.961Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1658,7 +1658,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-6ebf0cf0d73c4678617d",
               "file": "critique-hud.spec.ts",
-              "line": 183,
+              "line": 184,
               "column": 7
             },
             {
@@ -1677,12 +1677,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 462,
+                      "duration": 539,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:19.029Z",
+                      "startTime": "2026-08-07T17:37:25.431Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1692,7 +1692,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-4d8f92e7e7a14df7aa92",
               "file": "critique-hud.spec.ts",
-              "line": 174,
+              "line": 175,
               "column": 7
             },
             {
@@ -1711,12 +1711,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 458,
+                      "duration": 461,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:19.504Z",
+                      "startTime": "2026-08-07T17:37:25.989Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1726,7 +1726,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-f7c6bfd74eb5e608eabd",
               "file": "critique-hud.spec.ts",
-              "line": 183,
+              "line": 184,
               "column": 7
             },
             {
@@ -1745,12 +1745,12 @@
                       "workerIndex": 2,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 693,
+                      "duration": 718,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:40.349Z",
+                      "startTime": "2026-08-07T17:37:42.531Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1760,7 +1760,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-400ddc0aa78c4c57a071",
               "file": "critique-hud.spec.ts",
-              "line": 174,
+              "line": 175,
               "column": 7
             },
             {
@@ -1779,12 +1779,12 @@
                       "workerIndex": 2,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 763,
+                      "duration": 757,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:41.059Z",
+                      "startTime": "2026-08-07T17:37:43.263Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1794,7 +1794,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-e86209b06a59fbd85eec",
               "file": "critique-hud.spec.ts",
-              "line": 183,
+              "line": 184,
               "column": 7
             },
             {
@@ -1813,12 +1813,12 @@
                       "workerIndex": 3,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 652,
+                      "duration": 660,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:53.739Z",
+                      "startTime": "2026-08-07T17:37:55.684Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1828,7 +1828,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-facfdd4c89cb2f66fd12",
               "file": "critique-hud.spec.ts",
-              "line": 174,
+              "line": 175,
               "column": 7
             },
             {
@@ -1847,12 +1847,12 @@
                       "workerIndex": 3,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 702,
+                      "duration": 728,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:28:54.409Z",
+                      "startTime": "2026-08-07T17:37:56.362Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1862,7 +1862,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-7989951a6a7b93efa067",
               "file": "critique-hud.spec.ts",
-              "line": 183,
+              "line": 184,
               "column": 7
             },
             {
@@ -1881,12 +1881,12 @@
                       "workerIndex": 4,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 297,
+                      "duration": 419,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:29:05.838Z",
+                      "startTime": "2026-08-07T17:38:06.748Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1896,7 +1896,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-7d404c8f1b7c16d0eb3f",
               "file": "critique-hud.spec.ts",
-              "line": 174,
+              "line": 175,
               "column": 7
             },
             {
@@ -1915,12 +1915,12 @@
                       "workerIndex": 4,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 350,
+                      "duration": 380,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:29:06.153Z",
+                      "startTime": "2026-08-07T17:38:07.185Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1930,7 +1930,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-d3ac4f8afd7174925b7d",
               "file": "critique-hud.spec.ts",
-              "line": 183,
+              "line": 184,
               "column": 7
             },
             {
@@ -1949,12 +1949,12 @@
                       "workerIndex": 5,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 696,
+                      "duration": 805,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:29:18.903Z",
+                      "startTime": "2026-08-07T17:38:19.519Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1964,7 +1964,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-c446b2531527496d7dbb",
               "file": "critique-hud.spec.ts",
-              "line": 174,
+              "line": 175,
               "column": 7
             },
             {
@@ -1983,12 +1983,12 @@
                       "workerIndex": 5,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 836,
+                      "duration": 842,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-08-07T17:29:19.616Z",
+                      "startTime": "2026-08-07T17:38:20.339Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1998,7 +1998,7 @@
               ],
               "id": "0bdf1120eeaf4284cbb7-8727423c7be8cf6d48e7",
               "file": "critique-hud.spec.ts",
-              "line": 183,
+              "line": 184,
               "column": 7
             }
           ]
@@ -2008,8 +2008,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-08-07T17:27:51.491Z",
-    "duration": 89111.144,
+    "startTime": "2026-08-07T17:36:57.970Z",
+    "duration": 83340.969,
     "expected": 54,
     "skipped": 0,
     "unexpected": 0,
