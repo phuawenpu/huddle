@@ -72,7 +72,7 @@ describe("OpenAI analysis request compatibility", () => {
       String(fetchMock.mock.calls[0]?.[1]?.body),
     ) as Record<string, unknown>;
     expect(body.max_completion_tokens).toBe(2000);
-    expect(body.reasoning_effort).toBe("low");
+    expect(body.reasoning_effort).toBe("minimal");
     expect(body).not.toHaveProperty("max_tokens");
     expect(result.get("turn-1")?.signals).toHaveLength(1);
   });
@@ -114,7 +114,7 @@ describe("OpenAI analysis request compatibility", () => {
       String(fetchMock.mock.calls[0]?.[1]?.body),
     ) as Record<string, unknown>;
     expect(body.max_completion_tokens).toBe(1500);
-    expect(body.reasoning_effort).toBe("low");
+    expect(body.reasoning_effort).toBe("minimal");
     expect(body).not.toHaveProperty("max_tokens");
   });
 

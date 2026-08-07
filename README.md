@@ -15,7 +15,7 @@ Both modes drive the same pipeline: audio → worklet → PCM16 → ASR → tran
 
 ## Current Status
 
-**Active development — core live capture and natural-audio simulation are implemented; research-facing correction, provenance, injected simulation, and evaluation workflows remain partial.**
+**Active development — core live capture, natural-audio simulation, and source-linked critique extraction are implemented; human disposition, artifact revision linkage, and production governance remain next.**
 
 | Metric            | Value                                            |
 | ----------------- | ------------------------------------------------ |
@@ -26,8 +26,9 @@ Both modes drive the same pipeline: audio → worklet → PCM16 → ASR → tran
 | Frontend pages    | 9 routes functional                              |
 | DB schema         | 11 models, SQLite via Prisma                     |
 | Test scenarios    | 11 generated and synthesized                     |
-| Fly.io deployment | v22, health passing                              |
+| Fly.io deployment | health passing                                   |
 | API secrets       | `ASSEMBLYAI_API_KEY` + `OPENAI_API_KEY` deployed |
+| Dependency audit  | 3 high transitive findings; major fix pending    |
 
 ### Build Stage Progress
 
@@ -52,6 +53,9 @@ The research papers in `workspace/`, the current implementation, and adjacent 20
 - [Online novelty landscape](docs/research/03-novelty-landscape.md)
 - [Seven system versions](docs/research/04-system-versions.md)
 - [Evaluation roadmap](docs/research/05-evaluation-roadmap.md)
+- [Product and investor assessment](docs/research/06-product-and-investor-assessment.md)
+- [Critique Intelligence System — 11-page diagram PDF](docs/research/critique-intelligence-system-2026-08-07.pdf)
+- [Diagram generator](docs/research/generate_critique_intelligence_system.py)
 - [Archived conceptual diagram set](docs/research/archive/diagrams-2026-08-07/)
 
 ### New API Endpoints (since prototype)
@@ -77,6 +81,16 @@ POST /api/uploads                        — Upload audio files (WAV, MP3, M4A, 
 | `/scenarios`               | Library with duplicate, delete, launch-to-simulator actions.                                                                                                                                                    |
 
 ## Known Issues
+
+### ⚠ Production dependency gate
+
+Compatible updates moved Next.js to 15.5.23, Prisma to 6.19.3, and `ws` to
+8.21.3, reducing the production audit from six high-severity findings to three.
+`npm audit --omit=dev` still traces those three findings through Next.js
+transitive PostCSS and Sharp packages; its advertised automated remediation is
+a Next.js 16 major upgrade. That migration is intentionally not folded into
+this feature/research phase and remains required before treating the deployment
+as production-secure.
 
 ### ⚠ Simulation Path
 
@@ -138,7 +152,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `DATABASE_URL`              | SQLite database path                     | `file:./data/app.db`     |
 | `LLM_STUB`                  | Use deterministic stubs                  | `1`                      |
 | `ANALYSIS_TIMEOUT_MS`       | Provider deadline before safe fallback   | `12000`                  |
-| `ANALYSIS_REASONING_EFFORT` | GPT reasoning effort for live extraction | `low`                    |
+| `ANALYSIS_REASONING_EFFORT` | GPT reasoning effort for live extraction | `minimal`                |
 | `TTS_STUB`                  | Use tone-based TTS stubs                 | `1`                      |
 | `ASR_STUB`                  | Use in-process ASR stub                  | `1`                      |
 

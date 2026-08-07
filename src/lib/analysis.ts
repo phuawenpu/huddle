@@ -181,7 +181,7 @@ Return JSON: { "analyses": [{ "id": "<turn_id>", ... }] }`;
           ],
           response_format: { type: "json_object" },
           max_completion_tokens: 2000,
-          reasoning_effort: process.env.ANALYSIS_REASONING_EFFORT || "low",
+          reasoning_effort: process.env.ANALYSIS_REASONING_EFFORT || "minimal",
         }),
       },
     );
@@ -279,7 +279,7 @@ Return JSON with:
           ],
           response_format: { type: "json_object" },
           max_completion_tokens: 1500,
-          reasoning_effort: process.env.ANALYSIS_REASONING_EFFORT || "low",
+          reasoning_effort: process.env.ANALYSIS_REASONING_EFFORT || "minimal",
         }),
       },
     );
