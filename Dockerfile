@@ -21,18 +21,20 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-
-# Copy prisma CLI and regenerate client for production
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder /app/node_modules/@prisma/engines ./node_modules/@prisma/engines
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/package.json ./package.json
 
 RUN mkdir -p /data/audio /data/ir
 RUN chown -R nextjs:nodejs /app /data
+
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
 
 USER nextjs
 EXPOSE 3000
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV DATABASE_URL=file:/data/app.db
 
-# Startup script: init DB, then start server
-CMD sh -c "npx prisma db push --skip-generate && node server.js"
+CMD ["/app/start.sh"]
