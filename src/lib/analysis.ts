@@ -152,7 +152,7 @@ Return JSON: { "analyses": [{ "id": "<turn_id>", ... }] }`;
           { role: "user", content: JSON.stringify({ turns: turnContexts }) },
         ],
         response_format: { type: "json_object" },
-        max_tokens: 2000,
+        max_completion_tokens: 2000,
       }),
     });
 
@@ -246,7 +246,7 @@ Return JSON with:
           },
         ],
         response_format: { type: "json_object" },
-        max_tokens: 1500,
+        max_completion_tokens: 1500,
       }),
     });
 

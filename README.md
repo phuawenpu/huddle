@@ -20,7 +20,7 @@ Both modes drive the same pipeline: audio → worklet → PCM16 → ASR → tran
 | Metric            | Value                                            |
 | ----------------- | ------------------------------------------------ |
 | TypeScript        | 0 errors                                         |
-| Unit tests        | 88/88 passing                                    |
+| Unit tests        | 90/90 passing                                    |
 | Browser tests     | 54/54 passing across 6 desktop/mobile profiles   |
 | API routes        | 39 endpoints operational                         |
 | Frontend pages    | 9 routes functional                              |
@@ -157,7 +157,7 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Testing
 
 ```bash
-npm test                    # 88 unit tests (including critique intelligence and SSE framing)
+npm test                    # 90 unit tests (including OpenAI request compatibility)
 npx tsc --noEmit           # TypeScript check
 npm run build              # production Next.js build
 npm run test:e2e           # 54 cases across Chromium, Firefox, WebKit, iPhone, Android, iPad
