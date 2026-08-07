@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAudioCapture } from "@/lib/client/audio-capture";
 import { createASRClient, type ASRClient, type IngestTurnData } from "@/lib/client/asr-client";
 import { useWakeLock } from "@/lib/client/wake-lock";
+import { AudioVisualizer } from "@/lib/client/audio-visualizer";
 
 interface SessionData {
   id: string;
@@ -73,7 +74,7 @@ export default function FacilitatorPage() {
   const pcm16CountRef = useRef(0);
 
   // Audio capture hook
-  const { start: startCapture, stop: stopCapture, isCapturing, settings, meter, error: captureError, workletLoaded } = 
+  const { start: startCapture, stop: stopCapture, isCapturing, settings, meter, error: captureError, workletLoaded, analyserNode } = 
     useAudioCapture({
       onPcm16: (buffer: ArrayBuffer, frameIndex: number) => {
         asrRef.current?.sendAudio(buffer);

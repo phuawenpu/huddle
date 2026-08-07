@@ -28,6 +28,7 @@ export interface AudioCaptureState {
   meter: number; // 0.0 - 1.0
   error: string | null;
   workletLoaded: boolean;
+  analyserNode: AnalyserNode | null;
 }
 
 export function useAudioCapture(options: AudioCaptureOptions) {
@@ -48,12 +49,14 @@ export function useAudioCapture(options: AudioCaptureOptions) {
     meter: 0,
     error: null,
     workletLoaded: false,
+    analyserNode: null,
   });
 
   const streamRef = useRef<MediaStream | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
   const contextRef = useRef<AudioContext | null>(null);
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
+  
   const meterIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onPcm16Ref = useRef(onPcm16);
   onPcm16Ref.current = onPcm16;
@@ -138,6 +141,9 @@ export function useAudioCapture(options: AudioCaptureOptions) {
       
       source.connect(analyser);
       source.connect(workletNode);
+
+      // Expose analyser for visualizer
+      if (!analyserRef.current) analyserRef.current = analyser;
       // Worklet has no output connection (we only use its MessagePort)
 
       // Meter polling (every 100ms)
@@ -154,7 +160,7 @@ export function useAudioCapture(options: AudioCaptureOptions) {
         setState(s => ({ ...s, meter: Math.min(1, rms * 2) })); // Scale for visibility
       }, 100);
 
-      setState(s => ({ ...s, isCapturing: true }));
+      setState(s => ({ ...s, isCapturing: true, analyserNode: analyser || null }));
 
     } catch (err: any) {
       const message = err.message || "Failed to start audio capture";
@@ -196,6 +202,7 @@ export function useAudioCapture(options: AudioCaptureOptions) {
       isCapturing: false,
       meter: 0,
       workletLoaded: false,
+    analyserNode: null,
     }));
   }, []);
 
