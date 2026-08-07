@@ -10,6 +10,7 @@ FROM base AS builder
 COPY package.json package-lock.json* ./
 RUN npm ci
 COPY . .
+ENV DATABASE_URL=file:./data/app.db
 RUN npx prisma generate
 RUN npm run build
 
@@ -22,13 +23,9 @@ COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
-RUN mkdir -p /data/audio /data/ir
-RUN chown -R nextjs:nodejs /app /data
-
 USER nextjs
 EXPOSE 3000
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Create dirs at runtime (volume mount hides image dirs) then start
 CMD ["sh", "-c", "mkdir -p /data/audio /data/ir && node server.js"]
