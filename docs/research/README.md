@@ -7,7 +7,7 @@ This folder separates three questions that should not be collapsed:
 
 1. **What the research contributes** — the empirical and participatory-design findings.
 2. **What the current prototype actually implements** — verified from source and tests.
-3. **What a defensible next-generation information system could contribute** — seven design iterations, five selected for detailed diagrams.
+3. **What a defensible next-generation information system could contribute** — seven design iterations, with an earlier five-diagram interpretation retained in the archive.
 
 ## Deliverables
 
@@ -18,17 +18,17 @@ This folder separates three questions that should not be collapsed:
 | [`03-novelty-landscape.md`](03-novelty-landscape.md) | Targeted comparison with current research and products; novelty boundary |
 | [`04-system-versions.md`](04-system-versions.md) | Seven system versions, operating models, comparisons, and ranked selection |
 | [`05-evaluation-roadmap.md`](05-evaluation-roadmap.md) | Research hypotheses, study designs, measures, gates, and implementation sequence |
-| [`diagrams/`](diagrams/) | Five publication-quality vector PDF diagrams plus their generator |
+| [`archive/diagrams-2026-08-07/`](archive/diagrams-2026-08-07/) | Archived conceptual diagram set and its generator |
 
-## Five selected diagrams
+## Archived diagram set
 
-The PDFs use vector geometry and text on an A3 landscape page. They are resolution-independent and suitable for print, zooming, and conversion to raster formats.
+These diagrams are retained as a dated research artifact rather than the current product direction. They blended findings from the two papers with an earlier reading of the application and may understate the implemented system and its broader potential.
 
-1. [`01-live-critique-mirror.pdf`](diagrams/01-live-critique-mirror.pdf) — Version 1: live, dual-surface cognitive mirror
-2. [`02-intent-ledger.pdf`](diagrams/02-intent-ledger.pdf) — Version 2: longitudinal critique-to-revision provenance
-3. [`03-studio-commons.pdf`](diagrams/03-studio-commons.pdf) — Version 3: identity and audience-controlled peer critique
-4. [`04-jury-bridge.pdf`](diagrams/04-jury-bridge.pdf) — Version 4: accessible real-time and post-jury cognitive offloading
-5. [`05-reflective-twin.pdf`](diagrams/05-reflective-twin.pdf) — Version 5: multimodal, intent-grounded reflective twin
+1. [`01-live-critique-mirror.pdf`](archive/diagrams-2026-08-07/01-live-critique-mirror.pdf) — Version 1: live, dual-surface cognitive mirror
+2. [`02-intent-ledger.pdf`](archive/diagrams-2026-08-07/02-intent-ledger.pdf) — Version 2: longitudinal critique-to-revision provenance
+3. [`03-studio-commons.pdf`](archive/diagrams-2026-08-07/03-studio-commons.pdf) — Version 3: identity and audience-controlled peer critique
+4. [`04-jury-bridge.pdf`](archive/diagrams-2026-08-07/04-jury-bridge.pdf) — Version 4: accessible real-time and post-jury cognitive offloading
+5. [`05-reflective-twin.pdf`](archive/diagrams-2026-08-07/05-reflective-twin.pdf) — Version 5: multimodal, intent-grounded reflective twin
 
 ## Headline conclusion
 
@@ -53,6 +53,6 @@ At the time of this audit:
 - The unit suite passes: 79 tests across 7 files.
 - `npx tsc --noEmit` succeeds.
 - `npm run build` succeeds and generates 19 static/dynamic route entries.
-- The five diagram PDFs are validated as one-page A3 vector documents.
+- The archived diagram PDFs were validated as one-page A3 vector documents.
 
 These checks establish repository health. They do **not** establish pedagogical efficacy, novelty, diarization quality, safety, or end-to-end live-session correctness.

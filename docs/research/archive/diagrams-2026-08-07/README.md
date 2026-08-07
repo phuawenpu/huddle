@@ -1,6 +1,8 @@
-# Diagram exports
+# Archived diagram exports
 
-These five diagrams correspond to the five highest-ranked system versions in [`../04-system-versions.md`](../04-system-versions.md).
+These five diagrams correspond to the five highest-ranked system versions in [`../../04-system-versions.md`](../../04-system-versions.md).
+
+They were archived on 2026-08-07 because they blend the source-paper concepts with an earlier, narrower interpretation of the application. They are retained for research history and should not be treated as the current product architecture or roadmap.
 
 | PDF | System version | Page |
 |---|---|---|
@@ -26,7 +28,7 @@ The generator depends on `reportlab`:
 
 ```bash
 python -m pip install reportlab
-python docs/research/diagrams/generate_diagrams.py
+python docs/research/archive/diagrams-2026-08-07/generate_diagrams.py
 ```
 
 The generated PDFs are committed so readers do not need Python to view them.

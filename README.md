@@ -51,7 +51,7 @@ The research papers in `workspace/`, the current implementation, and adjacent 20
 - [Online novelty landscape](docs/research/03-novelty-landscape.md)
 - [Seven system versions](docs/research/04-system-versions.md)
 - [Evaluation roadmap](docs/research/05-evaluation-roadmap.md)
-- [Five high-resolution vector PDF diagrams](docs/research/diagrams/)
+- [Archived conceptual diagram set](docs/research/archive/diagrams-2026-08-07/)
 
 ### New API Endpoints (since prototype)
 
