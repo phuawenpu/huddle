@@ -150,7 +150,7 @@ export default function NewSessionPage() {
       // If using a recording, we may need to synthesize it first
       if (audioSource === "recording" && selectedRecordingId) {
         const rec = recordings.find(r => r.id === selectedRecordingId);
-        if (rec && !rec.mixedUrl && rec.status !== "ready") {
+        if (rec && !rec.mixedUrl) {
           // Synthesize first
           const synRes = await fetch(`/api/scenarios/${selectedRecordingId}/synthesize`, { method: "POST" });
           const synData = await synRes.json();

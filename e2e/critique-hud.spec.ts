@@ -9,7 +9,7 @@ test.describe("Critique HUD — E2E", () => {
     await expect(page.locator("h1")).toContainText("Critique HUD");
     
     // Three navigation links should be visible
-    const links = page.locator("a[href]");
+    const links = page.locator("nav a[href]");
     await expect(links).toHaveCount(3);
   });
 
@@ -27,7 +27,7 @@ test.describe("Critique HUD — E2E", () => {
     }
 
     // Check touch targets on navigation links
-    const navLinks = page.locator("a[href]");
+    const navLinks = page.locator("nav a[href]");
     const count = await navLinks.count();
     for (let i = 0; i < count; i++) {
       const link = navLinks.nth(i);
@@ -49,14 +49,15 @@ test.describe("Critique HUD — E2E", () => {
       await chips.first().click();
     }
     
-    // Set duration and speakers
-    const durationSelect = page.locator("select").first();
-    if (await durationSelect.isVisible()) {
-      await durationSelect.selectOption("5");
-    }
+    // Duration is a touch-friendly segmented control, not a select.
+    await page
+      .getByText(/^Duration:/)
+      .locator("..")
+      .getByRole("button", { name: "5", exact: true })
+      .click();
     
     // Click generate
-    const generateBtn = page.locator("button").filter({ hasText: /generate/i });
+    const generateBtn = page.getByRole("button", { name: "Generate Scenario" });
     if (await generateBtn.isVisible()) {
       await generateBtn.click();
       // Wait for results
@@ -67,7 +68,7 @@ test.describe("Critique HUD — E2E", () => {
   test("session create → facilitator page loads → display page loads", async ({ page }) => {
     // Create a session
     await page.goto("/sessions/new");
-    await expect(page.locator("h1")).toContainText("New Session", { timeout: 10000 });
+    await expect(page.locator("h1")).toContainText("New Critique Session", { timeout: 10000 });
     
     // Fill in title
     const titleInput = page.locator("input").first();
@@ -76,7 +77,7 @@ test.describe("Critique HUD — E2E", () => {
     }
     
     // Submit
-    const createBtn = page.locator("button").filter({ hasText: /create|start/i });
+    const createBtn = page.getByRole("button", { name: /Start (Live Critique|Critique Session)/ });
     if (await createBtn.isVisible()) {
       await createBtn.click();
     }
@@ -100,7 +101,7 @@ test.describe("Critique HUD — E2E", () => {
     if (await titleInput.isVisible()) {
       await titleInput.fill("Display Test");
     }
-    const createBtn = page.locator("button").filter({ hasText: /create|start/i });
+    const createBtn = page.getByRole("button", { name: /Start (Live Critique|Critique Session)/ });
     if (await createBtn.isVisible()) {
       await createBtn.click();
     }

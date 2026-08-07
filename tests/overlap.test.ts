@@ -33,6 +33,26 @@ describe("validateOverlapRules", () => {
     expect(result.valid).toBe(true);
   });
 
+  it("rejects overlap by the same speaker", () => {
+    const turns = [
+      { ...makeTurn(0, 0, 5000, [1]), speakerIndex: 2 },
+      { ...makeTurn(1, 4800, 9000, [0]), speakerIndex: 2 },
+    ];
+    const result = validateOverlapRules(turns);
+    expect(result.violations.some(v => v.rule === "no_self_overlap")).toBe(true);
+  });
+
+  it("rejects overlap longer than 60% of the shorter clip", () => {
+    const turns = [
+      makeTurn(0, 0, 5000, [1]),
+      makeTurn(1, 3800, 5600, [0]),
+    ];
+    const result = validateOverlapRules(turns);
+    expect(
+      result.violations.some(v => v.rule === "max_overlap_60_percent")
+    ).toBe(true);
+  });
+
   it("rejects overlap > 1500ms", () => {
     const turns = [
       makeTurn(0, 0, 5000, [1]),

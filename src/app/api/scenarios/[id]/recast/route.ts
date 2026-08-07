@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { composeVoiceInstructions } from "@/lib/voice-casting";
 
 export async function POST(
   request: NextRequest,
@@ -21,6 +22,8 @@ export async function POST(
           speakers[idx].voiceId = cast.voiceId || speakers[idx].voiceId;
           speakers[idx].accent = cast.accent || speakers[idx].accent;
           speakers[idx].timbreClass = cast.timbreClass || speakers[idx].timbreClass;
+          speakers[idx].speakingRate = cast.speakingRate || speakers[idx].speakingRate;
+          speakers[idx].instructions = composeVoiceInstructions(speakers[idx]);
         }
       }
     }

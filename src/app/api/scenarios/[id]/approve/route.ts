@@ -7,6 +7,20 @@ export async function POST(
 ) {
   const { id } = await context.params;
   try {
+    const existing = await prisma.scenario.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ error: "Scenario not found" }, { status: 404 });
+    }
+    const preflight = safeParseJson(existing.preflightJson, null);
+    if (existing.status !== "ready" || !preflight?.passed || !preflight?.audioAvailable) {
+      return NextResponse.json(
+        {
+          error:
+            "Scenario cannot be approved until real audio is rendered and preflight passes.",
+        },
+        { status: 409 }
+      );
+    }
     const scenario = await prisma.scenario.update({
       where: { id },
       data: { status: "approved", approvedAt: new Date() },

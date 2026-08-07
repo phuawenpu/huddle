@@ -66,6 +66,10 @@ export default function NewScenarioPage() {
           speakerCount,
           difficulty,
           crossTalkLevel,
+          workshopType,
+          disagreementLevel: difficulty === "clean" ? "low" : difficulty === "stress_test" ? "high" : "moderate",
+          evidenceQuality: difficulty === "clean" ? "strong" : "mixed",
+          facilitationQuality: "light",
           seed: Date.now(),
         }),
       });

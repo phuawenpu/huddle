@@ -65,14 +65,23 @@ export default function SimulatorPage() {
         const sData = await sRes.json();
         setScenario(sData);
 
-        // Set WAV URL
+        // Audio existence is part of readiness. A database status alone is
+        // not sufficient because an older volume or failed render can leave
+        // the scenario metadata pointing at a file that does not exist.
         const url = `/api/scenarios/${sid}/mixed?format=wav`;
+        const audioHead = await fetch(url, { method: "HEAD", cache: "no-store" });
+        if (!audioHead.ok) {
+          const detail = await fetch(url, { cache: "no-store" })
+            .then((response) => response.json())
+            .then((body) => body?.error)
+            .catch(() => null);
+          throw new Error(
+            detail ||
+              "This scenario has no rendered audio. Return to the scenario and synthesize it before playback."
+          );
+        }
         setWavUrl(url);
-
-        // Get file size for display
-        fetch(url, { method: "HEAD" })
-          .then(h => setWavSize(Number(h.headers.get("content-length")) || null))
-          .catch(() => {});
+        setWavSize(Number(audioHead.headers.get("content-length")) || null);
 
         setStatus("ready");
       } catch (e: any) {
@@ -217,7 +226,7 @@ export default function SimulatorPage() {
         <p className="text-xs text-hud-muted mt-0.5">
           {scenario?.durationMinutes} min · {scenario?.speakerCount} speakers · {scenario?.turns?.length || 0} turns
           {wavSize && ` · ${(wavSize / 1024 / 1024).toFixed(1)} MB`}
-          {wavUrl && " · 🔊 Ready"}
+          {status === "ready" && wavUrl && " · 🔊 Ready"}
         </p>
       </div>
 

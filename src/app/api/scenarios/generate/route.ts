@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stubGenerateScenario } from "@/lib/stubs/openai";
 import { validateScenarioParams } from "@/lib/budget";
+import {
+  buildDiscussionPrompts,
+  normalizeGeneratedScenario,
+  type ScenarioGenerationInput,
+} from "@/lib/scenario-generation";
 import type { CrossTalkLevel } from "@/lib/types";
 
 export async function POST(request: NextRequest) {
@@ -18,46 +23,66 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: validation.errors.join("; ") }, { status: 400 });
     }
 
+    const input: ScenarioGenerationInput = {
+      topic: String(topic || "Design Thinking topic"),
+      durationMinutes: Number(durationMinutes) || 8,
+      speakerCount: Number(speakerCount) || 4,
+      difficulty: difficulty || "realistic",
+      crossTalkLevel: (crossTalkLevel || "occasional") as CrossTalkLevel,
+      workshopType: body.workshopType,
+      objective: body.objective,
+      criteria: body.criteria,
+      disagreementLevel: body.disagreementLevel,
+      evidenceQuality: body.evidenceQuality,
+      facilitationQuality: body.facilitationQuality,
+      language: body.language || "English",
+    };
+    const prompts = buildDiscussionPrompts(input);
     const isStub = process.env.LLM_STUB === "1";
 
     if (isStub) {
-      const generated = stubGenerateScenario({
-        seed: seed || Date.now(),
-        topic: topic || "Design Thinking topic",
-        durationMinutes: Number(durationMinutes),
-        speakerCount: Number(speakerCount),
-        difficulty: difficulty || "realistic",
-        crossTalkLevel: crossTalkLevel as CrossTalkLevel,
+      const raw = stubGenerateScenario({
+        seed: seed || 42,
+        topic: input.topic,
+        durationMinutes: input.durationMinutes,
+        speakerCount: input.speakerCount,
+        difficulty: input.difficulty,
+        crossTalkLevel: input.crossTalkLevel,
       });
+      const generated = normalizeGeneratedScenario(raw, input, prompts.budget);
       return NextResponse.json({ ...generated, stubbed: true });
     }
 
-    // In production, use OpenAI for generation
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      // Fall back to stub
-      const generated = stubGenerateScenario({
-        seed: seed || Date.now(),
-        topic: topic || "Design Thinking topic",
-        durationMinutes: Number(durationMinutes),
-        speakerCount: Number(speakerCount),
-        difficulty: difficulty || "realistic",
-        crossTalkLevel: crossTalkLevel as CrossTalkLevel,
-      });
-      return NextResponse.json({ ...generated, stubbed: true, degraded: true });
+      return NextResponse.json(
+        {
+          error:
+            "Dialogue generation is unavailable because OPENAI_API_KEY is not configured. Set LLM_STUB=1 explicitly for deterministic development fixtures.",
+        },
+        { status: 503 }
+      );
     }
 
-    // For long scenarios (12+ min), chunk the generation
-    const isLong = Number(durationMinutes) >= 12;
-    const systemPrompt = `You generate realistic Design Thinking critique discussions. 
-Return a JSON object with: title, description, objective, criteria (string array), 
-speakers (array of {index, name, voiceId, accent, timbreClass}), 
-and turns (array of {index, speakerIndex, text, expectedCategory})`;
+    const content = await generateDialogue(apiKey, prompts.system, prompts.user);
+    const generated = normalizeGeneratedScenario(content, input, prompts.budget);
+    return NextResponse.json({ ...generated, stubbed: false });
+  } catch (error: any) {
+    console.error("Scenario generation failed:", error?.message || error);
+    return NextResponse.json(
+      { error: error?.message || "Failed to generate scenario" },
+      { status: 500 }
+    );
+  }
+}
 
-    const userPrompt = `Generate a ${durationMinutes}-minute Design Thinking critique 
-with ${speakerCount} speakers, difficulty "${difficulty}", cross-talk "${crossTalkLevel}".
-Topic: ${topic}${isLong ? '. Split into two parts.' : ''}`;
-
+async function generateDialogue(
+  apiKey: string,
+  systemPrompt: string,
+  userPrompt: string
+): Promise<any> {
+  let lastError = "OpenAI dialogue generation failed";
+  for (let attempt = 0; attempt < 2; attempt++) {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -65,7 +90,7 @@ Topic: ${topic}${isLong ? '. Split into two parts.' : ''}`;
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: process.env.ANALYSIS_MODEL || "gpt-5-mini-2025-08-07",
+        model: process.env.SCENARIO_MODEL || process.env.ANALYSIS_MODEL || "gpt-5-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -73,24 +98,16 @@ Topic: ${topic}${isLong ? '. Split into two parts.' : ''}`;
         response_format: { type: "json_object" },
       }),
     });
-
-    if (!res.ok) {
-      // Fall back to stub
-      const generated = stubGenerateScenario({
-        seed: seed || Date.now(),
-        topic: topic || "Design Thinking topic",
-        durationMinutes: Number(durationMinutes),
-        speakerCount: Number(speakerCount),
-        difficulty: difficulty || "realistic",
-        crossTalkLevel: crossTalkLevel as CrossTalkLevel,
-      });
-      return NextResponse.json({ ...generated, stubbed: true, degraded: true });
+    if (res.ok) {
+      const data = await res.json();
+      const text = data?.choices?.[0]?.message?.content;
+      if (!text) throw new Error("The dialogue model returned no content.");
+      return JSON.parse(text);
     }
-
-    const data = await res.json();
-    const content = JSON.parse(data.choices[0].message.content);
-    return NextResponse.json({ ...content, stubbed: false });
-  } catch {
-    return NextResponse.json({ error: "Failed to generate scenario" }, { status: 500 });
+    const detail = await res.text();
+    lastError = `Dialogue model returned ${res.status}: ${detail.slice(0, 300)}`;
+    if (res.status !== 429 && res.status < 500) break;
+    await new Promise((resolve) => setTimeout(resolve, 750 * 2 ** attempt));
   }
+  throw new Error(lastError);
 }

@@ -51,6 +51,37 @@ export function validateOverlapRules(turns: ScenarioTurn[], calibrationIndices: 
         });
       }
 
+      const firstMainIndex =
+        calibrationIndices.length > 0
+          ? Math.max(...calibrationIndices) + 1
+          : 0;
+      if (
+        calibrationIndices.length > 0 &&
+        (i < firstMainIndex + 2 || otherIdx < firstMainIndex + 2)
+      ) {
+        violations.push({
+          rule: "no_early_overlap",
+          turnIndices: [i, otherIdx],
+          detail: "The first two main-discussion turns cannot overlap.",
+        });
+      }
+
+      if (turn.speakerIndex === other.speakerIndex) {
+        violations.push({
+          rule: "no_self_overlap",
+          turnIndices: [i, otherIdx],
+          detail: `Speaker ${turn.speakerIndex} cannot overlap themself.`,
+        });
+      }
+
+      if (Math.abs(i - otherIdx) !== 1) {
+        violations.push({
+          rule: "adjacent_turns_only",
+          turnIndices: [i, otherIdx],
+          detail: "An overlap may only involve the immediately previous turn.",
+        });
+      }
+
       // Rule 2: Never three concurrent speakers
       const concurrentSpeakers = new Set([i, otherIdx]);
       for (let j = 0; j < turns.length; j++) {
@@ -75,6 +106,17 @@ export function validateOverlapRules(turns: ScenarioTurn[], calibrationIndices: 
           rule: "max_overlap_1500ms",
           turnIndices: [i, otherIdx],
           detail: `Overlap duration ${overlapDuration}ms exceeds maximum of 1500ms.`,
+        });
+      }
+      const shorterDuration = Math.min(
+        turn.endMs! - turn.startMs!,
+        other.endMs! - other.startMs!
+      );
+      if (overlapDuration > shorterDuration * 0.6) {
+        violations.push({
+          rule: "max_overlap_60_percent",
+          turnIndices: [i, otherIdx],
+          detail: `Overlap duration ${overlapDuration}ms exceeds 60% of the shorter clip.`,
         });
       }
 

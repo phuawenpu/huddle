@@ -4,7 +4,15 @@
 
 export type RunMode = "live" | "sim_acoustic" | "sim_injected";
 export type SessionStatus = "setup" | "active" | "paused" | "terminated";
-export type ScenarioStatus = "draft" | "generated" | "ready" | "approved" | "archived";
+export type ScenarioStatus =
+  | "draft"
+  | "generated"
+  | "synthesizing"
+  | "incomplete"
+  | "rendered"
+  | "ready"
+  | "approved"
+  | "archived";
 export type RunStatus = "created" | "playing" | "completed" | "incomplete" | "evaluated";
 export type CrossTalkLevel = "none" | "occasional" | "frequent";
 export type Difficulty = "simple" | "realistic" | "challenging";
@@ -144,6 +152,11 @@ export interface ScenarioBudget {
   estimatedCostUsd: number;
   characterBudget: number;
   turnBudget: number;
+  calibrationMs?: number;
+  targetTurns?: number;
+  targetCharacters?: number;
+  minTurnsPerSpeaker?: number;
+  overlapCount?: number;
 }
 
 export interface ScenarioSpeaker {
@@ -152,14 +165,37 @@ export interface ScenarioSpeaker {
   voiceId: string;
   accent: string;
   timbreClass: string;
+  role?: string;
+  viewpoint?: string;
+  discourseStyle?: string;
+  habitualMove?: string;
+  instructions?: string;
+  speakingRate?: number;
+  targetTalkShare?: number;
   previewClipPath?: string;
 }
 
+export interface ScenarioOverlap {
+  withTurnId: string;
+  startOffsetMs: number;
+  kind: "interruption" | "eager_agreement" | "backchannel";
+}
+
 export interface ScenarioTurn {
+  id?: string;
   index: number;
   speakerIndex: number;
   text: string;
   expectedCategory?: DiscussionCategory;
+  expected?: {
+    substantive?: boolean;
+    category?: DiscussionCategory;
+    potentialSignal?: string;
+    reactsToTurnId?: string;
+  };
+  isCalibration?: boolean;
+  pauseBeforeMs?: number;
+  overlap?: ScenarioOverlap;
   startMs?: number;
   endMs?: number;
   overlapWith?: number[];
@@ -170,6 +206,9 @@ export interface PreflightResult {
   passed: boolean;
   mergedPairs: Array<[number, number]>;
   distinctnessScores: number[];
+  audioAvailable?: boolean;
+  checkedAt?: string;
+  reason?: string;
 }
 
 export interface RunData {

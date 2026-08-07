@@ -4,7 +4,17 @@
 // ============================================
 
 import type { CrossTalkLevel, ScenarioBudget } from "./types";
-import { stubEstimateScenario } from "./stubs/openai";
+
+const TTS_INPUT_COST_PER_MILLION_CHARS = 15;
+
+export function expectedOverlapCount(
+  durationMinutes: number,
+  crossTalkLevel: CrossTalkLevel
+): number {
+  if (crossTalkLevel === "none") return 0;
+  const perTenMinutes = crossTalkLevel === "frequent" ? 10 : 3;
+  return Math.max(1, Math.round((durationMinutes / 10) * perTenMinutes));
+}
 
 /**
  * Validate scenario parameters against allowed ranges.
@@ -40,7 +50,36 @@ export function estimateBudget(
   speakerCount: number,
   crossTalkLevel: CrossTalkLevel
 ): ScenarioBudget {
-  return stubEstimateScenario(durationMinutes, speakerCount, crossTalkLevel);
+  const totalMs = durationMinutes * 60_000;
+  const calibrationMs = speakerCount * 10_000 + (speakerCount - 1) * 2_000 + 2_000;
+  const mainMs = Math.max(30_000, totalMs - calibrationMs);
+  const speechMs = mainMs * 0.92;
+  const targetTurns = Math.round((speechMs / 60_000) * 11);
+  const targetCharacters = Math.round((speechMs / 60_000) * 750);
+  const minTurnsPerSpeaker = Math.max(
+    4,
+    Math.floor((targetTurns * 0.6) / speakerCount)
+  );
+  const overlapCount = expectedOverlapCount(durationMinutes, crossTalkLevel);
+  const estimatedCharacters = targetCharacters + speakerCount * 140;
+
+  return {
+    estimatedTurns: targetTurns + speakerCount,
+    estimatedCharacters,
+    estimatedCostUsd:
+      Math.round(
+        (estimatedCharacters / 1_000_000) *
+          TTS_INPUT_COST_PER_MILLION_CHARS *
+          100
+      ) / 100,
+    characterBudget: Math.round(targetCharacters * 1.15),
+    turnBudget: targetTurns + speakerCount + 5,
+    calibrationMs,
+    targetTurns,
+    targetCharacters,
+    minTurnsPerSpeaker,
+    overlapCount,
+  };
 }
 
 /**

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { VOICE_POOL } from "@/lib/stubs/openai";
+import { VOICE_CASTING_POOL } from "@/lib/voice-casting";
 
 export async function GET(
   request: NextRequest,
@@ -13,17 +13,17 @@ export async function GET(
 
     const speakers = safeParseJson(scenario.speakersJson, null);
     if (!speakers) {
-      return NextResponse.json({ voices: VOICE_POOL, cast: null });
+      return NextResponse.json({ voices: VOICE_CASTING_POOL, cast: null });
     }
 
     // Return current cast plus available voices
     const usedVoiceIds = new Set(speakers.map((s: any) => s.voiceId));
-    const availableVoices = VOICE_POOL.filter(v => !usedVoiceIds.has(v.voiceId));
+    const availableVoices = VOICE_CASTING_POOL.filter(v => !usedVoiceIds.has(v.voiceId));
 
     return NextResponse.json({
       cast: speakers,
       availableVoices,
-      allVoices: VOICE_POOL,
+      allVoices: VOICE_CASTING_POOL,
     });
   } catch {
     return NextResponse.json({ error: "Failed to get voices" }, { status: 500 });

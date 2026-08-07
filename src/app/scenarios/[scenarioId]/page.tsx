@@ -18,7 +18,18 @@ interface ScenarioData {
   budget?: any;
   speakers?: Array<{ index: number; name: string; voiceId: string; accent: string; timbreClass: string }>;
   turns?: Array<{ index: number; speakerIndex: number; text: string; expectedCategory?: string; overlapWith?: number[] }>;
-  preflight?: { passed: boolean; mergedPairs: Array<[number, number]> };
+  preflight?: {
+    passed: boolean;
+    mergedPairs: Array<[number, number]>;
+    audioAvailable?: boolean;
+    reason?: string;
+    speechValidation?: {
+      method: string;
+      passed: boolean;
+      sampledTurnCount: number;
+      averageWordErrorRate: number | null;
+    } | null;
+  };
   approvedAt?: string;
   realizedDurationMs?: number;
 }
@@ -28,6 +39,8 @@ export default function ScenarioDetailPage() {
   const router = useRouter();
   const [scenario, setScenario] = useState<ScenarioData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [action, setAction] = useState("");
+  const [actionError, setActionError] = useState("");
 
   const loadScenario = async () => {
     try {
@@ -39,18 +52,33 @@ export default function ScenarioDetailPage() {
   useEffect(() => { loadScenario(); }, [params.scenarioId]);
 
   const handleApprove = async () => {
-    await fetch(`/api/scenarios/${params.scenarioId}/approve`, { method: "POST" });
-    loadScenario();
+    await runAction("Approving", "approve");
   };
 
   const handleSynthesize = async () => {
-    await fetch(`/api/scenarios/${params.scenarioId}/synthesize`, { method: "POST" });
-    loadScenario();
+    await runAction("Rendering speech and mixing audio", "synthesize");
   };
 
   const handlePreflight = async () => {
-    await fetch(`/api/scenarios/${params.scenarioId}/preflight`, { method: "POST" });
-    loadScenario();
+    await runAction("Checking audio readiness", "preflight");
+  };
+
+  const runAction = async (label: string, endpoint: string) => {
+    setAction(label);
+    setActionError("");
+    try {
+      const response = await fetch(
+        `/api/scenarios/${params.scenarioId}/${endpoint}`,
+        { method: "POST" }
+      );
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || `${label} failed`);
+      await loadScenario();
+    } catch (error: any) {
+      setActionError(error?.message || `${label} failed`);
+    } finally {
+      setAction("");
+    }
   };
 
   const handleLaunch = async () => {
@@ -190,6 +218,19 @@ export default function ScenarioDetailPage() {
                 ).join(", ")}
               </p>
             )}
+            {scenario.preflight.reason && (
+              <p className="text-sm text-hud-text mt-1">{scenario.preflight.reason}</p>
+            )}
+            {scenario.preflight.speechValidation && (
+              <p className="text-xs text-hud-muted mt-2">
+                Audio check: {scenario.preflight.speechValidation.method.replace(/_/g, " ")}
+                {scenario.preflight.speechValidation.sampledTurnCount > 0 && (
+                  <> · {scenario.preflight.speechValidation.sampledTurnCount} clips · average WER {
+                    Math.round((scenario.preflight.speechValidation.averageWordErrorRate || 0) * 100)
+                  }%</>
+                )}
+              </p>
+            )}
           </div>
         )}
 
@@ -222,38 +263,56 @@ export default function ScenarioDetailPage() {
 
         {/* Actions */}
         <div className="flex flex-wrap gap-3 pb-8">
-          {scenario.status !== "approved" && (
-            <>
-              <button
-                onClick={handleSynthesize}
-                className="px-4 py-3 bg-hud-surface border border-hud-border rounded-xl text-sm font-medium
-                  hover:border-hud-accent transition-all touch-manipulation"
-                style={{ minHeight: 48 }}
-              >
-                Synthesize Audio
-              </button>
-              <button
-                onClick={handlePreflight}
-                className="px-4 py-3 bg-hud-surface border border-hud-border rounded-xl text-sm font-medium
-                  hover:border-hud-accent transition-all touch-manipulation"
-                style={{ minHeight: 48 }}
-              >
-                Run Preflight
-              </button>
-              <button
-                onClick={handleApprove}
-                className="px-4 py-3 bg-hud-accent text-white rounded-xl text-sm font-medium
-                  hover:bg-hud-accent-dim transition-all touch-manipulation"
-                style={{ minHeight: 48 }}
-              >
-                Approve
-              </button>
-            </>
+          {(action || actionError) && (
+            <div className={`w-full rounded-xl border p-3 text-sm ${
+              actionError
+                ? "border-hud-danger/30 bg-hud-danger/10 text-hud-danger"
+                : "border-hud-accent/30 bg-hud-accent/10 text-hud-text"
+            }`}>
+              {actionError || `${action}… This can take several minutes.`}
+            </div>
+          )}
+          <button
+            onClick={handleSynthesize}
+            disabled={Boolean(action)}
+            className="px-4 py-3 bg-hud-surface border border-hud-border rounded-xl text-sm font-medium
+              hover:border-hud-accent transition-all touch-manipulation disabled:opacity-50"
+            style={{ minHeight: 48 }}
+          >
+            {scenario.realizedDurationMs ? "Re-synthesize Audio" : "Synthesize Audio"}
+          </button>
+          {(scenario.status === "rendered" || scenario.status === "ready") && (
+            <button
+              onClick={handlePreflight}
+              disabled={Boolean(action)}
+              className="px-4 py-3 bg-hud-surface border border-hud-border rounded-xl text-sm font-medium
+                hover:border-hud-accent transition-all touch-manipulation disabled:opacity-50"
+              style={{ minHeight: 48 }}
+            >
+              Run Preflight
+            </button>
+          )}
+          {scenario.status === "ready" && (
+            <button
+              onClick={handleApprove}
+              disabled={Boolean(action)}
+              className="px-4 py-3 bg-hud-accent text-white rounded-xl text-sm font-medium
+                hover:bg-hud-accent-dim transition-all touch-manipulation disabled:opacity-50"
+              style={{ minHeight: 48 }}
+            >
+              Approve
+            </button>
           )}
           <button
             onClick={handleLaunch}
+            disabled={
+              Boolean(action) ||
+              !["ready", "approved"].includes(scenario.status) ||
+              !scenario.preflight?.passed ||
+              !scenario.preflight?.audioAvailable
+            }
             className="px-4 py-3 bg-hud-success text-white rounded-xl text-sm font-medium
-              hover:opacity-90 transition-all touch-manipulation ml-auto"
+              hover:opacity-90 transition-all touch-manipulation ml-auto disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ minHeight: 48 }}
           >
             ▶ Launch Simulation

@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
+import { existsSync, readFileSync } from "fs";
+import { join } from "path";
 import { prisma } from "@/lib/db";
+
+function audioRoot() {
+  return process.env.ASSET_DIR || join(process.cwd(), "data", "audio");
+}
 
 export async function GET() {
   try {
@@ -24,22 +30,25 @@ export async function GET() {
       },
     });
 
-    const recordings = scenarios.map(s => ({
-      id: s.id,
-      title: s.title,
-      description: s.description,
-      durationMinutes: s.durationMinutes,
-      speakerCount: s.speakerCount,
-      crossTalkLevel: s.crossTalkLevel,
-      difficulty: s.difficulty,
-      status: s.status,
-      speakers: safeParse(s.speakersJson),
-      turnCount: safeParse(s.turnsJson)?.length || 0,
-      createdAt: s.createdAt,
-      mixedUrl: s.status === "ready" || s.status === "approved" 
-        ? `/api/scenarios/${s.id}/mixed?format=wav` 
-        : null,
-    }));
+    const recordings = scenarios.map(s => {
+      const hasAudio = hasValidatedAudio(s.id);
+      return {
+        id: s.id,
+        title: s.title,
+        description: s.description,
+        durationMinutes: s.durationMinutes,
+        speakerCount: s.speakerCount,
+        crossTalkLevel: s.crossTalkLevel,
+        difficulty: s.difficulty,
+        status: hasAudio ? s.status : "incomplete",
+        speakers: safeParse(s.speakersJson),
+        turnCount: safeParse(s.turnsJson)?.length || 0,
+        createdAt: s.createdAt,
+        mixedUrl: hasAudio
+          ? `/api/scenarios/${s.id}/mixed?format=wav`
+          : null,
+      };
+    });
 
     // Also include uploaded recordings
     const uploads = await prisma.scenario.findMany({
@@ -80,4 +89,26 @@ function safeParse(val: any) {
   if (!val) return null;
   if (typeof val === "object") return val;
   try { return JSON.parse(val); } catch { return null; }
+}
+
+function hasValidatedAudio(id: string) {
+  const dir = join(audioRoot(), id);
+  if (
+    !existsSync(join(dir, "mixed.wav")) ||
+    !existsSync(join(dir, "manifest.json"))
+  ) {
+    return false;
+  }
+  try {
+    const validation = JSON.parse(
+      readFileSync(join(dir, "validation.json"), "utf8")
+    );
+    return process.env.TTS_STUB === "1"
+      ? validation?.method === "tone_fixture"
+      : validation?.method === "independent_asr" &&
+          validation?.speechExpected === true &&
+          validation?.passed === true;
+  } catch {
+    return false;
+  }
 }
