@@ -238,7 +238,7 @@ Return JSON: { "analyses": [{ "id": "<turn_id>", ... }] }`;
  */
 export async function analyzeWindow(
   recentTurns: TurnContext[],
-  existingItems: Array<{ id: string; category: string; text: string }>,
+  _existingItems: Array<{ id: string; category: string; text: string }>,
   config: AnalysisConfig,
 ): Promise<WindowAnalysis> {
   const isStub = process.env.LLM_STUB === "1";
@@ -287,10 +287,80 @@ Return JSON with:
     if (!res.ok) throw new Error(`Window analysis failed: ${res.status}`);
 
     const data = await res.json();
-    return JSON.parse(data.choices?.[0]?.message?.content || "{}");
+    return normalizeWindowAnalysis(
+      JSON.parse(data.choices?.[0]?.message?.content || "{}"),
+      recentTurns,
+      config,
+    );
   } catch {
     return stubWindowAnalysis(recentTurns, config);
   }
+}
+
+function normalizeWindowAnalysis(
+  raw: unknown,
+  turns: TurnContext[],
+  config: AnalysisConfig,
+): WindowAnalysis {
+  const fallback = stubWindowAnalysis(turns, config);
+  if (!isRecord(raw)) return fallback;
+  const phase = isRecord(raw.phaseAllocation) ? raw.phaseAllocation : {};
+  const agreementStates: WindowAnalysis["agreementState"][] = [
+    "consensus",
+    "majority",
+    "divided",
+    "emerging",
+  ];
+
+  return {
+    theme: boundedString(raw.theme, fallback.theme),
+    discussionState: boundedString(
+      raw.discussionState,
+      fallback.discussionState,
+    ),
+    phaseAllocation: {
+      problemAndEvidence: boundedPercentage(
+        phase.problemAndEvidence,
+        fallback.phaseAllocation.problemAndEvidence,
+      ),
+      ideas: boundedPercentage(phase.ideas, fallback.phaseAllocation.ideas),
+      evaluation: boundedPercentage(
+        phase.evaluation,
+        fallback.phaseAllocation.evaluation,
+      ),
+      decisionsAndActions: boundedPercentage(
+        phase.decisionsAndActions,
+        fallback.phaseAllocation.decisionsAndActions,
+      ),
+    },
+    openQuestions: boundedStringArray(raw.openQuestions),
+    positions: Array.isArray(raw.positions)
+      ? raw.positions
+          .filter(isRecord)
+          .map((position) => ({
+            label: boundedString(position.label, "Unattributed"),
+            gist: boundedString(position.gist, ""),
+          }))
+          .filter((position) => position.gist)
+          .slice(0, 6)
+      : [],
+    // These summaries can inform a private window model, but the queue never
+    // persists them as decisions/actions. Durable map items require an exact
+    // turn-level source signal.
+    decisions: boundedStringArray(raw.decisions),
+    actions: boundedStringArray(raw.actions),
+    agreementState:
+      typeof raw.agreementState === "string" &&
+      agreementStates.includes(
+        raw.agreementState as WindowAnalysis["agreementState"],
+      )
+        ? (raw.agreementState as WindowAnalysis["agreementState"])
+        : fallback.agreementState,
+    minorityPosition:
+      typeof raw.minorityPosition === "string"
+        ? boundedString(raw.minorityPosition, "")
+        : undefined,
+  };
 }
 
 function stubWindowAnalysis(
@@ -322,6 +392,35 @@ function stubWindowAnalysis(
     actions: [],
     agreementState: "emerging",
   };
+}
+
+function boundedString(
+  value: unknown,
+  fallback: string,
+  maxLength = 240,
+): string {
+  if (typeof value !== "string") return fallback;
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) return fallback;
+  return normalized.slice(0, maxLength);
+}
+
+function boundedStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => boundedString(item, ""))
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+function boundedPercentage(value: unknown, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.max(0, Math.min(100, value));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**

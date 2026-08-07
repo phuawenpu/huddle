@@ -55,6 +55,7 @@ export function normalizeTurnAnalysis(
   turnText: string,
   criteria: string[],
 ): TurnAnalysis {
+  const boundedCriteria = normalizeCriteria(criteria);
   const value = isRecord(raw) ? raw : {};
   const category = isOneOf(value.category, CATEGORIES)
     ? value.category
@@ -64,11 +65,13 @@ export function normalizeTurnAnalysis(
 
   const signals = rawSignals
     .slice(0, MAX_SIGNALS_PER_TURN)
-    .map((signal) => normalizeSignal(signal, turnText, criteria, confidence))
+    .map((signal) =>
+      normalizeSignal(signal, turnText, boundedCriteria, confidence),
+    )
     .filter((signal): signal is CritiqueSignal => signal !== null);
 
   if (signals.length === 0 && turnText.trim()) {
-    signals.push(deriveSignal(turnText, category, criteria, confidence));
+    signals.push(deriveSignal(turnText, category, boundedCriteria, confidence));
   }
 
   const targetCriteria = unique(
@@ -94,11 +97,12 @@ export function buildCritiqueIntelligence(
   turns: TranscriptTurnData[],
   criteria: string[],
 ): CritiqueIntelligenceSnapshot {
+  const boundedCriteria = normalizeCriteria(criteria);
   const signalCounts = Object.fromEntries(
     SIGNAL_KINDS.map((kind) => [kind, 0]),
   ) as Record<CritiqueSignalKind, number>;
 
-  const coverage = criteria.map((criterion) => ({
+  const coverage = boundedCriteria.map((criterion) => ({
     criterion,
     discussed: 0,
     evidenced: 0,
@@ -214,6 +218,56 @@ export function discussionItemsForAnalysis(
       turnIds: [turnId],
     },
   ];
+}
+
+/**
+ * Only expose discussion-map records that can be reproduced from one
+ * source-linked turn analysis. This deliberately excludes legacy window-level
+ * summaries, whose broad turn lists cannot prove that a decision or action was
+ * actually stated.
+ */
+export function isSourceLinkedDiscussionItem(
+  item: {
+    category: string;
+    text: string;
+    turnIds: string[];
+  },
+  turns: TranscriptTurnData[],
+): boolean {
+  if (item.turnIds.length !== 1) return false;
+  const turn = turns.find((candidate) => candidate.id === item.turnIds[0]);
+  if (!turn?.analysis?.signals?.length) return false;
+  return discussionItemsForAnalysis(
+    turn.id,
+    turn.analysis,
+    turn.currentText,
+  ).some(
+    (candidate) =>
+      candidate.category === item.category && candidate.text === item.text,
+  );
+}
+
+/**
+ * Coerce historic or externally supplied criteria into the string contract
+ * expected by prompts and coverage logic. Older records may contain objects
+ * such as {label: "..."}; those should not crash a live analysis window.
+ */
+export function normalizeCriteria(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const values = raw
+    .map((value) => {
+      if (typeof value === "string") return cleanText(value);
+      if (!isRecord(value)) return "";
+      for (const key of ["criterion", "label", "name", "title", "text"]) {
+        if (typeof value[key] === "string") {
+          return cleanText(value[key] as string);
+        }
+      }
+      return "";
+    })
+    .filter(Boolean)
+    .slice(0, 12);
+  return unique(values);
 }
 
 function normalizeSignal(

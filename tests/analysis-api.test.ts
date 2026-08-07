@@ -94,11 +94,17 @@ describe("OpenAI analysis request compatibility", () => {
                     evaluation: 40,
                     decisionsAndActions: 10,
                   },
-                  openQuestions: [],
+                  openQuestions: [
+                    { question: "This shape must be discarded" },
+                    "What evidence supports the recovery claim?",
+                  ],
                   positions: [],
-                  decisions: [],
-                  actions: [],
-                  agreementState: "emerging",
+                  decisions: [
+                    { text: "This object must not reach persistence" },
+                    "We agreed to test the neutral state.",
+                  ],
+                  actions: [{ text: "This object must be discarded" }],
+                  agreementState: "unsupported-state",
                 }),
               },
             },
@@ -108,7 +114,7 @@ describe("OpenAI analysis request compatibility", () => {
       ),
     );
 
-    await analyzeWindow([], [], config);
+    const result = await analyzeWindow([], [], config);
 
     const body = JSON.parse(
       String(fetchMock.mock.calls[0]?.[1]?.body),
@@ -116,6 +122,12 @@ describe("OpenAI analysis request compatibility", () => {
     expect(body.max_completion_tokens).toBe(1500);
     expect(body.reasoning_effort).toBe("minimal");
     expect(body).not.toHaveProperty("max_tokens");
+    expect(result.openQuestions).toEqual([
+      "What evidence supports the recovery claim?",
+    ]);
+    expect(result.decisions).toEqual(["We agreed to test the neutral state."]);
+    expect(result.actions).toEqual([]);
+    expect(result.agreementState).toBe("emerging");
   });
 
   it("falls back to bounded local analysis when the provider misses its deadline", async () => {

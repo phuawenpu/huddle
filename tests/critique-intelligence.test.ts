@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildCritiqueIntelligence,
   discussionItemsForAnalysis,
+  isSourceLinkedDiscussionItem,
+  normalizeCriteria,
   normalizeTurnAnalysis,
 } from "../src/lib/critique-intelligence";
 import type {
@@ -315,7 +317,8 @@ describe("critique intelligence contract", () => {
       ],
     };
 
-    expect(discussionItemsForAnalysis("turn-1", analysis, "fallback")).toEqual([
+    const items = discussionItemsForAnalysis("turn-1", analysis, "fallback");
+    expect(items).toEqual([
       {
         category: "questions",
         text: "The handoff is unclear",
@@ -327,6 +330,35 @@ describe("critique intelligence contract", () => {
         turnIds: ["turn-1"],
       },
     ]);
+
+    const sourceTurn = {
+      ...turn(
+        "turn-1",
+        "The handoff is unclear. Use a neutral prompt.",
+        analysis.signals![0],
+        20,
+      ),
+      analysis,
+    };
+    expect(isSourceLinkedDiscussionItem(items[0], [sourceTurn])).toBe(true);
+    expect(
+      isSourceLinkedDiscussionItem(
+        {
+          category: "decisions",
+          text: "A window inferred a decision",
+          turnIds: ["turn-1", "turn-2"],
+        },
+        [sourceTurn],
+      ),
+    ).toBe(false);
+    expect(
+      normalizeCriteria([
+        " privacy ",
+        { label: "Accessibility" },
+        { criterion: "Verification" },
+        42,
+      ]),
+    ).toEqual(["privacy", "Accessibility", "Verification"]);
   });
 });
 

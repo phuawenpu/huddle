@@ -21,6 +21,7 @@ import { calculateMetrics } from "./metrics";
 import {
   buildCritiqueIntelligence,
   discussionItemsForAnalysis,
+  normalizeCriteria,
 } from "./critique-intelligence";
 
 const BATCH_WINDOW_MS = 1500;
@@ -129,7 +130,7 @@ async function flushBatch(sessionId: string): Promise<void> {
     const config = {
       sessionObjective: session.objective,
       sessionPhase: session.phase,
-      sessionCriteria: safeParseJson(session.criteria, []),
+      sessionCriteria: normalizeCriteria(safeParseJson(session.criteria, [])),
       runMode: session.runMode,
     };
 
@@ -275,15 +276,10 @@ async function runWindowAnalysis(sessionId: string): Promise<void> {
 
     if (recentTurns.length === 0) return;
 
-    const existingItems = await prisma.discussionItem.findMany({
-      where: { sessionId },
-      select: { id: true, category: true, text: true },
-    });
-
     const config = {
       sessionObjective: session.objective,
       sessionPhase: session.phase,
-      sessionCriteria: safeParseJson(session.criteria, []),
+      sessionCriteria: normalizeCriteria(safeParseJson(session.criteria, [])),
       runMode: session.runMode,
     };
 
@@ -295,23 +291,9 @@ async function runWindowAnalysis(sessionId: string): Promise<void> {
         category: safeParseJson(t.analysisJson, undefined)?.category,
         isSubstantive: t.isSubstantive,
       })),
-      existingItems,
+      [],
       config,
     );
-
-    // Generate discussion map items from window analysis
-    const supportingTurnIds = recentTurns.map((turn) => turn.id);
-    for (const decision of windowAnalysis.decisions || []) {
-      await persistWindowItem(
-        sessionId,
-        "decisions",
-        decision,
-        supportingTurnIds,
-      );
-    }
-    for (const action of windowAnalysis.actions || []) {
-      await persistWindowItem(sessionId, "actions", action, supportingTurnIds);
-    }
 
     // Generate facilitation prompt
     const prompt = generatePrompt(windowAnalysis, config);
@@ -386,30 +368,6 @@ async function runWindowAnalysis(sessionId: string): Promise<void> {
   } catch (err) {
     console.error("Window analysis failed:", err);
   }
-}
-
-async function persistWindowItem(
-  sessionId: string,
-  category: "decisions" | "actions",
-  text: string,
-  turnIds: string[],
-): Promise<void> {
-  const normalizedText = text.trim().slice(0, 180);
-  if (!normalizedText) return;
-  const existing = await prisma.discussionItem.findFirst({
-    where: { sessionId, category, text: normalizedText },
-  });
-  if (existing) return;
-  const item = await prisma.discussionItem.create({
-    data: {
-      sessionId,
-      category,
-      text: normalizedText,
-      status: "open",
-      turnIds: JSON.stringify(turnIds),
-    },
-  });
-  publish(sessionId, mapPatch({ ...item, turnIds }));
 }
 
 function serializeTurn(t: any) {

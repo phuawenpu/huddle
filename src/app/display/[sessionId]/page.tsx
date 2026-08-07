@@ -186,7 +186,7 @@ export default function DisplayPage() {
       const p = participants.find((p) => p.id === mapping.participantId);
       if (p && !p.isHidden) return p.displayName;
     }
-    return `Speaker ${label}`;
+    return /^speaker\b/i.test(label) ? label : `Speaker ${label}`;
   };
 
   const talkShareEntries = Object.entries(metrics.talkShare || {})
@@ -406,11 +406,14 @@ export default function DisplayPage() {
             </div>
           </div>
 
-          {/* Discussion items */}
+          {/* Source-linked critique items */}
           <div className="bg-hud-surface border border-hud-border rounded-xl p-4 flex-1 overflow-y-auto">
             <h3 className="text-xs font-semibold text-hud-muted uppercase tracking-wider mb-3">
-              Discussion Map
+              Source Map
             </h3>
+            <p className="text-[10px] text-hud-muted mb-3">
+              Exact-turn signals only; window summaries never enter this map.
+            </p>
             {items.filter((i) => i.status === "open").length === 0 && (
               <p className="text-xs text-hud-muted">No items yet</p>
             )}

@@ -2,7 +2,12 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { createSSEResponse, snapshotPatch } from "@/lib/sse";
 import { subscribe } from "@/lib/pubsub";
-import { buildCritiqueIntelligence } from "@/lib/critique-intelligence";
+import {
+  buildCritiqueIntelligence,
+  isSourceLinkedDiscussionItem,
+  normalizeCriteria,
+  normalizeTurnAnalysis,
+} from "@/lib/critique-intelligence";
 import { calculateMetrics } from "@/lib/metrics";
 
 export const dynamic = "force-dynamic";
@@ -39,20 +44,23 @@ export async function GET(
           return;
         }
 
-        const serializedTurns = session.transcriptTurns.map(serializeTurn);
+        const criteria = normalizeCriteria(safeParseJson(session.criteria, []));
+        const serializedTurns = session.transcriptTurns.map((turn) =>
+          serializeTurn(turn, criteria),
+        );
+        const serializedItems = session.discussionItems.map(serializeItem);
         send(
           snapshotPatch(id, {
             session: serializeSession(session),
             participants: session.participants,
             speakerMappings: session.speakerMappings,
             turns: serializedTurns,
-          items: session.discussionItems.map(serializeItem),
-          intent: session.intentRevisions[0] || null,
-          metrics: calculateMetrics(serializedTurns),
-          intelligence: buildCritiqueIntelligence(
-              serializedTurns,
-              safeParseJson(session.criteria, []),
+            items: serializedItems.filter((item) =>
+              isSourceLinkedDiscussionItem(item, serializedTurns),
             ),
+            intent: session.intentRevisions[0] || null,
+            metrics: calculateMetrics(serializedTurns),
+            intelligence: buildCritiqueIntelligence(serializedTurns, criteria),
           }),
           String(++sequenceId),
         );
@@ -81,17 +89,20 @@ function serializeSession(s: any) {
   } = s;
   return {
     ...session,
-    criteria: safeParseJson(session.criteria, []),
+    criteria: normalizeCriteria(safeParseJson(session.criteria, [])),
     createdAt: session.createdAt?.toISOString(),
     updatedAt: session.updatedAt?.toISOString(),
   };
 }
 
-function serializeTurn(t: any) {
+function serializeTurn(t: any, criteria: string[]) {
+  const rawAnalysis = safeParseJson(t.analysisJson, null);
   return {
     ...t,
     wordsJson: safeParseJson(t.wordsJson, null),
-    analysis: safeParseJson(t.analysisJson, null),
+    analysis: rawAnalysis
+      ? normalizeTurnAnalysis(rawAnalysis, t.currentText, criteria)
+      : null,
     session: undefined,
   };
 }
