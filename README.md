@@ -20,7 +20,7 @@ Both modes drive the same pipeline: audio → worklet → PCM16 → ASR → tran
 | Metric            | Value                                            |
 | ----------------- | ------------------------------------------------ |
 | TypeScript        | 0 errors                                         |
-| Unit tests        | 91/91 passing                                    |
+| Unit tests        | 93/93 passing                                    |
 | Browser tests     | 54/54 passing across 6 desktop/mobile profiles   |
 | API routes        | 39 endpoints operational                         |
 | Frontend pages    | 9 routes functional                              |
@@ -54,8 +54,11 @@ The research papers in `workspace/`, the current implementation, and adjacent 20
 - [Seven system versions](docs/research/04-system-versions.md)
 - [Evaluation roadmap](docs/research/05-evaluation-roadmap.md)
 - [Product and investor assessment](docs/research/06-product-and-investor-assessment.md)
-- [Critique Intelligence System — 11-page diagram PDF](docs/research/critique-intelligence-system-2026-08-07.pdf)
-- [Diagram generator](docs/research/generate_critique_intelligence_system.py)
+- [Critique Intelligence System — three-page synthesized PDF](docs/research/critique-intelligence-system-2026-08-07.pdf)
+- [Business feasibility — investor one-pager](docs/research/business-feasibility-one-pager-2026-08-07.pdf)
+- [System brief generator](docs/research/generate_critique_intelligence_system.py)
+- [Business one-pager generator](docs/research/generate_business_feasibility_one_pager.py)
+- [Archived detailed 11-page system atlas](docs/research/archive/diagrams-2026-08-07/critique-intelligence-system-detailed-2026-08-07.pdf)
 - [Archived conceptual diagram set](docs/research/archive/diagrams-2026-08-07/)
 
 ### New API Endpoints (since prototype)
@@ -173,7 +176,7 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Testing
 
 ```bash
-npm test                    # 91 unit tests (including OpenAI deadline fallback)
+npm test                    # 93 unit tests (including decision-evidence gating)
 npx tsc --noEmit           # TypeScript check
 npm run build              # production Next.js build
 npm run test:e2e           # 54 cases across Chromium, Firefox, WebKit, iPhone, Android, iPad

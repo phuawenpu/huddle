@@ -305,7 +305,7 @@ These thresholds are proposed management gates, not established benchmarks.
 - duplicate suppression;
 - source-linked Critique Radar over SSE;
 - deterministic fallback when a provider rejects or misses its deadline;
-- 91 unit tests and 54 browser-profile cases at this assessment phase;
+- 93 unit tests and 54 browser-profile cases at this assessment phase;
 - successful production build and Fly.io health check;
 - public Fly probe of source-linked signals.
 
