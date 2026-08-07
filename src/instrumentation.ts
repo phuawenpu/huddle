@@ -1,10 +1,9 @@
 /**
  * Next.js Instrumentation — runs once at server startup.
- * Initializes the database schema.
+ * The actual DB schema init is handled lazily by db.ts on first Prisma access.
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
-    const { ensureDbSchema } = await import("@/lib/db");
-    await ensureDbSchema();
+    console.log("Critique HUD server starting...");
   }
 }

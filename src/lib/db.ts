@@ -2,26 +2,33 @@ import { PrismaClient } from "@prisma/client";
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
-export const prisma = globalForPrisma.prisma || new PrismaClient();
+let dbInitPromise: Promise<void> | null = null;
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+export const prisma = new Proxy(
+  globalForPrisma.prisma || new PrismaClient(),
+  {
+    get(target, prop, receiver) {
+      // Lazily init DB schema on first property access
+      if (!dbInitPromise) {
+        dbInitPromise = ensureDbSchema().catch((err) => {
+          console.error("DB schema init failed:", err);
+          dbInitPromise = null; // retry next time
+        });
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  }
+);
 
-/**
- * Initialize the database schema.
- * Safe to call multiple times — prisma db push is a no-op if schema matches.
- */
-let dbInitialized = false;
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma as any;
 
-export async function ensureDbSchema(): Promise<void> {
-  if (dbInitialized) return;
+async function ensureDbSchema(): Promise<void> {
   try {
-    // Test if the DB has tables by querying a known table
-    await prisma.$queryRaw`SELECT 1 FROM Session LIMIT 1`;
-    dbInitialized = true;
+    await (prisma as any).$queryRaw`SELECT 1 FROM Session LIMIT 1`;
     return;
   } catch {
-    // Tables don't exist — create them via raw SQL
-    await prisma.$executeRawUnsafe(`
+    // Tables don't exist — create them
+    await (prisma as any).$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "Session" (
         "id" TEXT NOT NULL PRIMARY KEY,
         "title" TEXT NOT NULL DEFAULT 'Untitled',
@@ -178,7 +185,6 @@ export async function ensureDbSchema(): Promise<void> {
         "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    dbInitialized = true;
     console.log("Database schema initialized successfully");
   }
 }
