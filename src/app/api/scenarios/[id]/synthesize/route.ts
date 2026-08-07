@@ -83,7 +83,7 @@ export async function POST(
       speakerCount: speakers.length,
       realizedDurationMs,
       durationSec: Math.round(realizedDurationMs / 1000),
-      mixedUrl: `/api/scenarios/${id}/mixed.wav`,
+      mixedUrl: `/api/scenarios/${id}/mixed?format=wav`,
       fileSize: buffer.length,
     });
   } catch (error: any) {

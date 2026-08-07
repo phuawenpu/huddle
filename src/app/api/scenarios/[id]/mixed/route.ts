@@ -9,12 +9,14 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   const { id } = await context.params;
-  const isMp3 = request.url.includes(".mp3");
+  const url = new URL(request.url);
+  const format = url.searchParams.get("format") || "wav";
+  const isMp3 = format === "mp3";
   const ext = isMp3 ? "mp3" : "wav";
   const filePath = join(AUDIO_DIR, id, `mixed.${ext}`);
 
   if (!existsSync(filePath)) {
-    return NextResponse.json({ error: "Audio not synthesized yet" }, { status: 404 });
+    return NextResponse.json({ error: "Audio not synthesized yet. Run synthesis first." }, { status: 404 });
   }
 
   const stat = statSync(filePath);
@@ -47,6 +49,7 @@ export async function GET(
       "Content-Length": String(stat.size),
       "Accept-Ranges": "bytes",
       "Cache-Control": "public, max-age=3600",
+      "Content-Disposition": `inline; filename="mixed.${ext}"`,
     },
   });
 }

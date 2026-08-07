@@ -37,7 +37,7 @@ export async function GET() {
       turnCount: safeParse(s.turnsJson)?.length || 0,
       createdAt: s.createdAt,
       mixedUrl: s.status === "ready" || s.status === "approved" 
-        ? `/api/scenarios/${s.id}/mixed.wav` 
+        ? `/api/scenarios/${s.id}/mixed?format=wav` 
         : null,
     }));
 

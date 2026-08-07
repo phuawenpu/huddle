@@ -67,7 +67,7 @@ export default function SimulatorPage() {
             const sData = await sRes.json();
             setScenario(sData);
             // Set the mixed audio URL
-            setMixedAudioUrl(`/api/scenarios/${runData.scenarioId}/mixed.wav`);
+            setMixedAudioUrl(`/api/scenarios/${runData.scenarioId}/mixed?format=wav`);
           }
         }
         setStatus("ready");
