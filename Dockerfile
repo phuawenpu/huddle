@@ -30,4 +30,5 @@ EXPOSE 3000
 ENV NODE_ENV=production
 ENV PORT=3000
 
-CMD ["node", "server.js"]
+# Create dirs at runtime (volume mount hides image dirs) then start
+CMD ["sh", "-c", "mkdir -p /data/audio /data/ir && node server.js"]
