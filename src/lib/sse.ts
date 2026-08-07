@@ -11,7 +11,7 @@ const HEARTBEAT_INTERVAL_MS = 15000;
  * Handles heartbeat and Last-Event-ID.
  */
 export function createSSEResponse(
-  onConnect: (send: (patch: SSEPatch) => void, close: () => void) => void
+  onConnect: (send: (patch: SSEPatch, eventId?: string) => void, close: () => void) => void
 ): Response {
   let encoder = new TextEncoder();
   let stream: ReadableStream<Uint8Array>;

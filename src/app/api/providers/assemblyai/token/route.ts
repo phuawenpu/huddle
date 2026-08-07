@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { STUB_ASR_PORT } from "@/lib/stubs/assemblyai";
 
 /**
  * AssemblyAI token endpoint.
@@ -11,7 +12,8 @@ export async function GET() {
   if (isStub) {
     return NextResponse.json({
       token: "stub-token",
-      wsBase: "ws://localhost:9876",
+      wsBase: `ws://localhost:${STUB_ASR_PORT}`,
+      wsUrl: `ws://localhost:${STUB_ASR_PORT}/v3/ws?sample_rate=16000&speech_model=universal-3-5-pro&mode=balanced&token=stub-token`,
       speechModel: "universal-3-5-pro",
       stubbed: true,
     });
@@ -43,6 +45,7 @@ export async function GET() {
     return NextResponse.json({
       token,
       wsBase: process.env.ASR_WS_BASE || "wss://streaming.assemblyai.com",
+      wsUrl: `${process.env.ASR_WS_BASE || "wss://streaming.assemblyai.com"}/v3/ws?sample_rate=16000&speech_model=universal-3-5-pro&mode=balanced&token=${token}`,
       speechModel: process.env.ASSEMBLYAI_SPEECH_MODEL || "universal-3-5-pro",
       stubbed: false,
     });

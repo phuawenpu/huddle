@@ -259,3 +259,27 @@ export interface CorrectionData {
   newValue: string;
   createdAt: string;
 }
+
+export interface WindowAnalysis {
+  theme: string;
+  discussionState: string;
+  phaseAllocation: {
+    problemAndEvidence: number;
+    ideas: number;
+    evaluation: number;
+    decisionsAndActions: number;
+  };
+  openQuestions: string[];
+  positions: Array<{ label: string; gist: string }>;
+  decisions: string[];
+  actions: string[];
+  agreementState: "consensus" | "majority" | "divided" | "emerging";
+  minorityPosition?: string;
+}
+
+export interface PromptData {
+  text: string;
+  supportingTurnIds: string[];
+  confidence: number;
+  category: string;
+}

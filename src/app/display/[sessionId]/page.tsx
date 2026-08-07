@@ -3,15 +3,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 
-interface SessionData {
-  title: string;
-  objective: string;
-  phase: string;
-  status: string;
-  runMode: string;
-  criteria: string[];
-}
-
 interface TranscriptTurn {
   id: string;
   providerSpeakerLabel: string;
@@ -22,7 +13,9 @@ interface TranscriptTurn {
   isSubstantive: boolean;
   isCalibration: boolean;
   isUnknownSpeaker: boolean;
-  analysis?: { category?: string };
+  possibleOverlap: boolean;
+  wasSpeakerRevised?: boolean;
+  analysis?: { category?: string; evidence?: string };
 }
 
 interface SpeakerMapping {
@@ -43,260 +36,317 @@ interface DiscussionItem {
   status: string;
 }
 
-const CATEGORIES = ["evidence", "questions", "positions", "decisions", "actions"] as const;
+interface SessionMetrics {
+  talkShare?: Record<string, number>;
+  categoryCounts?: Record<string, number>;
+  substantiveTurnCount?: number;
+  streamingMinutesUsed?: number;
+}
+
+interface PromptData {
+  id: string;
+  text: string;
+  confidence: number;
+}
+
+interface SessionInfo {
+  title: string;
+  objective: string;
+  status: string;
+  runMode: string;
+}
 
 export default function DisplayPage() {
   const params = useParams<{ sessionId: string }>();
   const sessionId = params.sessionId;
 
-  const [session, setSession] = useState<SessionData | null>(null);
+  const [session, setSession] = useState<SessionInfo | null>(null);
   const [turns, setTurns] = useState<TranscriptTurn[]>([]);
   const [mappings, setMappings] = useState<SpeakerMapping[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [items, setItems] = useState<DiscussionItem[]>([]);
-  const [promptText, setPromptText] = useState("");
-  const [talkShare, setTalkShare] = useState<Record<string, number>>({});
-  const [clock, setClock] = useState("");
-  const [isSimulated, setIsSimulated] = useState(false);
+  const [metrics, setMetrics] = useState<SessionMetrics>({});
+  const [prompt, setPrompt] = useState<PromptData | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
+  // Connect to SSE
   useEffect(() => {
-    const tick = () => {
-      const now = new Date();
-      setClock(now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
-    };
-    tick();
-    const int = setInterval(tick, 10000);
-    return () => clearInterval(int);
-  }, []);
+    let es: EventSource;
+    let retryTimeout: ReturnType<typeof setTimeout>;
 
-  useEffect(() => {
-    const es = new EventSource(`/api/sessions/${sessionId}/events`);
+    const connect = () => {
+      es = new EventSource(`/api/sessions/${sessionId}/events`);
+      eventSourceRef.current = es;
+      es.onopen = () => {
+        setConnected(true);
+        setReconnectAttempt(0);
+      };
 
-    es.addEventListener("snapshot", (e) => {
-      const data = JSON.parse(e.data);
-      if (data.session) {
-        setSession(data.session);
-        setIsSimulated(data.session.runMode?.startsWith("sim"));
-      }
-      if (data.turns) setTurns(data.turns || []);
-      if (data.speakerMappings) setMappings(data.speakerMappings || []);
-      if (data.participants) setParticipants(data.participants || []);
-      if (data.items) setItems(data.items || []);
-    });
-
-    es.addEventListener("turn.final", (e) => {
-      const turn = JSON.parse(e.data);
-      setTurns(prev => {
-        const filtered = prev.filter(t => t.id !== turn.id);
-        return [...filtered, turn].slice(-3);
+      es.addEventListener("snapshot", (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.session) setSession(data.session);
+          if (data.turns) setTurns(data.turns);
+          if (data.speakerMappings) setMappings(data.speakerMappings);
+          if (data.participants) setParticipants(data.participants);
+          if (data.items) setItems(data.items);
+        } catch {}
       });
-    });
 
-    es.addEventListener("metrics", (e) => {
-      const data = JSON.parse(e.data);
-      if (data.talkShare) setTalkShare(data.talkShare);
-    });
+      es.addEventListener("turn.final", (e) => {
+        try {
+          const turn = JSON.parse(e.data);
+          setTurns(prev => {
+            const idx = prev.findIndex(t => t.id === turn.id);
+            if (idx >= 0) {
+              const next = [...prev];
+              next[idx] = turn;
+              return next;
+            }
+            return [...prev, turn].slice(-20); // keep last 20
+          });
+        } catch {}
+      });
 
-    es.addEventListener("prompt.show", (e) => {
-      const data = JSON.parse(e.data);
-      setPromptText(data.text || "");
-    });
+      es.addEventListener("turn.updated", (e) => {
+        try {
+          const turn = JSON.parse(e.data);
+          setTurns(prev => prev.map(t => t.id === turn.id ? turn : t));
+        } catch {}
+      });
 
-    es.addEventListener("prompt.clear", () => setPromptText(""));
+      es.addEventListener("map.patch", (e) => {
+        try {
+          const item = JSON.parse(e.data);
+          setItems(prev => [...prev.filter(i => i.id !== item.id), item]);
+        } catch {}
+      });
 
-    es.addEventListener("map.patch", (e) => {
-      const data = JSON.parse(e.data);
-      if (data.items) setItems(data.items);
-    });
+      es.addEventListener("prompt.show", (e) => {
+        try {
+          const p = JSON.parse(e.data);
+          setPrompt(p);
+        } catch {}
+      });
 
-    es.addEventListener("turn.updated", (e) => {
-      const turn = JSON.parse(e.data);
-      setTurns(prev => prev.map(t => t.id === turn.id ? turn : t));
-    });
+      es.addEventListener("prompt.clear", () => {
+        setPrompt(null);
+      });
 
-    return () => es.close();
+      es.addEventListener("metrics", (e) => {
+        try {
+          setMetrics(JSON.parse(e.data));
+        } catch {}
+      });
+
+      es.addEventListener("status", (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          setSession(s => s ? { ...s, status: data.status } : s);
+        } catch {}
+      });
+
+      es.onerror = () => {
+        setConnected(false);
+        es.close();
+        // Reconnect with backoff
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttempt), 15000);
+        setReconnectAttempt(a => a + 1);
+        retryTimeout = setTimeout(connect, delay);
+      };
+    };
+
+    connect();
+
+    return () => {
+      clearTimeout(retryTimeout);
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+    };
   }, [sessionId]);
 
-  const getSpeakerName = (label: string) => {
+  const getSpeakerName = (label: string): string => {
+    if (!label) return "Unassigned";
     const mapping = mappings.find(m => m.speakerLabel === label);
     if (mapping?.participantId) {
       const p = participants.find(p => p.id === mapping.participantId);
-      if (p?.isHidden) return "—";
-      return p?.displayName || label;
+      if (p && !p.isHidden) return p.displayName;
     }
-    return label;
+    return `Speaker ${label}`;
   };
 
-  const visibleTurns = turns
-    .filter(t => t.isFinal && t.isSubstantive && !t.isCalibration)
-    .slice(-3);
+  const talkShareEntries = Object.entries(metrics.talkShare || {})
+    .filter(([label]) => {
+      const mapping = mappings.find(m => m.speakerLabel === label);
+      const p = mapping?.participantId ? participants.find(p => p.id === mapping.participantId) : null;
+      return !p?.isHidden;
+    })
+    .sort((a, b) => b[1] - a[1]);
 
-  const catItems = (category: string) =>
-    items.filter(i => i.category === category).slice(0, 4);
-
-  const activeSpeakers = Object.keys(talkShare).length;
-
-  // Font size scaling with clamp for readability at distance
-  const metricsFontSize = "clamp(18px, 2vw, 32px)";
+  const lastTurns = turns.filter(t => t.isFinal && !t.isCalibration).slice(-5);
+  const isSimulation = session?.runMode !== "live";
 
   return (
-    <main className="min-h-dvh bg-hud-bg text-hud-text overflow-hidden" style={{ overscrollBehavior: "none" }}>
-      {/* HUD Header */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-hud-border safe-top"
-        style={{ fontSize: "clamp(14px, 1.5vw, 18px)" }}>
-        <div className="flex items-center gap-6">
-          <h1 className="font-bold" style={{ fontSize: "clamp(16px, 2vw, 22px)" }}>
-            DESIGN CRITIQUE HUD
+    <main className="min-h-dvh flex flex-col bg-hud-bg text-hud-text safe-top safe-bottom safe-left safe-right overscroll-none">
+      {/* Header */}
+      <header className="px-6 py-4 border-b border-hud-border flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            {session?.title || "Critique HUD"}
           </h1>
-          {isSimulated && (
-            <span className="px-3 py-1 bg-hud-sim-badge/20 text-hud-sim-badge rounded-full text-xs font-bold"
-              style={{ fontSize: "clamp(10px, 1.2vw, 14px)" }}>
-              ◆ SIMULATION — synthetic AI voices
+          <p className="text-sm text-hud-muted mt-1">
+            {session?.objective?.slice(0, 80) || ""}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          {isSimulation && (
+            <span className="px-3 py-1.5 bg-yellow-500/20 border border-yellow-500/50 text-yellow-400 text-sm font-bold rounded-lg">
+              ◆ SIMULATION
             </span>
           )}
+          <span className={`w-3 h-3 rounded-full ${session?.status === "active" ? "bg-green-400 animate-pulse" : "bg-gray-500"}`} />
+          <span className="text-sm text-hud-muted">
+            {session?.status || "setup"}
+            {!connected && session?.status === "active" && " · reconnecting…"}
+          </span>
         </div>
-        <span className="text-hud-muted font-mono" style={{ fontSize: "clamp(14px, 1.5vw, 18px)" }}>
-          {clock}
-        </span>
       </header>
 
-      <div className="h-[calc(100dvh-100px)] flex">
-        {/* Left: Transcript Panel (~60%) */}
-        <div className="flex-1 flex flex-col p-4" style={{ maxWidth: "60%" }}>
-          <div className="flex-1 space-y-3 overflow-hidden">
-            <div className="text-hud-muted text-xs uppercase tracking-wider" style={{ fontSize: "clamp(10px, 1vw, 12px)" }}>
-              Transcript
-            </div>
-            {visibleTurns.map(turn => (
-              <div key={turn.id} className="p-3 bg-hud-surface/50 rounded-lg border border-hud-border/50"
-                style={{ fontSize: "clamp(14px, 1.5vw, 18px)" }}>
+      {/* Prompt banner */}
+      {prompt && (
+        <div className="mx-6 mt-3 p-3 bg-hud-accent/10 border border-hud-accent/30 rounded-xl text-sm text-hud-accent animate-fade-in">
+          💡 {prompt.text}
+        </div>
+      )}
+
+      <div className="flex-1 flex flex-col lg:flex-row gap-4 p-4 sm:p-6 overflow-hidden">
+        {/* Transcript panel (left, ~55%) */}
+        <div className="flex-1 flex flex-col min-w-0">
+          <h2 className="text-xs font-semibold text-hud-muted uppercase tracking-wider mb-2 px-1">
+            Transcript
+          </h2>
+          <div className="flex-1 overflow-y-auto space-y-2 pr-2 overscroll-contain">
+            {lastTurns.length === 0 && (
+              <p className="text-hud-muted text-sm py-12 text-center">
+                {session?.status === "active"
+                  ? "Waiting for discussion to begin…"
+                  : session?.status === "terminated"
+                  ? "Session ended."
+                  : "Session not started."}
+              </p>
+            )}
+            {lastTurns.map((turn) => (
+              <div
+                key={turn.id}
+                className={`p-3 rounded-lg border ${
+                  turn.isSubstantive
+                    ? "border-hud-border bg-hud-surface animate-fade-in"
+                    : "border-hud-border/50 bg-hud-surface/50"
+                }`}
+              >
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="font-semibold text-hud-accent"
-                    style={{ fontSize: "clamp(12px, 1.3vw, 16px)" }}>
-                    {getSpeakerName(turn.providerSpeakerLabel)}
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                    turn.isUnknownSpeaker
+                      ? "bg-gray-600/30 text-gray-400"
+                      : "bg-hud-accent/20 text-hud-accent"
+                  }`}>
+                    {turn.isUnknownSpeaker ? "Unassigned" : getSpeakerName(turn.providerSpeakerLabel)}
                   </span>
                   {turn.analysis?.category && (
-                    <span className="px-2 py-0.5 bg-hud-accent/10 text-hud-accent rounded text-xs"
-                      style={{ fontSize: "clamp(9px, 0.9vw, 11px)" }}>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-hud-accent/5 text-hud-accent/60">
                       {turn.analysis.category}
                     </span>
                   )}
+                  {turn.possibleOverlap && (
+                    <span className="text-[10px] text-yellow-400/60">⌇ overlap</span>
+                  )}
+                  {turn.wasSpeakerRevised && (
+                    <span className="text-[10px] text-blue-400/60">↻ revised</span>
+                  )}
                 </div>
-                <p className="leading-relaxed" style={{ fontSize: "clamp(14px, 1.5vw, 18px)" }}>
+                <p className="text-sm leading-relaxed">
                   {turn.currentText}
                 </p>
               </div>
             ))}
-            {visibleTurns.length === 0 && (
-              <div className="flex-1 flex items-center justify-center text-hud-muted"
-                style={{ fontSize: "clamp(16px, 2vw, 24px)" }}>
-                Waiting for discussion…
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Right: Discussion Map + Metrics */}
-        <div className="w-[40%] flex flex-col p-4 border-l border-hud-border">
-          {/* Objective & Status */}
-          <div className="mb-3 pb-3 border-b border-hud-border/50">
-            <div className="text-hud-muted text-xs" style={{ fontSize: "clamp(9px, 0.9vw, 11px)" }}>
-              OBJECTIVE
-            </div>
-            <div style={{ fontSize: "clamp(12px, 1.2vw, 15px)" }}>
-              {session?.objective || "—"}
-            </div>
-            <div className="flex gap-4 mt-2">
-              <span className="text-hud-accent text-xs" style={{ fontSize: "clamp(9px, 0.9vw, 11px)" }}>
-                {session?.phase?.toUpperCase() || ""}
-              </span>
-              <span className="text-hud-muted text-xs" style={{ fontSize: "clamp(9px, 0.9vw, 11px)" }}>
-                {session?.status || ""}
-              </span>
+        {/* Right panel: Talk share + Discussion map */}
+        <div className="lg:w-80 flex flex-col gap-4 min-w-0">
+          {/* Talk share */}
+          <div className="bg-hud-surface border border-hud-border rounded-xl p-4">
+            <h3 className="text-xs font-semibold text-hud-muted uppercase tracking-wider mb-3">
+              Participation
+            </h3>
+            {talkShareEntries.length === 0 && (
+              <p className="text-xs text-hud-muted">No data yet</p>
+            )}
+            {talkShareEntries.map(([label, pct]) => (
+              <div key={label} className="mb-2 last:mb-0">
+                <div className="flex justify-between text-xs mb-1">
+                  <span>{getSpeakerName(label)}</span>
+                  <span className="text-hud-muted">{pct}%</span>
+                </div>
+                <div className="h-2 bg-hud-bg rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-hud-accent/60 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(100, pct)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+            <div className="mt-3 text-xs text-hud-muted">
+              {metrics.substantiveTurnCount || 0} substantive turns
+              {metrics.streamingMinutesUsed !== undefined && ` · ${metrics.streamingMinutesUsed.toFixed(1)}m streaming`}
             </div>
           </div>
 
-          {/* Discussion Map */}
-          <div className="flex-1 overflow-hidden">
-            <div className="text-hud-muted text-xs uppercase tracking-wider mb-2"
-              style={{ fontSize: "clamp(9px, 0.9vw, 11px)" }}>
+          {/* Discussion items */}
+          <div className="bg-hud-surface border border-hud-border rounded-xl p-4 flex-1 overflow-y-auto">
+            <h3 className="text-xs font-semibold text-hud-muted uppercase tracking-wider mb-3">
               Discussion Map
-            </div>
-            <div className="space-y-2 overflow-y-auto" style={{ maxHeight: "calc(100% - 140px)" }}>
-              {CATEGORIES.map(cat => {
-                const catItemsList = catItems(cat);
-                return (
-                  <div key={cat} className="bg-hud-surface/30 rounded-lg p-2">
-                    <div className="text-[10px] text-hud-muted uppercase mb-1"
-                      style={{ fontSize: "clamp(8px, 0.8vw, 10px)" }}>
-                      {cat} ({catItemsList.length})
-                    </div>
-                    {catItemsList.map(item => (
-                      <div key={item.id} className="flex items-center gap-1.5 py-0.5"
-                        style={{ fontSize: "clamp(10px, 1vw, 13px)" }}>
-                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                          item.status === "resolved" ? "bg-hud-success" : "bg-hud-accent"
-                        }`} />
-                        <span className="truncate">{item.text}</span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Metric Strip */}
-          <div className="mt-3 pt-3 border-t border-hud-border/50">
-            <div className="grid grid-cols-4 gap-3 text-center">
-              <div>
-                <div className="text-hud-muted text-[9px] uppercase"
-                  style={{ fontSize: "clamp(8px, 0.8vw, 10px)" }}>
-                  Speakers
-                </div>
-                <div className="text-hud-text font-mono font-bold" style={{ fontSize: metricsFontSize }}>
-                  {activeSpeakers}
-                </div>
+            </h3>
+            {items.filter(i => i.status === "open").length === 0 && (
+              <p className="text-xs text-hud-muted">No items yet</p>
+            )}
+            {items.filter(i => i.status === "open").slice(0, 20).map((item) => (
+              <div key={item.id} className="mb-2 pb-2 border-b border-hud-border/30 last:border-0 last:pb-0">
+                <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${
+                  categoryColor(item.category)
+                }`}>
+                  {item.category}
+                </span>
+                <p className="text-xs mt-1 text-hud-text/80">{item.text}</p>
               </div>
-              <div>
-                <div className="text-hud-muted text-[9px] uppercase"
-                  style={{ fontSize: "clamp(8px, 0.8vw, 10px)" }}>
-                  Questions
-                </div>
-                <div className="text-hud-text font-mono font-bold" style={{ fontSize: metricsFontSize }}>
-                  {catItems("questions").length}
-                </div>
-              </div>
-              <div>
-                <div className="text-hud-muted text-[9px] uppercase"
-                  style={{ fontSize: "clamp(8px, 0.8vw, 10px)" }}>
-                  Evidence
-                </div>
-                <div className="text-hud-text font-mono font-bold" style={{ fontSize: metricsFontSize }}>
-                  {catItems("evidence").length}
-                </div>
-              </div>
-              <div>
-                <div className="text-hud-muted text-[9px] uppercase"
-                  style={{ fontSize: "clamp(8px, 0.8vw, 10px)" }}>
-                  Open
-                </div>
-                <div className="text-hud-text font-mono font-bold" style={{ fontSize: metricsFontSize }}>
-                  {items.filter(i => i.status !== "resolved").length}
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Prompt Banner */}
-      {promptText && (
-        <div className="fixed bottom-0 inset-x-0 bg-hud-accent/10 border-t border-hud-accent/30 px-6 py-3"
-          style={{ fontSize: "clamp(13px, 1.4vw, 16px)", paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))" }}>
-          💡 {promptText}
-        </div>
-      )}
+      {/* Status bar */}
+      <footer className="px-6 py-2 border-t border-hud-border flex items-center justify-between text-xs text-hud-muted">
+        <span>
+          {connected ? "● Live" : "○ Connecting…"}
+          {reconnectAttempt > 0 && ` (attempt ${reconnectAttempt})`}
+        </span>
+        <span>Critique HUD</span>
+      </footer>
     </main>
   );
+}
+
+function categoryColor(cat: string): string {
+  switch (cat) {
+    case "evidence": return "bg-blue-500/20 text-blue-400";
+    case "questions": return "bg-purple-500/20 text-purple-400";
+    case "positions": return "bg-orange-500/20 text-orange-400";
+    case "decisions": return "bg-green-500/20 text-green-400";
+    case "actions": return "bg-yellow-500/20 text-yellow-400";
+    case "themes": return "bg-pink-500/20 text-pink-400";
+    default: return "bg-gray-500/20 text-gray-400";
+  }
 }

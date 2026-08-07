@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useAudioCapture } from "@/lib/client/audio-capture";
+import { createASRClient, type ASRClient, type IngestTurnData } from "@/lib/client/asr-client";
+import { useWakeLock } from "@/lib/client/wake-lock";
 
 interface SessionData {
   id: string;
@@ -29,6 +32,8 @@ interface TranscriptTurn {
   isCalibration: boolean;
   isUnknownSpeaker: boolean;
   possibleOverlap: boolean;
+  isManuallyCorrected?: boolean;
+  wasSpeakerRevised?: boolean;
   analysis?: any;
   wordsJson?: any[];
 }
@@ -42,18 +47,7 @@ interface SpeakerMapping {
 interface Participant {
   id: string;
   displayName: string;
-  role: string;
-  isHidden: boolean;
 }
-
-interface DiscussionItem {
-  id: string;
-  category: string;
-  text: string;
-  status: string;
-}
-
-const CATEGORIES = ["evidence", "questions", "positions", "decisions", "actions"] as const;
 
 export default function FacilitatorPage() {
   const params = useParams<{ sessionId: string }>();
@@ -64,135 +58,319 @@ export default function FacilitatorPage() {
   const [turns, setTurns] = useState<TranscriptTurn[]>([]);
   const [mappings, setMappings] = useState<SpeakerMapping[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
-  const [items, setItems] = useState<DiscussionItem[]>([]);
-  const [status, setStatus] = useState("loading");
-  const [showDisplay, setShowDisplay] = useState(false);
-  const [editingTurn, setEditingTurn] = useState<string | null>(null);
-  const [editText, setEditText] = useState("");
-  const [facilitatorPrompt, setFacilitatorPrompt] = useState("");
-  const [metrics, setMetrics] = useState<any>(null);
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const [error, setError] = useState("");
+  const [streamingMins, setStreamingMins] = useState(0);
+  const [asrConnected, setAsrConnected] = useState(false);
+  const [activeSpeaker, setActiveSpeaker] = useState<string | null>(null);
+  const [livePartial, setLivePartial] = useState<string>("");
+  
+  const [intentObjective, setIntentObjective] = useState("");
+  const [intentPhase, setIntentPhase] = useState("");
+  const [intentCriteria, setIntentCriteria] = useState("");
+  
+  const asrRef = useRef<ASRClient | null>(null);
+  const streamingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pcm16CountRef = useRef(0);
+
+  // Audio capture hook
+  const { start: startCapture, stop: stopCapture, isCapturing, settings, meter, error: captureError, workletLoaded } = 
+    useAudioCapture({
+      onPcm16: (buffer: ArrayBuffer, frameIndex: number) => {
+        asrRef.current?.sendAudio(buffer);
+        pcm16CountRef.current++;
+      },
+      onSettingsReadback: (s) => {
+        console.log("Audio settings:", s);
+      },
+      onError: (err) => {
+        setError(`Audio capture error: ${err.message}`);
+      },
+    });
+
+  // Wake lock
+  const { locked: wakeLocked, supported: wakeLockSupported, acquire: acquireWakeLock, release: releaseWakeLock } = useWakeLock();
 
   // Load session data
-  const loadSession = useCallback(async () => {
-    try {
-      const [sRes, tRes, mRes, pRes, iRes] = await Promise.all([
-        fetch(`/api/sessions/${sessionId}`),
-        fetch(`/api/sessions/${sessionId}/turns`),
-        fetch(`/api/sessions/${sessionId}/speaker-mappings`),
-        fetch(`/api/sessions/${sessionId}/participants`),
-        fetch(`/api/sessions/${sessionId}/items`),
-      ]);
-      if (sRes.ok) setSession(await sRes.json());
-      if (tRes.ok) setTurns(await tRes.json());
-      if (mRes.ok) setMappings(await mRes.json());
-      if (pRes.ok) setParticipants(await pRes.json());
-      if (iRes.ok) setItems(await iRes.json());
-      setStatus("ready");
-    } catch {
-      setStatus("error");
-    }
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}`);
+        if (!res.ok) throw new Error("Session not found");
+        const data = await res.json();
+        setSession(data);
+        setIntentObjective(data.objective || "");
+        setIntentPhase(data.phase || "");
+        setIntentCriteria((data.criteria || []).join("\n"));
+
+        // Load turns, mappings, participants
+        const [tRes, mRes, pRes] = await Promise.all([
+          fetch(`/api/sessions/${sessionId}/turns`),
+          fetch(`/api/sessions/${sessionId}/speaker-mappings`),
+          fetch(`/api/sessions/${sessionId}/participants`),
+        ]);
+        if (tRes.ok) setTurns(await tRes.json());
+        if (mRes.ok) setMappings(await mRes.json());
+        if (pRes.ok) setParticipants(await pRes.json());
+      } catch (e: any) {
+        setError(e.message || "Failed to load session");
+      }
+    };
+    load();
   }, [sessionId]);
 
-  useEffect(() => { loadSession(); }, [loadSession]);
-
-  // SSE connection
+  // SSE event listener for live patches
   useEffect(() => {
     const es = new EventSource(`/api/sessions/${sessionId}/events`);
-    eventSourceRef.current = es;
+    let lastId = "";
 
     es.addEventListener("snapshot", (e) => {
-      const data = JSON.parse(e.data);
-      if (data.session) setSession(data.session);
-      if (data.turns) setTurns(data.turns);
-      if (data.mappings) setMappings(data.mappings);
-      if (data.participants) setParticipants(data.participants);
+      lastId = e.lastEventId;
+      try {
+        const data = JSON.parse(e.data);
+        if (data.turns) setTurns(data.turns);
+        if (data.session) setSession(data.session);
+        if (data.speakerMappings) setMappings(data.speakerMappings);
+        if (data.participants) setParticipants(data.participants);
+      } catch {}
     });
 
     es.addEventListener("turn.final", (e) => {
-      const turn = JSON.parse(e.data);
-      setTurns(prev => [...prev.filter(t => t.id !== turn.id), turn]);
-    });
-
-    es.addEventListener("metrics", (e) => {
-      setMetrics(JSON.parse(e.data));
-    });
-
-    es.addEventListener("prompt.show", (e) => {
-      setFacilitatorPrompt(JSON.parse(e.data).text || "");
+      lastId = e.lastEventId;
+      try {
+        const turn = JSON.parse(e.data);
+        setTurns(prev => {
+          const idx = prev.findIndex(t => t.id === turn.id);
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = turn;
+            return next;
+          }
+          return [...prev, turn];
+        });
+        setLivePartial("");
+        setActiveSpeaker(null);
+      } catch {}
     });
 
     es.addEventListener("turn.updated", (e) => {
-      const turn = JSON.parse(e.data);
-      setTurns(prev => prev.map(t => t.id === turn.id ? turn : t));
-    });
-
-    es.addEventListener("map.patch", () => {
-      fetch(`/api/sessions/${sessionId}/items`)
-        .then(r => r.json())
-        .then(setItems)
-        .catch(() => {});
+      try {
+        const turn = JSON.parse(e.data);
+        setTurns(prev => prev.map(t => t.id === turn.id ? turn : t));
+      } catch {}
     });
 
     es.addEventListener("status", (e) => {
-      const data = JSON.parse(e.data);
-      if (data.status) {
-        setSession(prev => prev ? { ...prev, status: data.status } : prev);
-      }
+      try {
+        const data = JSON.parse(e.data);
+        if (data.status === "terminated") {
+          setSession(s => s ? { ...s, status: "terminated" } : s);
+        }
+      } catch {}
+    });
+
+    es.addEventListener("metrics", (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.streamingMinutesUsed !== undefined) {
+          setStreamingMins(data.streamingMinutesUsed);
+        }
+      } catch {}
     });
 
     es.onerror = () => {
-      setTimeout(() => {
-        es.close();
-        const newEs = new EventSource(`/api/sessions/${sessionId}/events`);
-        eventSourceRef.current = newEs;
-      }, 2000);
+      // EventSource auto-reconnects
     };
 
     return () => es.close();
   }, [sessionId]);
 
-  const startSession = async () => {
-    await fetch(`/api/sessions/${sessionId}/start`, { method: "POST" });
-    setStatus("live");
+  // Streaming minutes counter
+  useEffect(() => {
+    if (isCapturing) {
+      streamingTimerRef.current = setInterval(() => {
+        setStreamingMins(prev => {
+          const newVal = prev + (5 / 60);
+          return Math.round(newVal * 10) / 10;
+        });
+      }, 5000);
+    } else {
+      if (streamingTimerRef.current) {
+        clearInterval(streamingTimerRef.current);
+        streamingTimerRef.current = null;
+      }
+    }
+    return () => {
+      if (streamingTimerRef.current) clearInterval(streamingTimerRef.current);
+    };
+  }, [isCapturing]);
+
+  // sendBeacon on unload
+  useEffect(() => {
+    const handler = () => {
+      const sessionId = asrRef.current?.getState().sessionId;
+      if (sessionId) {
+        const body = JSON.stringify({ type: "Terminate", sessionId });
+        navigator.sendBeacon("/api/sessions/terminate-beacon", body);
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    window.addEventListener("pagehide", handler);
+    return () => {
+      window.removeEventListener("beforeunload", handler);
+      window.removeEventListener("pagehide", handler);
+    };
+  }, []);
+
+  // Ingest finalized turns to server
+  const ingestTurn = useCallback(async (turnData: IngestTurnData) => {
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/turns`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(turnData),
+      });
+      if (!res.ok) console.error("Turn ingest failed:", await res.text());
+    } catch (err) {
+      console.error("Turn ingest error:", err);
+    }
+  }, [sessionId]);
+
+  // Start session
+  const handleStart = async () => {
+    setError("");
+    try {
+      // Start session on server
+      await fetch(`/api/sessions/${sessionId}/start`, { method: "POST" });
+
+      // Get ASR token
+      const tokenRes = await fetch("/api/providers/assemblyai/token");
+      const tokenData = await tokenRes.json();
+      if (tokenData.error) throw new Error(tokenData.error);
+
+      // Create ASR client
+      const asr = createASRClient({
+        wsUrl: tokenData.wsUrl || `${tokenData.wsBase}/v3/ws?sample_rate=16000&speech_model=universal-3-5-pro&mode=balanced&token=${tokenData.token}`,
+        onTurn: (turn) => {
+          if (turn.endOfTurn) {
+            setActiveSpeaker(null);
+            setLivePartial("");
+          } else {
+            setActiveSpeaker(turn.speakerLabel || null);
+            setLivePartial(turn.transcript);
+          }
+        },
+        onSpeechStarted: (event) => {
+          setActiveSpeaker(event.speakerLabel || null);
+        },
+        onSpeakerRevision: (revision) => {
+          // Apply revisions to existing turns
+          for (const rev of revision.revisions) {
+            setTurns(prev => prev.map(t => {
+              if (t.providerSessionId === asr.getState().sessionId) {
+                // Update if turn order matches
+                return { ...t, providerSpeakerLabel: rev.speakerLabel, wasSpeakerRevised: true };
+              }
+              return t;
+            }));
+          }
+        },
+        onTermination: () => {
+          setAsrConnected(false);
+          stopCapture();
+          releaseWakeLock();
+        },
+        onError: (err) => {
+          setError(`ASR error: ${err.message}`);
+        },
+        onConnectionChange: (connected) => {
+          setAsrConnected(connected);
+        },
+        onTurnIngest: ingestTurn,
+      });
+
+      asrRef.current = asr;
+      
+      // Connect ASR
+      await asr.connect();
+      
+      // Start audio capture
+      await startCapture();
+      await acquireWakeLock();
+
+      setSession(s => s ? { ...s, status: "active" } : s);
+    } catch (e: any) {
+      setError(e.message || "Failed to start session");
+      stopCapture();
+      releaseWakeLock();
+    }
   };
 
-  const terminateSession = async () => {
-    await fetch(`/api/sessions/${sessionId}/terminate`, { method: "POST" });
-    loadSession();
+  // Stop session
+  const handleStop = async () => {
+    asrRef.current?.terminate();
+    stopCapture();
+    releaseWakeLock();
+    
+    try {
+      await fetch(`/api/sessions/${sessionId}/terminate`, { method: "POST" });
+    } catch {}
+
+    setSession(s => s ? { ...s, status: "terminated" } : s);
   };
 
-  const handleMapSpeaker = async (label: string, participantId: string) => {
-    await fetch(`/api/sessions/${sessionId}/speaker-mappings/${label}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ participantId: participantId || null }),
-    });
-    loadSession();
+  // Update intent
+  const handleUpdateIntent = async () => {
+    try {
+      const criteria = intentCriteria
+        .split("\n")
+        .map((c: string) => c.trim())
+        .filter((c: string) => c.length > 0);
+      
+      await fetch(`/api/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          objective: intentObjective,
+          phase: intentPhase,
+          criteria,
+        }),
+      });
+
+      setSession(s => s ? { ...s, objective: intentObjective, phase: intentPhase, criteria } : s);
+    } catch {
+      setError("Failed to update session intent");
+    }
   };
 
-  const handleEditTurn = async (turnId: string) => {
-    if (!editText.trim()) return;
-    await fetch(`/api/turns/${turnId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ currentText: editText }),
-    });
-    setEditingTurn(null);
-    setEditText("");
-    loadSession();
+  // Map speaker label
+  const mapSpeaker = async (label: string, participantId: string) => {
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/speaker-mappings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ speakerLabel: label, participantId: participantId || null }),
+      });
+      if (res.ok) {
+        const mapping = await res.json();
+        setMappings(prev => [...prev.filter(m => m.speakerLabel !== label), mapping]);
+      }
+    } catch {}
   };
 
-  const handleAddItem = async (category: string, text: string) => {
-    await fetch("/api/items", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId, category, text }),
-    });
-    loadSession();
+  // Correct turn text
+  const correctTurn = async (turnId: string, newText: string) => {
+    try {
+      await fetch(`/api/turns/${turnId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentText: newText }),
+      });
+      setTurns(prev => prev.map(t => t.id === turnId ? { ...t, currentText: newText, isManuallyCorrected: true } : t));
+    } catch {}
   };
 
-  const getSpeakerName = (label: string) => {
+  const finalizedTurns = turns.filter(t => t.isFinal);
+  const getParticipantName = (label: string) => {
     const mapping = mappings.find(m => m.speakerLabel === label);
     if (mapping?.participantId) {
       const p = participants.find(p => p.id === mapping.participantId);
@@ -201,251 +379,233 @@ export default function FacilitatorPage() {
     return label;
   };
 
-  const substantiveTurns = turns.filter(t => t.isFinal && t.isSubstantive);
+  const isActive = session?.status === "active";
 
-  if (status === "loading") {
+  if (error && !session) {
     return (
-      <main className="min-h-dvh flex items-center justify-center p-4">
-        <div className="text-hud-muted text-lg animate-pulse">Loading session…</div>
+      <main className="min-h-dvh flex items-center justify-center p-4 safe-top safe-bottom">
+        <div className="text-center">
+          <p className="text-red-400 mb-4">{error}</p>
+          <button onClick={() => router.push("/")} className="text-hud-accent underline">
+            Return Home
+          </button>
+        </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-dvh bg-hud-bg text-hud-text">
+    <main className="min-h-dvh flex flex-col bg-hud-bg text-hud-text safe-top safe-bottom safe-left safe-right">
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-hud-bg/95 backdrop-blur-sm border-b border-hud-border px-4 py-3 safe-top">
-        <div className="flex items-center justify-between max-w-3xl mx-auto">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.push("/")}
-              className="text-hud-muted hover:text-hud-text touch-manipulation"
-              style={{ minWidth: 44, minHeight: 44 }}
-            >
-              ←
-            </button>
-            <div>
-              <h1 className="text-lg font-bold truncate max-w-[200px]">{session?.title || "Session"}</h1>
-              <p className="text-xs text-hud-muted">{session?.phase} · {session?.status}</p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowDisplay(!showDisplay)}
-              className="px-3 py-2 text-sm bg-hud-surface border border-hud-border rounded-lg touch-manipulation"
-              style={{ minHeight: 44 }}
-            >
-              {showDisplay ? "Hide" : "Display"}
-            </button>
-            {session?.status === "active" ? (
-              <button
-                onClick={terminateSession}
-                className="px-3 py-2 text-sm bg-hud-danger text-white rounded-lg touch-manipulation"
-                style={{ minHeight: 44 }}
-              >
-                End
-              </button>
-            ) : (
-              <button
-                onClick={startSession}
-                className="px-3 py-2 text-sm bg-hud-accent text-white rounded-lg touch-manipulation"
-                style={{ minHeight: 44 }}
-              >
-                Start
-              </button>
+      <header className="px-4 py-3 border-b border-hud-border flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-bold">{session?.title || "Loading..."}</h1>
+          <div className="flex gap-2 items-center text-sm text-hud-muted">
+            <span className={`w-2 h-2 rounded-full ${isActive ? "bg-green-400 animate-pulse" : "bg-gray-500"}`} />
+            <span>{session?.status || "..."}</span>
+            {isActive && wakeLockSupported && (
+              <span className={wakeLocked ? "text-green-400" : "text-yellow-400"}>
+                {wakeLocked ? "🔒" : "⚠️"}
+              </span>
             )}
           </div>
         </div>
+        <div className="flex gap-2 text-sm">
+          <span className="text-hud-muted">{streamingMins.toFixed(1)} min</span>
+          {workletLoaded && <span className="text-green-400">Worklet ✓</span>}
+          {asrConnected && <span className="text-green-400">ASR ✓</span>}
+        </div>
       </header>
 
-      <div className="max-w-3xl mx-auto p-4 space-y-6">
-        {/* Display Preview */}
-        {showDisplay && (
-          <div className="bg-hud-surface border border-hud-accent/30 rounded-xl p-4 mb-4">
-            <div className="flex justify-between items-center mb-3">
-              <h2 className="text-sm font-semibold text-hud-accent">Display Preview</h2>
-              <a
-                href={`/display/${sessionId}`}
-                target="_blank"
-                className="text-sm text-hud-accent underline"
-              >
-                Open in new tab ↗
-              </a>
-            </div>
-            <div className="space-y-2">
-              {substantiveTurns.slice(-3).map(t => (
-                <div key={t.id} className="flex gap-2 text-sm">
-                  <span className="text-hud-accent font-medium">{getSpeakerName(t.providerSpeakerLabel)}</span>
-                  <span className="text-hud-muted">{t.currentText || t.originalText}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Metrics */}
-        {metrics && (
-          <div className="bg-hud-surface border border-hud-border rounded-xl p-4">
-            <h2 className="text-sm font-semibold text-hud-muted mb-2">Session Metrics</h2>
-            <div className="grid grid-cols-3 gap-4 text-sm">
-              <div>
-                <span className="text-hud-muted">Turns</span>
-                <p className="text-hud-text font-mono">{metrics.turnCount}</p>
-              </div>
-              <div>
-                <span className="text-hud-muted">Substantive</span>
-                <p className="text-hud-text font-mono">{metrics.substantiveTurnCount}</p>
-              </div>
-              <div>
-                <span className="text-hud-muted">Minutes</span>
-                <p className="text-hud-text font-mono">{metrics.streamingMinutesUsed}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Facilitator Prompt */}
-        {facilitatorPrompt && (
-          <div className="bg-hud-accent/10 border border-hud-accent/30 rounded-xl p-4">
-            <p className="text-hud-text text-sm">💡 {facilitatorPrompt}</p>
-            <button
-              onClick={() => setFacilitatorPrompt("")}
-              className="mt-2 text-xs text-hud-muted hover:text-hud-text touch-manipulation"
-              style={{ minHeight: 44 }}
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
-
-        {/* Speaker Mappings */}
-        <div className="bg-hud-surface border border-hud-border rounded-xl p-4">
-          <h2 className="text-sm font-semibold text-hud-muted mb-3">Speaker Mappings</h2>
-          <div className="space-y-2">
-            {mappings.map(m => (
-              <div key={m.id} className="flex items-center gap-2">
-                <span className="text-hud-accent text-sm w-8">{m.speakerLabel}</span>
-                <span className="text-hud-muted text-sm">→</span>
-                <select
-                  value={m.participantId || ""}
-                  onChange={e => handleMapSpeaker(m.speakerLabel, e.target.value)}
-                  className="flex-1 px-3 py-2 bg-hud-bg border border-hud-border rounded-lg text-sm text-hud-text
-                    focus:outline-none focus:border-hud-accent touch-manipulation"
-                  style={{ minHeight: 44 }}
-                >
-                  <option value="">Unassigned</option>
-                  {participants.map(p => (
-                    <option key={p.id} value={p.id}>{p.displayName}</option>
-                  ))}
-                </select>
-              </div>
-            ))}
-          </div>
+      {/* Controls */}
+      <div className="px-4 py-3 border-b border-hud-border flex gap-3 items-center">
+        {/* Meter */}
+        <div className="flex-1 h-3 bg-hud-surface rounded-full overflow-hidden">
+          <div
+            className="h-full bg-green-400 transition-all duration-100"
+            style={{ width: `${Math.min(100, meter * 100)}%` }}
+          />
         </div>
 
-        {/* Transcript */}
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-hud-muted">Transcript ({substantiveTurns.length} turns)</h2>
-          {turns.filter(t => t.isFinal).map(turn => (
-            <div
-              key={turn.id}
-              className={`p-3 rounded-xl border transition-colors ${
-                turn.isSubstantive ? "bg-hud-surface border-hud-border" : "bg-hud-bg border-hud-border/50"
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs font-mono px-2 py-0.5 rounded ${
-                    turn.isCalibration ? "bg-hud-calibration/20 text-hud-calibration" : "bg-hud-accent/20 text-hud-accent"
-                  }`}>
-                    {getSpeakerName(turn.providerSpeakerLabel)}
-                  </span>
-                  {turn.isCalibration && <span className="text-[10px] text-hud-calibration">CAL</span>}
-                  {!turn.isSubstantive && <span className="text-[10px] text-hud-muted">backchannel</span>}
-                  {turn.isUnknownSpeaker && <span className="text-[10px] text-hud-warn">UNKNOWN</span>}
-                </div>
-                <span className="text-xs text-hud-muted font-mono">
-                  {(turn.endMs - turn.startMs) / 1000}s
-                </span>
-              </div>
-
-              {editingTurn === turn.id ? (
-                <div className="space-y-2">
-                  <textarea
-                    value={editText}
-                    onChange={e => setEditText(e.target.value)}
-                    rows={2}
-                    className="w-full px-3 py-2 bg-hud-bg border border-hud-border rounded-lg text-sm text-hud-text
-                      focus:outline-none focus:border-hud-accent resize-none"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleEditTurn(turn.id)}
-                      className="px-3 py-1 text-xs bg-hud-accent text-white rounded touch-manipulation"
-                      style={{ minHeight: 36 }}
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => { setEditingTurn(null); setEditText(""); }}
-                      className="px-3 py-1 text-xs text-hud-muted hover:text-hud-text touch-manipulation"
-                      style={{ minHeight: 36 }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <p
-                  className="text-sm text-hud-text leading-relaxed cursor-pointer hover:text-hud-text/80"
-                  onClick={() => { setEditingTurn(turn.id); setEditText(turn.currentText || turn.originalText); }}
-                  style={{ minHeight: 44 }}
-                >
-                  {turn.currentText || turn.originalText}
-                  {turn.analysis?.category && (
-                    <span className="ml-2 text-[10px] px-1.5 py-0.5 bg-hud-accent/10 text-hud-accent rounded">
-                      {turn.analysis.category}
-                    </span>
-                  )}
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Discussion Map */}
-        <div className="bg-hud-surface border border-hud-border rounded-xl p-4">
-          <h2 className="text-sm font-semibold text-hud-muted mb-3">Discussion Map</h2>
-          <div className="grid grid-cols-2 gap-2">
-            {CATEGORIES.map(cat => {
-              const catItems = items.filter(i => i.category === cat);
-              return (
-                <div key={cat} className="bg-hud-bg rounded-lg p-3">
-                  <h3 className="text-xs font-semibold text-hud-muted uppercase mb-2">{cat}</h3>
-                  {catItems.map(item => (
-                    <div key={item.id} className="text-xs text-hud-text mb-1 flex items-center gap-1">
-                      <span className={`w-1.5 h-1.5 rounded-full ${
-                        item.status === "resolved" ? "bg-hud-success" : "bg-hud-accent"
-                      }`} />
-                      {item.text}
-                    </div>
-                  ))}
-                  <button
-                    onClick={() => {
-                      const text = window.prompt("Add item:", "");
-                      if (text) handleAddItem(cat, text);
-                    }}
-                    className="text-xs text-hud-muted hover:text-hud-text mt-1 touch-manipulation"
-                    style={{ minHeight: 36 }}
-                  >
-                    + Add
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        {isActive ? (
+          <button
+            onClick={handleStop}
+            className="px-6 py-3 bg-red-600 text-white rounded-xl font-semibold touch-manipulation active:scale-95"
+            style={{ minHeight: 44 }}
+          >
+            Stop
+          </button>
+        ) : (
+          <button
+            onClick={handleStart}
+            disabled={session?.status === "terminated"}
+            className="px-6 py-3 bg-hud-accent text-white rounded-xl font-semibold touch-manipulation active:scale-95 disabled:opacity-50"
+            style={{ minHeight: 44 }}
+          >
+            {session?.status === "terminated" ? "Ended" : "Start Capture"}
+          </button>
+        )}
       </div>
+
+      {/* Live partial */}
+      {isActive && livePartial && (
+        <div className="px-4 py-2 bg-hud-surface border-b border-hud-border">
+          <span className="text-xs text-hud-muted">
+            {activeSpeaker ? getParticipantName(activeSpeaker) : "Speaker"}
+          </span>
+          <p className="text-sm italic text-hud-muted">{livePartial}</p>
+        </div>
+      )}
+
+      {/* Session intent editor */}
+      <details className="px-4 py-2 border-b border-hud-border">
+        <summary className="text-sm text-hud-muted cursor-pointer font-medium">
+          Session Intent ▸
+        </summary>
+        <div className="mt-2 space-y-2">
+          <input
+            value={intentObjective}
+            onChange={e => setIntentObjective(e.target.value)}
+            placeholder="Objective"
+            className="w-full bg-hud-surface border border-hud-border rounded-lg px-3 py-2 text-sm text-hud-text"
+          />
+          <select
+            value={intentPhase}
+            onChange={e => setIntentPhase(e.target.value)}
+            className="w-full bg-hud-surface border border-hud-border rounded-lg px-3 py-2 text-sm text-hud-text"
+          >
+            {["frame","empathize","define","ideate","evaluate","decide","plan_experiment","reflect"].map(p => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+          <textarea
+            value={intentCriteria}
+            onChange={e => setIntentCriteria(e.target.value)}
+            placeholder="Criteria (one per line)"
+            rows={3}
+            className="w-full bg-hud-surface border border-hud-border rounded-lg px-3 py-2 text-sm text-hud-text"
+          />
+          <button
+            onClick={handleUpdateIntent}
+            className="px-4 py-2 bg-hud-accent text-white rounded-lg text-sm touch-manipulation"
+            style={{ minHeight: 44 }}
+          >
+            Update Intent
+          </button>
+        </div>
+      </details>
+
+      {/* Error display */}
+      {(error || captureError) && (
+        <div className="mx-4 mt-2 p-2 bg-red-900/30 border border-red-700 rounded-lg text-sm text-red-300">
+          {error || captureError}
+        </div>
+      )}
+
+      {/* Audio settings readback */}
+      {settings && (
+        <div className="px-4 py-1 text-xs text-hud-muted">
+          Mic: {settings.sampleRate}Hz · {settings.channelCount}ch
+          {settings.echoCancellation && " · echo cancel"}
+          {settings.noiseSuppression && " · noise supp"}
+        </div>
+      )}
+
+      {/* Transcript */}
+      <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2 overscroll-contain">
+        {finalizedTurns.length === 0 && !isActive && (
+          <p className="text-hud-muted text-sm py-8 text-center">
+            {session?.status === "terminated" ? "Session ended. No turns recorded." : "Start capture to begin transcription."}
+          </p>
+        )}
+        {finalizedTurns.length === 0 && isActive && (
+          <p className="text-hud-muted text-sm py-8 text-center">Listening… speak to begin.</p>
+        )}
+
+        {finalizedTurns.map((turn) => (
+          <div
+            key={turn.id}
+            className={`p-3 rounded-lg border ${
+              turn.isSubstantive ? "border-hud-border bg-hud-surface" : "border-hud-border/50 bg-hud-surface/50"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-medium px-2 py-0.5 rounded bg-hud-accent/20 text-hud-accent">
+                {turn.isUnknownSpeaker
+                  ? "Unassigned"
+                  : getParticipantName(turn.providerSpeakerLabel)}
+              </span>
+              <span className="text-xs text-hud-muted">
+                {turn.isSubstantive ? "substantive" : "backchannel"}
+                {turn.isCalibration && " · calibration"}
+                {turn.possibleOverlap && " · overlap"}
+                {turn.isManuallyCorrected && " · corrected"}
+                {turn.wasSpeakerRevised && " · revised"}
+              </span>
+            </div>
+            <p className="text-sm">{turn.currentText || turn.originalText}</p>
+            {turn.analysis?.category && (
+              <span className="inline-block mt-1 text-xs px-1.5 py-0.5 rounded bg-hud-accent/10 text-hud-accent/70">
+                {turn.analysis.category}
+              </span>
+            )}
+
+            {/* Turn actions */}
+            <details className="mt-1">
+              <summary className="text-xs text-hud-muted cursor-pointer">Actions ▸</summary>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {["A", "B", "C", "D", "E", "F"].map(label => (
+                  <button
+                    key={label}
+                    onClick={() => mapSpeaker(turn.providerSpeakerLabel, label)}
+                    className="px-2 py-1 text-xs rounded bg-hud-surface border border-hud-border text-hud-text"
+                  >
+                    → {label}
+                  </button>
+                ))}
+                <button
+                  onClick={() => {
+                    const newText = prompt("Correct text:", turn.currentText);
+                    if (newText) correctTurn(turn.id, newText);
+                  }}
+                  className="px-2 py-1 text-xs rounded bg-hud-surface border border-hud-border text-hud-text"
+                >
+                  ✏ Edit
+                </button>
+              </div>
+            </details>
+          </div>
+        ))}
+      </div>
+
+      {/* Navigation */}
+      <nav className="px-4 py-3 border-t border-hud-border flex gap-3">
+        <a
+          href={`/display/${sessionId}`}
+          target="_blank"
+          rel="noopener"
+          className="flex-1 py-3 bg-hud-surface border border-hud-border text-center text-sm rounded-xl touch-manipulation"
+          style={{ minHeight: 44 }}
+        >
+          Open Display
+        </a>
+        {session?.runMode !== "live" && (
+          <button
+            onClick={() => router.push("/runs")}
+            className="flex-1 py-3 bg-hud-surface border border-hud-border text-center text-sm rounded-xl touch-manipulation"
+            style={{ minHeight: 44 }}
+          >
+            Runs
+          </button>
+        )}
+        <button
+          onClick={() => router.push(`/runs`)}
+          className="flex-1 py-3 bg-hud-surface border border-hud-border text-center text-sm rounded-xl touch-manipulation"
+          style={{ minHeight: 44 }}
+        >
+          Export
+        </button>
+      </nav>
     </main>
   );
 }

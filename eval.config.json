@@ -1,0 +1,27 @@
+{
+  "thresholds": {
+    "default": {
+      "speakerAccuracyExcludingOverlaps": 85,
+      "unknownSubstantiveRate": 15,
+      "lostFinalizedTurns": 0,
+      "guardViolationsDisplayed": 0,
+      "realizedVsRequestedDurationPct": { "min": 80, "max": 120 }
+    },
+    "profiles": {
+      "simple_3speaker_none": {
+        "speakerAccuracyExcludingOverlaps": 90,
+        "unknownSubstantiveRate": 10
+      },
+      "realistic_4speaker_occasional": {
+        "speakerAccuracyExcludingOverlaps": 85,
+        "unknownSubstantiveRate": 15
+      },
+      "challenging_6speaker_frequent": {
+        "speakerAccuracyExcludingOverlaps": 75,
+        "unknownSubstantiveRate": 20
+      }
+    }
+  },
+  "failFast": false,
+  "outputDir": "./eval-runs"
+}

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { createSSEResponse, snapshotPatch } from "@/lib/sse";
+import { subscribe } from "@/lib/pubsub";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,8 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   const { id } = await context.params;
+
+  let sequenceId = 0;
 
   return createSSEResponse((send, close) => {
     // Send initial snapshot
@@ -39,30 +42,29 @@ export async function GET(
           participants: session.participants,
           speakerMappings: session.speakerMappings,
           turns: session.transcriptTurns.map(serializeTurn),
-          items: session.discussionItems,
+          items: session.discussionItems.map(serializeItem),
           intent: session.intentRevisions[0] || null,
-        }));
+        }), String(++sequenceId));
       } catch {
         close();
       }
     })();
 
-    // Keep connection alive; patches are sent from other API routes
-    // via a simple in-memory pub/sub (not implemented in stub mode)
-    const interval = setInterval(() => {
-      // Heartbeat is handled by createSSEResponse
-    }, 30000);
+    // Subscribe to live patches via pub/sub
+    const unsub = subscribe(id, { send, close });
 
-    return () => clearInterval(interval);
+    return () => {
+      unsub();
+    };
   });
 }
 
 function serializeSession(s: any) {
   return {
-    id: s.id, title: s.title, objective: s.objective, phase: s.phase,
-    criteria: safeParseJson(s.criteria, []), speakerCount: s.speakerCount,
-    status: s.status, runMode: s.runMode, scenarioId: s.scenarioId,
-    createdAt: s.createdAt?.toISOString(), updatedAt: s.updatedAt?.toISOString(),
+    ...s,
+    criteria: safeParseJson(s.criteria, []),
+    createdAt: s.createdAt?.toISOString(),
+    updatedAt: s.updatedAt?.toISOString(),
   };
 }
 
@@ -70,8 +72,17 @@ function serializeTurn(t: any) {
   return {
     ...t,
     wordsJson: safeParseJson(t.wordsJson, null),
-    analysisJson: safeParseJson(t.analysisJson, null),
-    createdAt: t.createdAt?.toISOString(),
+    analysis: safeParseJson(t.analysisJson, null),
+    session: undefined,
+  };
+}
+
+function serializeItem(i: any) {
+  return {
+    ...i,
+    turnIds: safeParseJson(i.turnIds, []),
+    createdAt: i.createdAt?.toISOString(),
+    updatedAt: i.updatedAt?.toISOString(),
   };
 }
 
