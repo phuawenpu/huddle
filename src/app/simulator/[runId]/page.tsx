@@ -37,13 +37,12 @@ export default function SimulatorPage() {
   const [audioReady, setAudioReady] = useState(false);
   const [audioLoading, setAudioLoading] = useState(false);
   const [mixedAudioUrl, setMixedAudioUrl] = useState<string | null>(null);
+  const [debugMsg, setDebugMsg] = useState<string>("");
 
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
   const audioBufferRef = useRef<AudioBuffer | null>(null);
   const startTimeRef = useRef<number>(0);
+  const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const turnTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const currentTurnIdxRef = useRef<number>(0);
 
   const { locked, supported, acquire } = useWakeLock();
@@ -52,11 +51,7 @@ export default function SimulatorPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [rRes, synthedScenarios] = await Promise.all([
-          fetch(`/api/runs/${runId}`),
-          fetch("/api/recordings"),
-        ]);
-        
+        const rRes = await fetch(`/api/runs/${runId}`);
         if (!rRes.ok) throw new Error("Run not found");
         const runData = await rRes.json();
         setRun(runData);
@@ -66,122 +61,159 @@ export default function SimulatorPage() {
           if (sRes.ok) {
             const sData = await sRes.json();
             setScenario(sData);
-            // Set the mixed audio URL
             setMixedAudioUrl(`/api/scenarios/${runData.scenarioId}/mixed?format=wav`);
           }
         }
         setStatus("ready");
-      } catch {
+      } catch (e: any) {
         setStatus("error");
+        setDebugMsg(e.message || "Failed to load");
       }
     };
     load();
   }, [runId]);
 
-  // Load audio buffer
+  // ---- AUDIO LOAD: triggered by user clicking "Load Audio" ----
   const loadAudio = useCallback(async () => {
-    if (!mixedAudioUrl) return;
+    if (!mixedAudioUrl) {
+      setDebugMsg("No audio URL available");
+      return;
+    }
     
     setAudioLoading(true);
+    setDebugMsg(`Loading: ${mixedAudioUrl}...`);
+    
     try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioCtx();
+      // Fetch the WAV file
+      const response = await fetch(mixedAudioUrl);
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}`);
       }
-      const ctx = audioContextRef.current;
+      
+      const contentType = response.headers.get("content-type") || "";
+      setDebugMsg(`Got ${response.headers.get("content-length") || "?"} bytes, type=${contentType}`);
+      
+      const arrayBuffer = await response.arrayBuffer();
+      if (arrayBuffer.byteLength < 100) {
+        throw new Error(`File too small: ${arrayBuffer.byteLength} bytes`);
+      }
+      
+      setDebugMsg(`Loaded ${(arrayBuffer.byteLength / 1024).toFixed(1)} KB. Decoding audio...`);
 
-      // Resume if suspended (iOS)
+      // Create a fresh AudioContext (must be inside user gesture on iOS)
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AudioCtx();
+      
+      // Resume immediately (we're in a click handler)
       if (ctx.state === "suspended") {
         await ctx.resume();
       }
-
-      const response = await fetch(mixedAudioUrl);
-      if (!response.ok) throw new Error(`Audio not found (${response.status})`);
       
-      const arrayBuffer = await response.arrayBuffer();
+      setDebugMsg(`AudioContext state: ${ctx.state}, sampleRate: ${ctx.sampleRate}Hz`);
+
+      // Decode
       const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
       audioBufferRef.current = audioBuffer;
+      
+      setDebugMsg(`Decoded: ${audioBuffer.duration.toFixed(1)}s, ${audioBuffer.numberOfChannels}ch, ${audioBuffer.sampleRate}Hz`);
       setAudioReady(true);
       setAudioLoading(false);
     } catch (err: any) {
-      console.error("Audio load failed:", err);
+      setDebugMsg(`Error: ${err.message}`);
       setAudioLoading(false);
-      // Fall back to turn-based visual playback
       setAudioReady(false);
     }
   }, [mixedAudioUrl]);
 
-  // Preload audio when ready
-  useEffect(() => {
-    if (status === "ready" && mixedAudioUrl) {
-      loadAudio();
-    }
-  }, [status, mixedAudioUrl, loadAudio]);
-
-  // Start playback
+  // ---- START PLAYBACK ----
   const startPlayback = useCallback(async () => {
+    setDebugMsg("");
+    
     await fetch(`/api/runs/${runId}/playback`, { method: "POST" });
     await acquire();
 
-    const ctx = audioContextRef.current;
-    if (ctx && ctx.state === "suspended") {
+    // Create fresh AudioContext inside user gesture
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    const ctx = new AudioCtx();
+    
+    // Resume
+    if (ctx.state === "suspended") {
       await ctx.resume();
     }
-
-    // Try audio playback first
-    if (audioBufferRef.current && ctx) {
-      // Stop any existing source
-      if (sourceNodeRef.current) {
-        try { sourceNodeRef.current.stop(); } catch {}
+    
+    if (!audioBufferRef.current) {
+      // Need to load audio first
+      if (!mixedAudioUrl) {
+        setDebugMsg("No audio source — starting visual-only playback");
+        startVisualPlayback(ctx);
+        return;
       }
-
-      const source = ctx.createBufferSource();
-      source.buffer = audioBufferRef.current;
-      source.playbackRate.value = playbackSpeed;
-      source.connect(ctx.destination);
       
-      const duration = audioBufferRef.current.duration / playbackSpeed;
-      setStatus("playing");
-      startTimeRef.current = ctx.currentTime;
-      sourceNodeRef.current = source;
+      try {
+        const resp = await fetch(mixedAudioUrl);
+        const buf = await resp.arrayBuffer();
+        const audioBuf = await ctx.decodeAudioData(buf);
+        audioBufferRef.current = audioBuf;
+        setAudioReady(true);
+      } catch (e: any) {
+        setDebugMsg(`Load failed: ${e.message} — visual playback`);
+        startVisualPlayback(ctx);
+        return;
+      }
+    }
 
-      // Track elapsed time
-      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
-      progressTimerRef.current = setInterval(() => {
-        const elapsed = (ctx.currentTime - startTimeRef.current) * 1000 * playbackSpeed;
-        setElapsed(Math.round(elapsed));
+    const audioBuffer = audioBufferRef.current;
+    if (!audioBuffer) {
+      startVisualPlayback(ctx);
+      return;
+    }
 
-        // Update current turn based on audio position
-        if (scenario?.turns) {
-          for (let i = scenario.turns.length - 1; i >= 0; i--) {
-            const turn = scenario.turns[i];
-            const tStart = turn.startMs || 0;
-            if (elapsed >= tStart) {
-              if (i !== currentTurnIdxRef.current) {
-                currentTurnIdxRef.current = i;
-                setCurrentTurn(i);
-              }
-              break;
+    setDebugMsg(`Playing: ${audioBuffer.duration.toFixed(1)}s, ${audioBuffer.numberOfChannels}ch, ${audioBuffer.sampleRate}Hz`);
+
+    // Create source node
+    const source = ctx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.playbackRate.value = playbackSpeed;
+    source.connect(ctx.destination);
+    sourceNodeRef.current = source;
+
+    const totalDuration = audioBuffer.duration / playbackSpeed;
+    startTimeRef.current = ctx.currentTime;
+    setStatus("playing");
+
+    // Progress tracking
+    if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+    progressTimerRef.current = setInterval(() => {
+      const elapsedMs = (ctx.currentTime - startTimeRef.current) * 1000 * playbackSpeed;
+      setElapsed(Math.round(elapsedMs));
+
+      // Track current turn
+      if (scenario?.turns) {
+        for (let i = scenario.turns.length - 1; i >= 0; i--) {
+          const turn = scenario.turns[i];
+          if (elapsedMs >= (turn.startMs || 0)) {
+            if (i !== currentTurnIdxRef.current) {
+              currentTurnIdxRef.current = i;
+              setCurrentTurn(i);
             }
+            break;
           }
         }
-      }, 100);
+      }
+    }, 100);
 
-      source.onended = () => {
-        setStatus("complete");
-        setElapsed(Math.round(duration * 1000));
-        if (progressTimerRef.current) clearInterval(progressTimerRef.current);
-      };
+    source.onended = () => {
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+      setStatus("complete");
+      setElapsed(Math.round(totalDuration * 1000));
+      setDebugMsg("Playback complete ✓");
+    };
 
-      source.start(0);
-    } else {
-      // Fall back to visual-only turn-by-turn playback
-      startVisualPlayback();
-    }
-  }, [runId, acquire, playbackSpeed, scenario, audioReady]);
+    source.start(0);
+  }, [runId, acquire, playbackSpeed, scenario, mixedAudioUrl, audioReady]);
 
-  // Visual-only playback fallback
-  const startVisualPlayback = useCallback(async () => {
+  // Visual-only fallback
+  const startVisualPlayback = useCallback(async (ctx: AudioContext) => {
     if (!scenario?.turns) return;
     
     setStatus("playing");
@@ -189,42 +221,38 @@ export default function SimulatorPage() {
 
     let turnIdx = 0;
     currentTurnIdxRef.current = 0;
+    let cumulativeMs = 0;
     
     const advanceTurn = () => {
       if (turnIdx >= scenario.turns!.length) {
         setStatus("complete");
-        if (turnTimerRef.current) clearInterval(turnTimerRef.current);
         return;
       }
       setCurrentTurn(turnIdx);
       currentTurnIdxRef.current = turnIdx;
       
       const turn = scenario.turns![turnIdx];
-      const durationMs = Math.max(2000, (turn.endMs || 0) - (turn.startMs || 0)) / playbackSpeed;
-      setElapsed(prev => prev + durationMs);
+      const durationMs = Math.max(1500, ((turn.endMs || 0) - (turn.startMs || 0)) / playbackSpeed);
+      cumulativeMs += durationMs;
+      setElapsed(cumulativeMs);
       turnIdx++;
       
-      if (turnTimerRef.current) clearInterval(turnTimerRef.current);
-      turnTimerRef.current = setTimeout(advanceTurn, durationMs);
+      setTimeout(advanceTurn, durationMs);
     };
     
     advanceTurn();
+    ctx.close().catch(() => {});
   }, [scenario, playbackSpeed, acquire]);
 
   // Pause
   const pausePlayback = useCallback(() => {
-    if (sourceNodeRef.current && audioContextRef.current) {
-      // Can't truly pause, so stop and track position
-      const ctx = audioContextRef.current;
-      const elapsed = (ctx.currentTime - startTimeRef.current) * 1000 * playbackSpeed;
-      setElapsed(Math.round(elapsed));
+    if (sourceNodeRef.current) {
       try { sourceNodeRef.current.stop(); } catch {}
       sourceNodeRef.current = null;
     }
     if (progressTimerRef.current) clearInterval(progressTimerRef.current);
-    if (turnTimerRef.current) clearInterval(turnTimerRef.current);
     setStatus("paused");
-  }, [playbackSpeed]);
+  }, []);
 
   // Stop
   const stopPlayback = useCallback(() => {
@@ -233,28 +261,22 @@ export default function SimulatorPage() {
       sourceNodeRef.current = null;
     }
     if (progressTimerRef.current) clearInterval(progressTimerRef.current);
-    if (turnTimerRef.current) clearInterval(turnTimerRef.current);
-    if (audioContextRef.current) {
-      audioContextRef.current.close().catch(() => {});
-      audioContextRef.current = null;
-    }
-    setStatus("stopped");
+    setStatus("ready");
     setElapsed(0);
     setCurrentTurn(null);
     currentTurnIdxRef.current = 0;
     setAudioReady(false);
     audioBufferRef.current = null;
+    setDebugMsg("");
   }, []);
 
-  // Cleanup
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (progressTimerRef.current) clearInterval(progressTimerRef.current);
-      if (turnTimerRef.current) clearInterval(turnTimerRef.current);
       if (sourceNodeRef.current) {
         try { sourceNodeRef.current.stop(); } catch {}
       }
-      audioContextRef.current?.close().catch(() => {});
     };
   }, []);
 
@@ -262,7 +284,8 @@ export default function SimulatorPage() {
     ? scenario.speakers[scenario.turns[currentTurn]?.speakerIndex]?.name
     : null;
 
-  const totalDurationMs = scenario?.realizedDurationMs || (scenario?.durationMinutes || 0) * 60000;
+  const totalDurationMs = (audioBufferRef.current?.duration || 0) * 1000 || 
+    scenario?.realizedDurationMs || (scenario?.durationMinutes || 0) * 60000;
   const progress = totalDurationMs > 0 ? Math.min(100, (elapsed / totalDurationMs) * 100) : 0;
 
   const formatTime = (ms: number) => {
@@ -280,6 +303,7 @@ export default function SimulatorPage() {
   if (status === "error") return (
     <main className="min-h-dvh flex flex-col items-center justify-center p-4 safe-top safe-bottom bg-hud-bg text-hud-text">
       <p className="text-red-400 mb-4">Run not found or failed to load.</p>
+      <p className="text-xs text-hud-muted mb-4">{debugMsg}</p>
       <button onClick={() => router.push("/")} className="text-hud-accent underline">Return Home</button>
     </main>
   );
@@ -292,17 +316,16 @@ export default function SimulatorPage() {
         {run?.stubbed && <span className="ml-2 text-xs text-yellow-400/60">(stubbed)</span>}
       </header>
 
-      {/* Title and speaker info */}
+      {/* Title */}
       <div className="px-4 py-3 border-b border-hud-border">
         <h1 className="text-lg font-bold">{scenario?.title || "Simulated Critique"}</h1>
         <p className="text-xs text-hud-muted mt-0.5">
           {scenario?.durationMinutes} min · {scenario?.speakerCount} speakers · {scenario?.turns?.length || 0} turns
         </p>
-        {!audioReady && !audioLoading && status === "ready" && (
-          <p className="text-xs text-yellow-400 mt-1">⚠ No audio available — visual playback only</p>
-        )}
-        {audioLoading && (
-          <p className="text-xs text-hud-muted mt-1">Loading audio…</p>
+        {audioReady && audioBufferRef.current && (
+          <p className="text-xs text-green-400 mt-0.5">
+            🔊 Audio ready ({audioBufferRef.current.duration.toFixed(1)}s)
+          </p>
         )}
       </div>
 
@@ -320,14 +343,14 @@ export default function SimulatorPage() {
         </div>
         {scenario?.speakers && (
           <div className="flex gap-1 mt-1">
-            {scenario.speakers.map((spk, i) => (
+            {(scenario.speakers || []).slice(0, 6).map((spk, i) => (
               <div
                 key={i}
                 className="h-0.5 rounded-full transition-colors"
                 style={{
                   width: `${100 / (scenario.speakers || []).length}%`,
                   backgroundColor: i === (currentTurn !== null && scenario.turns?.[currentTurn]?.speakerIndex)
-                    ? "var(--hud-accent)" : "var(--hud-border)",
+                    ? "var(--hud-accent, #60a5fa)" : "var(--hud-border, #374151)",
                 }}
               />
             ))}
@@ -352,10 +375,13 @@ export default function SimulatorPage() {
         ) : (
           <div className="text-center">
             <p className="text-hud-muted text-lg mb-2">
-              {status === "complete" ? "Playback Complete ✓" : status === "ready" ? "Ready to Play" : "Paused"}
+              {status === "complete" ? "Playback Complete ✓" 
+               : status === "playing" ? "▶ Playing…" 
+               : status === "paused" ? "⏸ Paused"
+               : "Ready to Play"}
             </p>
-            {status === "ready" && audioReady && (
-              <p className="text-xs text-green-400">Audio loaded ({((audioBufferRef.current?.duration || 0) / 60).toFixed(1)} min)</p>
+            {debugMsg && (
+              <p className="text-xs text-hud-muted mt-1 max-w-xs mx-auto break-words">{debugMsg}</p>
             )}
           </div>
         )}
@@ -367,7 +393,7 @@ export default function SimulatorPage() {
         <div className="flex items-center gap-2">
           <span className="text-xs text-hud-muted w-16">Speed</span>
           <div className="flex gap-1 flex-1">
-            {[0.75, 1.0, 1.25, 1.5].map(speed => (
+            {[0.5, 0.75, 1.0, 1.25, 1.5, 2.0].map(speed => (
               <button
                 key={speed}
                 onClick={() => setPlaybackSpeed(speed)}
@@ -387,15 +413,25 @@ export default function SimulatorPage() {
 
         {/* Main controls */}
         <div className="flex gap-3">
-          {status === "ready" || status === "paused" ? (
+          {(status === "ready" || status === "complete") && (
             <button
               onClick={startPlayback}
               className="flex-1 py-3 bg-green-600 text-white rounded-xl font-semibold text-lg touch-manipulation active:scale-95"
               style={{ minHeight: 56 }}
             >
-              ▶ {status === "paused" ? "Resume" : "Start"}
+              ▶ {status === "complete" ? "Replay" : "Start"}
             </button>
-          ) : (
+          )}
+          {status === "paused" && (
+            <button
+              onClick={startPlayback}
+              className="flex-1 py-3 bg-green-600 text-white rounded-xl font-semibold text-lg touch-manipulation active:scale-95"
+              style={{ minHeight: 56 }}
+            >
+              ▶ Resume
+            </button>
+          )}
+          {status === "playing" && (
             <button
               onClick={pausePlayback}
               className="flex-1 py-3 bg-yellow-600 text-white rounded-xl font-semibold text-lg touch-manipulation active:scale-95"
@@ -415,22 +451,20 @@ export default function SimulatorPage() {
 
         {/* Extra actions */}
         <div className="flex gap-2">
-          {!audioReady && status === "ready" && (
-            <button
-              onClick={loadAudio}
-              disabled={audioLoading}
-              className="flex-1 py-2 bg-hud-surface border border-hud-border rounded-lg text-sm text-hud-text"
-              style={{ minHeight: 44 }}
-            >
-              {audioLoading ? "Loading audio…" : "🔊 Load Audio"}
-            </button>
-          )}
+          <button
+            onClick={loadAudio}
+            disabled={audioLoading}
+            className="flex-1 py-2.5 bg-hud-surface border border-hud-border rounded-lg text-sm text-hud-text touch-manipulation"
+            style={{ minHeight: 44 }}
+          >
+            {audioLoading ? "Loading…" : audioReady ? "🔊 Reload Audio" : "🎵 Test Load Audio"}
+          </button>
           {mixedAudioUrl && (
             <a
               href={mixedAudioUrl}
               download
-              className="flex-1 py-2 bg-hud-surface border border-hud-border rounded-lg text-sm text-hud-text text-center"
-              style={{ minHeight: 44, lineHeight: "28px" }}
+              className="flex-1 py-2.5 bg-hud-surface border border-hud-border rounded-lg text-sm text-hud-text text-center touch-manipulation"
+              style={{ minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center" }}
             >
               📥 Download WAV
             </a>
