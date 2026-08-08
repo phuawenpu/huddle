@@ -266,6 +266,7 @@ export interface TranscriptQualityReport {
   reactionCoverage: number;
   overlapCount: number;
   realizedTimingCoverage: number;
+  plannedWordsPerMinute: number | null;
   speakerTurnCounts: Array<{
     speakerIndex: number;
     speakerName: string;

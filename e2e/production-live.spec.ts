@@ -70,7 +70,7 @@ test.describe("Production live audio verification", () => {
     const speakerLabels = new Set(
       finalTurns
         .map((turn) => turn.providerSpeakerLabel)
-        .filter((label) => label && label !== "UNKNOWN"),
+        .filter((label) => label && label !== "UNKNOWN" && label !== "PENDING"),
     );
     expect(finalTurns.length).toBeGreaterThanOrEqual(8);
     expect(speakerLabels.size).toBeGreaterThanOrEqual(2);

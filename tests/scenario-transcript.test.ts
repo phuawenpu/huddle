@@ -97,6 +97,9 @@ describe("version-2 scenario transcripts", () => {
         targetDurationMinutes: 5,
         phase: "evaluate",
         criteria: ["Recovery clarity", "Trust"],
+        difficulty: "challenging",
+        crossTalkLevel: "occasional",
+        participationProfile: "mixed",
       },
     );
     const revised = turnsFromEditableTranscript(document, speakers);
@@ -110,10 +113,77 @@ describe("version-2 scenario transcripts", () => {
       targetDurationMinutes: 5,
       phase: "evaluate",
       criteria: ["Recovery clarity", "Trust"],
+      difficulty: "challenging",
+      crossTalkLevel: "occasional",
+      participationProfile: "mixed",
     });
     expect(revised[1].delivery?.tone).toBe("checking a distinction");
     expect(revised[1].startMs).toBeUndefined();
     expect(revised[1].endMs).toBeUndefined();
+  });
+
+  it("reports duration density and rejects overlap that contradicts no cross-talk", () => {
+    const turns = normalizeScenarioTurns(
+      [
+        {
+          id: "t0",
+          speakerIndex: 0,
+          text: "The selected layer does not explain its source or update date.",
+        },
+        {
+          id: "t1",
+          speakerIndex: 1,
+          text: "Exactly, and that makes the comparison look more certain than it is.",
+          overlap: {
+            withTurnId: "t0",
+            startBeforeEndMs: 400,
+            kind: "eager_agreement",
+            resolution: "continue",
+          },
+        },
+        {
+          id: "t2",
+          speakerIndex: 2,
+          text: "Then the prototype needs visible dates and uncertainty language.",
+        },
+      ],
+      speakers.length,
+    );
+
+    const report = analyzeTranscriptQuality(turns, speakers, {
+      targetDurationMinutes: 0.1,
+      crossTalkLevel: "none",
+    });
+
+    expect(report.errors).toContain(
+      "Transcript contains 1 overlap start, but cross-talk is configured as none.",
+    );
+    expect(report.plannedWordsPerMinute).toBeGreaterThan(185);
+  });
+
+  it("warns when a substantial draft cannot fit its requested duration", () => {
+    const turns: ScenarioTurn[] = Array.from({ length: 9 }, (_, index) => ({
+      id: `dense-${index}`,
+      index,
+      speakerIndex: [0, 1, 1, 2, 0, 2, 2, 1, 0][index],
+      text: `This deliberately detailed utterance number ${index} carries far more planned speech than the requested workshop duration can plausibly contain without rushing.`,
+      expectedCategory: "positions",
+      expected: {
+        substantive: true,
+        category: "positions",
+        reactsToTurnId: index ? `dense-${index - 1}` : undefined,
+      },
+      pauseBeforeMs: 350,
+    }));
+
+    const report = analyzeTranscriptQuality(turns, speakers, {
+      targetDurationMinutes: 0.5,
+      crossTalkLevel: "none",
+    });
+
+    expect(report.warnings).toContain(
+      `Planned dialogue density is ${report.plannedWordsPerMinute} words per requested minute; target roughly 105–185 after allowing for pauses.`,
+    );
   });
 
   it("fingerprints authored audio inputs but ignores measured timestamps", () => {

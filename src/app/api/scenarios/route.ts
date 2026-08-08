@@ -22,7 +22,10 @@ export async function GET(request: NextRequest) {
     });
     return NextResponse.json(scenarios.map(serializeScenarioRecord));
   } catch {
-    return NextResponse.json({ error: "Failed to list scenarios" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to list scenarios" },
+      { status: 500 },
+    );
   }
 }
 
@@ -36,7 +39,10 @@ export async function POST(request: NextRequest) {
       ? normalizeScenarioTurns(body.turns as ScenarioTurn[], speakers.length)
       : [];
     if (turns.length && speakers.length) {
-      validateTranscriptForRevision(turns, speakers);
+      validateTranscriptForRevision(turns, speakers, {
+        targetDurationMinutes: body.durationMinutes || 8,
+        crossTalkLevel: body.crossTalkLevel || "occasional",
+      });
     }
     const scenario = await prisma.scenario.create({
       data: {
@@ -57,15 +63,19 @@ export async function POST(request: NextRequest) {
         budgetJson: body.budget ? JSON.stringify(body.budget) : null,
         speakersJson: body.speakers ? JSON.stringify(speakers) : null,
         turnsJson: body.turns ? JSON.stringify(turns) : null,
-        expectedWindowOutcomeJson: body.expectedWindowOutcome ? JSON.stringify(body.expectedWindowOutcome) : null,
+        expectedWindowOutcomeJson: body.expectedWindowOutcome
+          ? JSON.stringify(body.expectedWindowOutcome)
+          : null,
         status: body.status || "draft",
       },
     });
-    return NextResponse.json(serializeScenarioRecord(scenario), { status: 201 });
+    return NextResponse.json(serializeScenarioRecord(scenario), {
+      status: 201,
+    });
   } catch (error: any) {
     return NextResponse.json(
       { error: error?.message || "Failed to create scenario" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 }

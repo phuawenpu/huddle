@@ -51,7 +51,14 @@ export const GENERATED_SCENARIO_JSON_SCHEMA = {
   schema: {
     type: "object",
     additionalProperties: false,
-    required: ["title", "description", "objective", "criteria", "speakers", "turns"],
+    required: [
+      "title",
+      "description",
+      "objective",
+      "criteria",
+      "speakers",
+      "turns",
+    ],
     properties: {
       title: { type: "string" },
       description: { type: "string" },
@@ -119,17 +126,36 @@ export const GENERATED_SCENARIO_JSON_SCHEMA = {
             pauseBeforeMs: { type: "integer", minimum: 0, maximum: 5000 },
             expectedCategory: {
               type: "string",
-              enum: ["evidence", "questions", "positions", "decisions", "actions", "themes"],
+              enum: [
+                "evidence",
+                "questions",
+                "positions",
+                "decisions",
+                "actions",
+                "themes",
+              ],
             },
             expected: {
               type: "object",
               additionalProperties: false,
-              required: ["substantive", "category", "potentialSignal", "reactsToTurnId"],
+              required: [
+                "substantive",
+                "category",
+                "potentialSignal",
+                "reactsToTurnId",
+              ],
               properties: {
                 substantive: { type: "boolean" },
                 category: {
                   type: "string",
-                  enum: ["evidence", "questions", "positions", "decisions", "actions", "themes"],
+                  enum: [
+                    "evidence",
+                    "questions",
+                    "positions",
+                    "decisions",
+                    "actions",
+                    "themes",
+                  ],
                 },
                 potentialSignal: { type: "string" },
                 reactsToTurnId: { type: ["string", "null"] },
@@ -141,10 +167,19 @@ export const GENERATED_SCENARIO_JSON_SCHEMA = {
                 {
                   type: "object",
                   additionalProperties: false,
-                  required: ["withTurnId", "startBeforeEndMs", "kind", "resolution"],
+                  required: [
+                    "withTurnId",
+                    "startBeforeEndMs",
+                    "kind",
+                    "resolution",
+                  ],
                   properties: {
                     withTurnId: { type: "string" },
-                    startBeforeEndMs: { type: "integer", minimum: 120, maximum: 1500 },
+                    startBeforeEndMs: {
+                      type: "integer",
+                      minimum: 120,
+                      maximum: 1500,
+                    },
                     kind: {
                       type: "string",
                       enum: ["interruption", "eager_agreement", "backchannel"],
@@ -165,7 +200,10 @@ export const GENERATED_SCENARIO_JSON_SCHEMA = {
                 pace: { type: "string", enum: ["slow", "natural", "quick"] },
                 tone: { type: "string" },
                 volume: { type: "string", enum: ["soft", "normal", "raised"] },
-                disfluency: { type: "string", enum: ["none", "light", "cut_off"] },
+                disfluency: {
+                  type: "string",
+                  enum: ["none", "light", "cut_off"],
+                },
               },
             },
           },
@@ -183,15 +221,15 @@ export function buildDiscussionPrompts(input: ScenarioGenerationInput): {
   const budget = estimateBudget(
     input.durationMinutes,
     input.speakerCount,
-    input.crossTalkLevel
+    input.crossTalkLevel,
   );
   const overlapCount = expectedOverlapCount(
     input.durationMinutes,
-    input.crossTalkLevel
+    input.crossTalkLevel,
   );
   const backchannelCount = Math.max(
     2,
-    Math.round((input.durationMinutes / 5) * input.speakerCount)
+    Math.round((input.durationMinutes / 5) * input.speakerCount),
   );
 
   const system = `You write realistic transcripts of live design-critique workshops for an audio simulation. Return one JSON object only.
@@ -299,13 +337,13 @@ export function normalizeGeneratedScenario(
   budget = estimateBudget(
     input.durationMinutes,
     input.speakerCount,
-    input.crossTalkLevel
-  )
+    input.crossTalkLevel,
+  ),
 ): GeneratedScenario {
   const warnings: string[] = [];
   const speakers = createDefaultCasting(
     input.speakerCount,
-    Array.isArray(raw?.speakers) ? raw.speakers : []
+    Array.isArray(raw?.speakers) ? raw.speakers : [],
   );
   const sourceTurns = Array.isArray(raw?.turns) ? raw.turns : [];
   let turns: ScenarioTurn[] = sourceTurns
@@ -314,7 +352,7 @@ export function normalizeGeneratedScenario(
       if (!text) return null;
       const speakerIndex = Math.min(
         input.speakerCount - 1,
-        Math.max(0, Number(source?.speakerIndex) || 0)
+        Math.max(0, Number(source?.speakerIndex) || 0),
       );
       const id = `t${index}`;
       const expectedCategory = CATEGORY_VALUES.has(source?.expectedCategory)
@@ -333,17 +371,17 @@ export function normalizeGeneratedScenario(
                   source.overlap.kind === "backchannel" ? 120 : 250,
                   Number(
                     source.overlap.startBeforeEndMs ??
-                      source.overlap.startOffsetMs
-                  ) || 500
-                )
+                      source.overlap.startOffsetMs,
+                  ) || 500,
+                ),
               ),
               kind: ["interruption", "eager_agreement", "backchannel"].includes(
-                source.overlap.kind
+                source.overlap.kind,
               )
                 ? source.overlap.kind
                 : "interruption",
               resolution: ["yield", "continue", "backchannel"].includes(
-                source.overlap.resolution
+                source.overlap.resolution,
               )
                 ? source.overlap.resolution
                 : source.overlap.kind === "backchannel"
@@ -365,15 +403,17 @@ export function normalizeGeneratedScenario(
               1800,
               Math.max(
                 isCalibration ? 1200 : 120,
-                Number(source?.pauseBeforeMs) || (isCalibration ? 1200 : 420)
-              )
+                Number(source?.pauseBeforeMs) || (isCalibration ? 1200 : 420),
+              ),
             ),
         expectedCategory,
         expected: {
-          substantive:
-            isCalibration ? false : source?.expected?.substantive !== false,
+          substantive: isCalibration
+            ? false
+            : source?.expected?.substantive !== false,
           category: expectedCategory,
-          potentialSignal: cleanText(source?.expected?.potentialSignal) || "none",
+          potentialSignal:
+            cleanText(source?.expected?.potentialSignal) || "none",
           reactsToTurnId:
             isCalibration || index === input.speakerCount
               ? undefined
@@ -386,10 +426,16 @@ export function normalizeGeneratedScenario(
     .filter((turn: ScenarioTurn | null): turn is ScenarioTurn => turn !== null);
 
   if (turns.length < input.speakerCount + 3) {
-    throw new Error("Generated discussion is too short to form a coherent critique.");
+    throw new Error(
+      "Generated discussion is too short to form a coherent critique.",
+    );
   }
 
-  for (let index = 0; index < Math.min(input.speakerCount, turns.length); index++) {
+  for (
+    let index = 0;
+    index < Math.min(input.speakerCount, turns.length);
+    index++
+  ) {
     turns[index].speakerIndex = index;
     turns[index].isCalibration = true;
     turns[index].overlap = undefined;
@@ -403,28 +449,34 @@ export function normalizeGeneratedScenario(
   turns = normalizeScenarioTurns(turns, input.speakerCount);
 
   const mainTurns = turns.slice(input.speakerCount);
-  const mainCharacters = mainTurns.reduce((sum, turn) => sum + turn.text.length, 0);
+  const mainCharacters = mainTurns.reduce(
+    (sum, turn) => sum + turn.text.length,
+    0,
+  );
   if (
     mainCharacters < (budget.targetCharacters || 0) * 0.8 ||
     mainCharacters > (budget.targetCharacters || 0) * 1.2
   ) {
     warnings.push(
-      `Dialogue length is ${mainCharacters.toLocaleString()} characters versus a ${(budget.targetCharacters || 0).toLocaleString()} target.`
+      `Dialogue length is ${mainCharacters.toLocaleString()} characters versus a ${(budget.targetCharacters || 0).toLocaleString()} target.`,
     );
   }
 
   for (const speaker of speakers) {
     const count = mainTurns.filter(
-      (turn) => turn.speakerIndex === speaker.index
+      (turn) => turn.speakerIndex === speaker.index,
     ).length;
     if (count < (budget.minTurnsPerSpeaker || 4)) {
       warnings.push(
-        `${speaker.name} has ${count} main turns; target minimum is ${budget.minTurnsPerSpeaker}.`
+        `${speaker.name} has ${count} main turns; target minimum is ${budget.minTurnsPerSpeaker}.`,
       );
     }
   }
 
-  const quality = analyzeTranscriptQuality(turns, speakers);
+  const quality = analyzeTranscriptQuality(turns, speakers, {
+    targetDurationMinutes: input.durationMinutes,
+    crossTalkLevel: input.crossTalkLevel,
+  });
   warnings.push(...quality.errors, ...quality.warnings);
 
   return {

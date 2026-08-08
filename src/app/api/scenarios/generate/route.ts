@@ -14,7 +14,14 @@ import { analyzeTranscriptQuality } from "@/lib/scenario-transcript";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { topic, durationMinutes, speakerCount, difficulty, crossTalkLevel, seed } = body;
+    const {
+      topic,
+      durationMinutes,
+      speakerCount,
+      difficulty,
+      crossTalkLevel,
+      seed,
+    } = body;
 
     const validation = validateScenarioParams({
       durationMinutes: Number(durationMinutes) || 8,
@@ -23,7 +30,10 @@ export async function POST(request: NextRequest) {
     });
 
     if (!validation.valid) {
-      return NextResponse.json({ error: validation.errors.join("; ") }, { status: 400 });
+      return NextResponse.json(
+        { error: validation.errors.join("; ") },
+        { status: 400 },
+      );
     }
 
     const input: ScenarioGenerationInput = {
@@ -63,7 +73,7 @@ export async function POST(request: NextRequest) {
           error:
             "Dialogue generation is unavailable because OPENAI_API_KEY is not configured. Set LLM_STUB=1 explicitly for deterministic development fixtures.",
         },
-        { status: 503 }
+        { status: 503 },
       );
     }
 
@@ -77,19 +87,36 @@ export async function POST(request: NextRequest) {
         schema: GENERATED_SCENARIO_JSON_SCHEMA,
         maxCompletionTokens: 32_000,
       });
-      const generated = normalizeGeneratedScenario(content, input, prompts.budget);
-      const quality = analyzeTranscriptQuality(generated.turns, generated.speakers);
+      const generated = normalizeGeneratedScenario(
+        content,
+        input,
+        prompts.budget,
+      );
+      const quality = analyzeTranscriptQuality(
+        generated.turns,
+        generated.speakers,
+        {
+          targetDurationMinutes: input.durationMinutes,
+          crossTalkLevel: input.crossTalkLevel,
+        },
+      );
       if (!quality.errors.length) {
-        return NextResponse.json({ ...generated, transcriptQuality: quality, stubbed: false });
+        return NextResponse.json({
+          ...generated,
+          transcriptQuality: quality,
+          stubbed: false,
+        });
       }
       qualityFeedback = `\n\nThe previous draft was rejected. Regenerate the complete scenario and fix these exact issues: ${quality.errors.join(" ")}`;
     }
-    throw new Error("The dialogue model could not produce a transcript that passed realism checks after two attempts.");
+    throw new Error(
+      "The dialogue model could not produce a transcript that passed realism checks after two attempts.",
+    );
   } catch (error: any) {
     console.error("Scenario generation failed:", error?.message || error);
     return NextResponse.json(
       { error: error?.message || "Failed to generate scenario" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

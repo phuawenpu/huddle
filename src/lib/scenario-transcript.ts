@@ -38,6 +38,9 @@ export interface EditableTranscriptDocument {
     targetDurationMinutes: number | null;
     phase: string;
     criteria: string[];
+    difficulty: string;
+    crossTalkLevel: string;
+    participationProfile: string;
   };
   speakers: Array<{
     index: number;
@@ -195,6 +198,9 @@ export function toEditableTranscript(
     targetDurationMinutes?: number | null;
     phase?: string;
     criteria?: string[];
+    difficulty?: string;
+    crossTalkLevel?: string;
+    participationProfile?: string;
   } = {},
 ): EditableTranscriptDocument {
   const normalized = normalizeScenarioTurns(turns, speakers.length);
@@ -214,6 +220,9 @@ export function toEditableTranscript(
         .map(cleanText)
         .filter(Boolean)
         .slice(0, 20),
+      difficulty: cleanText(context.difficulty) || "realistic",
+      crossTalkLevel: cleanText(context.crossTalkLevel) || "occasional",
+      participationProfile: cleanText(context.participationProfile) || "even",
     },
     speakers: speakers.map((speaker) => ({
       index: speaker.index,
@@ -315,6 +324,10 @@ export function turnsFromEditableTranscript(
 export function analyzeTranscriptQuality(
   turns: ScenarioTurn[],
   speakers: ScenarioSpeaker[],
+  context: {
+    targetDurationMinutes?: number | null;
+    crossTalkLevel?: string;
+  } = {},
 ): TranscriptQualityReport {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -420,9 +433,37 @@ export function analyzeTranscriptQuality(
   const realizedTimingCoverage = normalized.length
     ? realizedTimingCount / normalized.length
     : 0;
-  if (overlapCount === 0 && mainTurns.length >= 30) {
+  const crossTalkLevel = cleanText(context.crossTalkLevel).toLowerCase();
+  if (crossTalkLevel === "none" && overlapCount > 0) {
+    errors.push(
+      `Transcript contains ${overlapCount} overlap start${overlapCount === 1 ? "" : "s"}, but cross-talk is configured as none.`,
+    );
+  } else if (
+    crossTalkLevel !== "none" &&
+    overlapCount === 0 &&
+    mainTurns.length >= 30
+  ) {
     warnings.push(
       "Long discussion contains no authored overlap or backchannel.",
+    );
+  }
+
+  const targetDurationMinutes = Number(context.targetDurationMinutes);
+  const mainWordCount = mainTurns.reduce(
+    (sum, turn) => sum + wordCount(turn.text),
+    0,
+  );
+  const plannedWordsPerMinute =
+    Number.isFinite(targetDurationMinutes) && targetDurationMinutes > 0
+      ? roundTo(mainWordCount / targetDurationMinutes, 1)
+      : null;
+  if (
+    mainTurns.length >= 8 &&
+    plannedWordsPerMinute !== null &&
+    (plannedWordsPerMinute < 105 || plannedWordsPerMinute > 185)
+  ) {
+    warnings.push(
+      `Planned dialogue density is ${plannedWordsPerMinute} words per requested minute; target roughly 105–185 after allowing for pauses.`,
     );
   }
 
@@ -467,6 +508,7 @@ export function analyzeTranscriptQuality(
     reactionCoverage: roundTo(reactionCoverage, 3),
     overlapCount,
     realizedTimingCoverage: roundTo(realizedTimingCoverage, 3),
+    plannedWordsPerMinute,
     speakerTurnCounts,
   };
 }
@@ -474,6 +516,10 @@ export function analyzeTranscriptQuality(
 export function validateTranscriptForRevision(
   turns: ScenarioTurn[],
   speakers: ScenarioSpeaker[],
+  context: {
+    targetDurationMinutes?: number | null;
+    crossTalkLevel?: string;
+  } = {},
 ): TranscriptQualityReport {
   if (turns.length < 3)
     throw new Error("A transcript needs at least three utterances.");
@@ -488,7 +534,7 @@ export function validateTranscriptForRevision(
       throw new Error(`Turn ${turn.id} references an unknown speaker.`);
     }
   }
-  const report = analyzeTranscriptQuality(turns, speakers);
+  const report = analyzeTranscriptQuality(turns, speakers, context);
   if (report.errors.length) {
     throw new Error(
       `Transcript revision failed quality checks: ${report.errors.join(" ")}`,
@@ -573,6 +619,7 @@ NON-NEGOTIABLE INVARIANTS
 - Never overlap calibration, the first two main utterances, consecutive new starts, or three speakers.
 - Remove realizedStartMs and realizedEndMs by returning null. Those values are measured after TTS and must not be invented.
 - Preserve the supplied objective and evaluation criteria. Match the target duration with substantive talk (roughly 125–165 spoken words per minute), never by padding, repeated conclusions, or generic filler.
+- Preserve sessionContext.difficulty and sessionContext.participationProfile. Follow sessionContext.crossTalkLevel exactly: none means zero authored overlap; occasional means sparse motivated overlap; frequent permits more overlap but still forbids consecutive or three-speaker starts.
 - Preserve an evolving argument: specific evidence, disagreement, repair, a changed idea, an emerging decision, owned action, and at least one unresolved material concern.
 
 TIMING MEANING

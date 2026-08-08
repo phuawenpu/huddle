@@ -9,7 +9,7 @@ export function serializeScenarioRecord(scenario: any) {
   const speakers = safeParseJson<ScenarioSpeaker[]>(scenario.speakersJson, []);
   const turns = normalizeScenarioTurns(
     safeParseJson<ScenarioTurn[]>(scenario.turnsJson, []),
-    speakers.length || scenario.speakerCount || 0
+    speakers.length || scenario.speakerCount || 0,
   );
   return {
     ...scenario,
@@ -20,11 +20,14 @@ export function serializeScenarioRecord(scenario: any) {
     transcriptVersion: TRANSCRIPT_FORMAT_VERSION,
     transcriptQuality:
       speakers.length && turns.length
-        ? analyzeTranscriptQuality(turns, speakers)
+        ? analyzeTranscriptQuality(turns, speakers, {
+            targetDurationMinutes: scenario.durationMinutes,
+            crossTalkLevel: scenario.crossTalkLevel,
+          })
         : null,
     expectedWindowOutcome: safeParseJson(
       scenario.expectedWindowOutcomeJson,
-      null
+      null,
     ),
     preflight: safeParseJson(scenario.preflightJson, null),
     createdAt: scenario.createdAt?.toISOString(),

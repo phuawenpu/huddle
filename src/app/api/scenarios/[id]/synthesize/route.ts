@@ -12,24 +12,33 @@ export const maxDuration = 300;
 
 export async function POST(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
   try {
     const scenario = await prisma.scenario.findUnique({ where: { id } });
     if (!scenario) {
-      return NextResponse.json({ error: "Scenario not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Scenario not found" },
+        { status: 404 },
+      );
     }
     const storedTurns = safeParse<ScenarioTurn[]>(scenario.turnsJson, []);
     const speakers = safeParse<ScenarioSpeaker[]>(scenario.speakersJson, []);
     if (!storedTurns.length || !speakers.length) {
       return NextResponse.json(
-        { error: "Scenario needs a complete script and voice cast before synthesis." },
-        { status: 400 }
+        {
+          error:
+            "Scenario needs a complete script and voice cast before synthesis.",
+        },
+        { status: 400 },
       );
     }
     const turns = normalizeScenarioTurns(storedTurns, speakers.length);
-    validateTranscriptForRevision(turns, speakers);
+    validateTranscriptForRevision(turns, speakers, {
+      targetDurationMinutes: scenario.durationMinutes,
+      crossTalkLevel: scenario.crossTalkLevel,
+    });
 
     await prisma.scenario.update({
       where: { id },
@@ -49,7 +58,7 @@ export async function POST(
     if (!validation.passed) {
       throw new Error(
         validation.reason ||
-          "Independent speech-to-text validation did not match the source dialogue."
+          "Independent speech-to-text validation did not match the source dialogue.",
       );
     }
     const updatedTurns = turns.map((turn, index) => {
@@ -105,8 +114,11 @@ export async function POST(
       })
       .catch(() => {});
     return NextResponse.json(
-      { error: error?.message || "Speech synthesis failed", synthesized: false },
-      { status: 500 }
+      {
+        error: error?.message || "Speech synthesis failed",
+        synthesized: false,
+      },
+      { status: 500 },
     );
   }
 }

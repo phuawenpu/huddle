@@ -92,6 +92,9 @@ export async function POST(
           targetDurationMinutes: scenario.durationMinutes,
           phase: scenario.phase,
           criteria: safeParseJson<string[]>(scenario.criteria, []),
+          difficulty: scenario.difficulty,
+          crossTalkLevel: scenario.crossTalkLevel,
+          participationProfile: scenario.participationProfile,
         },
       );
       const prompts = buildTranscriptRevisionPrompts(document, {
@@ -125,7 +128,10 @@ export async function POST(
       );
     }
 
-    const quality = validateTranscriptForRevision(turns, speakers);
+    const quality = validateTranscriptForRevision(turns, speakers, {
+      targetDurationMinutes: scenario.durationMinutes,
+      crossTalkLevel: scenario.crossTalkLevel,
+    });
     const updated = await prisma.scenario.update({
       where: { id },
       data: {

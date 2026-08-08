@@ -2,7 +2,7 @@
 
 /**
  * ASR WebSocket Client — connects to AssemblyAI v3 (or stub)
- * 
+ *
  * Manages connection lifecycle, audio streaming, and message handling.
  */
 
@@ -38,7 +38,15 @@ export interface WordEvent {
 }
 
 function isUnknownSpeakerLabel(label: string | undefined): boolean {
-  return !label || label.toUpperCase() === "UNKNOWN";
+  const normalized = String(label || "")
+    .trim()
+    .toUpperCase();
+  return !normalized || normalized === "UNKNOWN" || normalized === "PENDING";
+}
+
+function persistedSpeakerLabel(label: string | undefined): string {
+  const normalized = String(label || "").trim();
+  return isUnknownSpeakerLabel(normalized) ? "UNKNOWN" : normalized;
 }
 
 function normalizeWord(word: any): WordEvent {
@@ -69,30 +77,55 @@ function joinWordText(words: WordEvent[]): string {
 export function segmentFinalTurn(
   turn: TurnEvent,
   providerSessionId: string,
-  receivedAtMs: number
+  receivedAtMs: number,
 ): IngestTurnData[] {
   const words = (turn.words || []).map(normalizeWord);
   if (words.length === 0) {
-    const label = turn.speakerLabel || "";
-    return [{
-      providerSessionId,
-      providerTurnOrder: turn.turnOrder,
-      segmentIndex: 0,
-      providerSpeakerLabel: label,
-      startMs: 0,
-      endMs: 0,
-      receivedAtMs,
-      originalText: turn.transcript,
-      currentText: turn.transcript,
-      isFinal: true,
-      isUnknownSpeaker: isUnknownSpeakerLabel(label),
-      possibleOverlap: false,
-    }];
+    const label = persistedSpeakerLabel(turn.speakerLabel);
+    return [
+      {
+        providerSessionId,
+        providerTurnOrder: turn.turnOrder,
+        segmentIndex: 0,
+        providerSpeakerLabel: label,
+        startMs: 0,
+        endMs: 0,
+        receivedAtMs,
+        originalText: turn.transcript,
+        currentText: turn.transcript,
+        isFinal: true,
+        isUnknownSpeaker: isUnknownSpeakerLabel(label),
+        possibleOverlap: false,
+      },
+    ];
   }
 
+  // The provider can temporarily emit PENDING on early final words while the
+  // rest of the same turn already has a stable label. Treat it as unattributed,
+  // and fold it into the sole known speaker when that is unambiguous.
+  const knownWordLabels = new Set(
+    words
+      .map((word) => String(word.speaker || "").trim())
+      .filter((label) => !isUnknownSpeakerLabel(label)),
+  );
+  const soleKnownWordLabel =
+    knownWordLabels.size === 1 ? [...knownWordLabels][0] : undefined;
+  const knownTurnLabel = isUnknownSpeakerLabel(turn.speakerLabel)
+    ? undefined
+    : String(turn.speakerLabel).trim();
+  const fallbackLabel = knownTurnLabel || soleKnownWordLabel;
+  const attributedWords = words.map((word) => {
+    const suppliedLabel = String(word.speaker || "").trim();
+    const label =
+      !suppliedLabel || suppliedLabel.toUpperCase() === "PENDING"
+        ? fallbackLabel || "UNKNOWN"
+        : persistedSpeakerLabel(suppliedLabel);
+    return { ...word, speaker: label };
+  });
+
   const groups: Array<{ label: string; words: WordEvent[] }> = [];
-  for (const word of words) {
-    const label = word.speaker || turn.speakerLabel || "";
+  for (const word of attributedWords) {
+    const label = word.speaker || "UNKNOWN";
     const previous = groups.at(-1);
     if (previous && previous.label === label) {
       previous.words.push(word);
@@ -101,15 +134,20 @@ export function segmentFinalTurn(
     }
   }
 
-  const knownLabels = new Set(
-    groups
-      .map((group) => group.label)
-      .filter((label) => !isUnknownSpeakerLabel(label))
-  );
-  const hasMixedSpeakers = knownLabels.size > 1;
-  const hasOverlappingWords = words.some(
-    (word, index) => index > 0 && word.start < words[index - 1].end
-  );
+  const hasCrossSpeakerTimingCollision = groups.some((group, index) => {
+    if (index === 0) return false;
+    const previous = groups[index - 1];
+    const previousEnd = previous.words.at(-1)?.end ?? 0;
+    const currentStart = group.words[0]?.start ?? previousEnd;
+    const gapMs = currentStart - previousEnd;
+    return (
+      group.label !== previous.label &&
+      (gapMs < 0 ||
+        (gapMs <= 120 &&
+          !isUnknownSpeakerLabel(group.label) &&
+          !isUnknownSpeakerLabel(previous.label)))
+    );
+  });
 
   return groups.map((group, segmentIndex) => ({
     providerSessionId,
@@ -124,7 +162,7 @@ export function segmentFinalTurn(
     wordsJson: group.words,
     isFinal: true,
     isUnknownSpeaker: isUnknownSpeakerLabel(group.label),
-    possibleOverlap: hasMixedSpeakers || hasOverlappingWords,
+    possibleOverlap: hasCrossSpeakerTimingCollision,
   }));
 }
 
@@ -137,7 +175,13 @@ export interface SpeakerRevisionEvent {
   revisions: Array<{
     turnOrder: number;
     speakerLabel: string;
-    words: Array<{ text: string; start: number; end: number; confidence: number; speaker: string }>;
+    words: Array<{
+      text: string;
+      start: number;
+      end: number;
+      confidence: number;
+      speaker: string;
+    }>;
   }>;
 }
 
@@ -263,19 +307,19 @@ export function createASRClient(options: ASRClientOptions) {
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data as string);
-          
+
           switch (msg.type) {
             case "Begin":
               sessionId = msg.id;
               break;
-            
+
             case "SpeechStarted":
               onSpeechStarted?.({
                 timestamp: msg.timestamp,
                 speakerLabel: msg.speaker_label,
               });
               break;
-            
+
             case "Turn": {
               turnCount++;
               const words = Array.isArray(msg.words)
@@ -297,7 +341,7 @@ export function createASRClient(options: ASRClientOptions) {
                 const segments = segmentFinalTurn(
                   turn,
                   sessionId,
-                  Date.now() - connectTime
+                  Date.now() - connectTime,
                 );
                 void (async () => {
                   for (const segment of segments) {
@@ -307,13 +351,13 @@ export function createASRClient(options: ASRClientOptions) {
                   onError?.(
                     error instanceof Error
                       ? error
-                      : new Error("Final ASR turn could not be ingested.")
+                      : new Error("Final ASR turn could not be ingested."),
                   );
                 });
               }
               break;
             }
-            
+
             case "SpeakerRevision":
               onSpeakerRevision?.({
                 revisions: (msg.revisions || []).map((revision: any) => ({
@@ -330,14 +374,16 @@ export function createASRClient(options: ASRClientOptions) {
                 })),
               });
               break;
-            
+
             case "Termination":
               if (streamingTimer) clearInterval(streamingTimer);
               onTermination?.({
                 audioDurationSeconds:
                   msg.audio_duration_seconds ?? msg.audioDurationSeconds ?? 0,
                 sessionDurationSeconds:
-                  msg.session_duration_seconds ?? msg.sessionDurationSeconds ?? 0,
+                  msg.session_duration_seconds ??
+                  msg.sessionDurationSeconds ??
+                  0,
               });
               break;
 
@@ -365,8 +411,8 @@ export function createASRClient(options: ASRClientOptions) {
         if (!wasOpen) {
           settleReject(
             new Error(
-              `ASR connection closed before it opened (code ${event.code || "unknown"}).`
-            )
+              `ASR connection closed before it opened (code ${event.code || "unknown"}).`,
+            ),
           );
         }
 
@@ -432,7 +478,7 @@ export function createASRClient(options: ASRClientOptions) {
 
   function sendBeaconTerminate(sessionId_param?: string) {
     // Best-effort termination via sendBeacon
-    const body = JSON.stringify({ 
+    const body = JSON.stringify({
       type: "Terminate",
       sessionId: sessionId_param || sessionId,
     });
