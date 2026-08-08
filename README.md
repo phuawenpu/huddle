@@ -15,18 +15,19 @@ Both modes drive the same pipeline: audio → worklet → PCM16 → ASR → tran
 
 ## Current Status
 
-**Active development — core live capture, natural-audio simulation, and source-linked critique extraction are implemented; human disposition, artifact revision linkage, and production governance remain next.**
+**Active development — live capture, overlap-aware scenario authoring, natural-audio simulation, injected end-to-end demos, and source-linked critique extraction are implemented. Human disposition, artifact revision linkage, broader real-device evaluation, and production governance remain next.**
 
 | Metric            | Value                                            |
 | ----------------- | ------------------------------------------------ |
 | TypeScript        | 0 errors                                         |
 | Unit tests        | 105/105 passing                                  |
-| Browser tests     | 54/54 passing across 6 desktop/mobile profiles   |
+| Live audio E2E    | Mic + recorded pipelines pass locally and on Fly |
 | API routes        | 39 endpoints operational                         |
 | Frontend pages    | 9 routes functional                              |
 | DB schema         | 11 models, SQLite via Prisma                     |
-| Test scenarios    | 11 generated and synthesized                     |
-| Fly.io deployment | health passing                                   |
+| Production data   | 12/12 scenarios at quality score 100             |
+| Scenario audit    | 0 errors, warnings, or exact duplicate lines     |
+| Fly.io deployment | 1/1 health checks passing                        |
 | API secrets       | `ASSEMBLYAI_API_KEY` + `OPENAI_API_KEY` deployed |
 | Dependency audit  | 3 high transitive findings; major fix pending    |
 
@@ -35,13 +36,13 @@ Both modes drive the same pipeline: audio → worklet → PCM16 → ASR → tran
 | Stage                         | Status         | Summary                                                                                                                                                                                                                                   |
 | ----------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **1 — Speech proof**          | ✅ Implemented | AudioWorklet PCM16 resampler, `useAudioCapture` hook (getUserMedia + analyser meter + settings readback), ASR WebSocket client (AssemblyAI v3 protocol), wake lock, sendBeacon termination                                                |
-| **2 — Diarization**           | 🟡 Partial     | Idempotent turn ingest, provider speaker labels, mappings, and UNKNOWN display work; late SpeakerRevision persistence/correction is incomplete.                                                                                           |
-| **3 — Scenarios + stubs**     | 🟡 Partial     | ASR/LLM/TTS stubs, generated scenarios, and overlap fixtures work; sim B does not yet feed decoded audio through the worklet/ASR path.                                                                                                    |
+| **2 — Diarization**           | 🟡 Partial     | Idempotent turn ingest, word-level provider speaker runs, UNKNOWN/PENDING normalization, overlap hints, and mappings work; late SpeakerRevision persistence/correction is incomplete.                                                     |
+| **3 — Scenarios + stubs**     | ✅ Implemented | Versioned rich transcripts, one-to-three-pass LLM revision, quality gates, ASR/LLM/TTS stubs, realistic overlap fixtures, and recorded-audio injection through the live Worklet/ASR path work.                                            |
 | **4 — HUD**                   | 🟡 Partial     | In-memory SSE, talk share, flat discussion items, simulation badge, and reconnect work; event replay/`Last-Event-ID` resume is not implemented.                                                                                           |
 | **5 — TTS + mixing**          | ✅ Implemented | Cached per-turn OpenAI TTS, explicit tone fixtures in stub mode, ffmpeg overlap scheduling/mixing, WAV + MP3 output, manifests, and independent ASR validation.                                                                           |
 | **6 — Critique intelligence** | 🟡 Partial     | Batched turn/window analysis, bounded source-quote validation, Critique Radar, criterion coverage, open loops, commitments, and deduplicated source-linked items work; cross-turn relation persistence and human disposition remain next. |
 | **7 — Facilitation**          | 🟡 Partial     | Single-prompt restraint and a lexical guard exist; correction audit, intent revision history, participant-aware guards, and SSE propagation are incomplete.                                                                               |
-| **8 — Evaluation**            | 🟡 Scaffolded  | Playwright E2E config (6 device profiles) and alignment utilities exist, but several reported metrics remain placeholders and real-device smoke is pending.                                                                               |
+| **8 — Evaluation**            | 🟡 Partial     | Playwright covers six device profiles; mic and recorded pipelines have passed local and deployed E2E checks with real ASR. Some reported metrics remain proxies, and a broader physical-device/acoustic matrix is still pending.          |
 
 ## Research and system-design study
 
@@ -54,6 +55,7 @@ The source studies, current implementation, and adjacent 2023–2026 systems hav
 - [Seven system versions](docs/research/04-system-versions.md)
 - [Evaluation roadmap](docs/research/05-evaluation-roadmap.md)
 - [Product and investor assessment](docs/research/06-product-and-investor-assessment.md)
+- [Realistic multi-party conversation simulation](docs/research/07-realistic-conversation-simulation.md)
 - [System brief generator](docs/research/generate_critique_intelligence_system.py)
 - [Business one-pager generator](docs/research/generate_business_feasibility_one_pager.py)
 - [Archived conceptual diagram set](docs/research/archive/diagrams-2026-08-07/)
@@ -65,6 +67,7 @@ POST /api/sessions/[id]/turns          — Idempotent turn ingest with SSE broad
 GET  /api/sessions/[id]/events          — SSE with pub/sub integration
 POST /api/sessions/terminate-beacon     — sendBeacon termination endpoint
 POST /api/scenarios/[id]/synthesize     — Generate WAV audio from scenario turns
+POST /api/scenarios/[id]/revise         — Run 1–3 sequential structured transcript revisions
 GET  /api/scenarios/[id]/mixed           — Serve synthesized WAV/MP3 (Range-capable)
 GET  /api/recordings                     — List all synthesized recordings + uploads
 POST /api/uploads                        — Upload audio files (WAV, MP3, M4A, WebM, OGG)
@@ -78,7 +81,8 @@ POST /api/uploads                        — Upload audio files (WAV, MP3, M4A, 
 | `/facilitator/[sessionId]` | Full capture pipeline: mic → AudioWorklet → ASR WebSocket. Live partial transcripts, speaker mapping (A-F labels), intent editor, corrections.                                                                  |
 | `/display/[sessionId]`     | Live SSE-driven HUD: last 5 turns, Critique Radar (criterion coverage, open loops, options, decisions, actions, evidence gaps), talk-share bars, source-linked discussion map, prompt banner, SIMULATION badge. |
 | `/simulator/[runId]`       | Playback controller with speed control (0.5×–2.0×), progress bar, current speaker/turn display, WAV download.                                                                                                   |
-| `/scenarios`               | Library with duplicate, delete, launch-to-simulator actions.                                                                                                                                                    |
+| `/scenarios`               | Quality-scored library with duplicate, delete, and launch-to-simulator actions.                                                                                                                                 |
+| `/scenarios/[scenarioId]`  | Timed transcript, quality diagnostics, 1–3-pass LLM workshop, synthesis, preflight, approval, and launch controls.                                                                                              |
 
 ## Known Issues
 
@@ -94,7 +98,7 @@ as production-secure.
 
 ### ⚠ Simulation Path
 
-**Status: acoustic playback is implemented; injected end-to-end simulation is not.**
+**Status: acoustic playback and injected end-to-end simulation are implemented.**
 
 ✅ **What works:**
 
@@ -103,29 +107,40 @@ as production-secure.
 - `ffmpeg` overlap scheduling, mixing, limiting, and WAV/MP3 output
 - Independent ASR validation of sampled real-speech clips
 - HTML5 audio playback and visual turn tracking for manual sim C tests
+- Browser decoding of an approved mix into the same AudioWorklet → PCM16 → ASR path used by a microphone
+- Local and deployed Playwright checks for recorded and fake-microphone sources, including persistence and clean session termination
 
 ❌ **What needs fixing:**
 
-- Sim B must decode the mixed file into the AudioWorklet and ASR WebSocket path
 - Simulator actions must persist run/playback lifecycle events
-- Browser/device playback needs a documented real-device test matrix
+- Browser/device playback needs a broader documented physical-device test matrix
 - Evaluation fields currently hardcoded or derived from proxy metrics must be replaced
 
 ### ⚠ Overlap Naturalness
 
-**Status: deterministic stub dialogue remains mechanical.** The real scenario-generation path now prompts for conversational causality, repair, disagreement, and context-sensitive overlaps; stub mode remains a protocol fixture rather than a naturalness benchmark.
+**Status: production scenarios use version-2 causal, timing-aware transcripts; deterministic stub dialogue remains a protocol fixture rather than a naturalness benchmark.**
 
 ✅ **What works:**
 
-- Overlap rules enforced at generation time
-- `possibleOverlap` flag on turns
-- A basic overlap-restricted transcript proxy in evaluation
+- Stable utterance IDs, response links, dialogue acts, delivery guidance, variable gaps, anchored overlap types/resolution, and post-synthesis realized timing
+- Quality gates for duplicate speech, reaction coverage, round-robin order, participation, speaking density, and invalid overlap graphs
+- Twelve audited production scenarios score 100 with 33 authored overlaps and no exact duplicate lines, quality errors, or warnings
+- Independent ASR validation of the approved Climate mix sampled 11 clips at 0.002 average lexical WER
 
 ❌ **What needs fixing:**
 
 - Human evaluation of real generated conversations and overlap naturalness
 - Acoustic validation across rooms, devices, distances, and background conditions
 - Separate overlap WER and diarization-error measurements
+
+## Scenario transcript lifecycle
+
+1. Generation or legacy migration produces a normalized version-2 transcript with session context, stable speakers and utterances, response links, delivery guidance, and planned timing/overlap metadata.
+2. The scenario workshop can run one to three sequential structured LLM revisions. Each pass receives the complete transcript and the prior pass result.
+3. Normalization and quality gates reject invalid speaker references, duplicate IDs or speech, broken reaction links, contradictory cross-talk settings, impossible overlaps, and participation pathologies.
+4. Any material revision returns the scenario to draft, clears stale realized timing and approval/preflight state, and invalidates the old mix while preserving reusable fingerprinted clips.
+5. Synthesis renders per-turn speech, measures clips, resolves planned transitions into an absolute timeline, mixes WAV/MP3 output, and records the realized transcript.
+6. Independent ASR validation, preflight, and approval apply to that exact fingerprinted mix before playback or a recorded live demo.
 
 ## Quick Start
 
@@ -180,6 +195,12 @@ npm test                    # 105 unit tests (including transcript/ASR/audio gat
 npx tsc --noEmit           # TypeScript check
 npm run build              # production Next.js build
 npm run test:e2e           # cross-browser UI suite plus Chromium mic/recording pipeline cases
+
+# Explicitly authorized deployed mic/recording verification
+RUN_PRODUCTION_LIVE=1 BASE_URL=https://huddle-ti5ikw.fly.dev \
+  PRODUCTION_LIVE_SCENARIO_ID=<approved-scenario-id> \
+  PRODUCTION_LIVE_AUDIO_FILE=<absolute-wav-path> \
+  npx playwright test e2e/production-live.spec.ts --project=chromium
 ```
 
 ## Architecture
