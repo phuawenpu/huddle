@@ -34,6 +34,11 @@ export interface EditableTranscriptDocument {
   timeUnit: "ms";
   topic: string;
   objective: string;
+  sessionContext: {
+    targetDurationMinutes: number | null;
+    phase: string;
+    criteria: string[];
+  };
   speakers: Array<{
     index: number;
     name: string;
@@ -83,13 +88,13 @@ export function getOverlapLeadMs(overlap?: ScenarioOverlap): number {
   return clamp(
     Number(overlap.startBeforeEndMs ?? overlap.startOffsetMs) || 0,
     overlap.kind === "backchannel" ? 120 : 250,
-    1500
+    1500,
   );
 }
 
 export function normalizeScenarioTurns(
   source: unknown,
-  speakerCount: number
+  speakerCount: number,
 ): ScenarioTurn[] {
   const input = Array.isArray(source) ? source : [];
   const usedIds = new Set<string>();
@@ -111,7 +116,7 @@ export function normalizeScenarioTurns(
       const speakerIndex = clamp(
         Number(value?.speakerIndex) || 0,
         0,
-        Math.max(0, speakerCount - 1)
+        Math.max(0, speakerCount - 1),
       );
       const isCalibration = Boolean(value?.isCalibration ?? value?.calibration);
       const rawCategory = value?.expectedCategory ?? value?.expected?.category;
@@ -124,7 +129,7 @@ export function normalizeScenarioTurns(
         : normalizeOverlap(
             value?.overlap ?? value?.timing?.overlap,
             previousId,
-            originalToNormalized
+            originalToNormalized,
           );
       const rawReaction =
         value?.expected?.reactsToTurnId ??
@@ -134,7 +139,7 @@ export function normalizeScenarioTurns(
         rawReaction,
         index,
         ids,
-        originalToNormalized
+        originalToNormalized,
       );
 
       return {
@@ -146,9 +151,9 @@ export function normalizeScenarioTurns(
         expected: {
           substantive: isCalibration
             ? false
-            : value?.expected?.substantive ??
+            : (value?.expected?.substantive ??
               value?.dialogue?.substantive ??
-              wordCount(text) >= 4,
+              wordCount(text) >= 4),
           category: expectedCategory,
           potentialSignal:
             cleanText(value?.expected?.potentialSignal) ||
@@ -163,15 +168,15 @@ export function normalizeScenarioTurns(
               Number(
                 value?.pauseBeforeMs ??
                   value?.timing?.gapBeforeMs ??
-                  (isCalibration ? 1000 : 320)
+                  (isCalibration ? 1000 : 320),
               ) || 0,
               0,
-              5000
+              5000,
             ),
         overlap,
         delivery: normalizeDelivery(value?.delivery, overlap, expectedCategory),
         startMs: finiteOrUndefined(
-          value?.startMs ?? value?.timing?.realizedStartMs
+          value?.startMs ?? value?.timing?.realizedStartMs,
         ),
         endMs: finiteOrUndefined(value?.endMs ?? value?.timing?.realizedEndMs),
         hash: typeof value?.hash === "string" ? value.hash : undefined,
@@ -185,7 +190,12 @@ export function toEditableTranscript(
   topic: string,
   objective: string,
   speakers: ScenarioSpeaker[],
-  turns: ScenarioTurn[]
+  turns: ScenarioTurn[],
+  context: {
+    targetDurationMinutes?: number | null;
+    phase?: string;
+    criteria?: string[];
+  } = {},
 ): EditableTranscriptDocument {
   const normalized = normalizeScenarioTurns(turns, speakers.length);
   return {
@@ -193,6 +203,18 @@ export function toEditableTranscript(
     timeUnit: "ms",
     topic,
     objective,
+    sessionContext: {
+      targetDurationMinutes:
+        Number.isFinite(Number(context.targetDurationMinutes)) &&
+        Number(context.targetDurationMinutes) > 0
+          ? Number(context.targetDurationMinutes)
+          : null,
+      phase: cleanText(context.phase) || "evaluate",
+      criteria: (context.criteria || [])
+        .map(cleanText)
+        .filter(Boolean)
+        .slice(0, 20),
+    },
     speakers: speakers.map((speaker) => ({
       index: speaker.index,
       name: speaker.name,
@@ -202,7 +224,7 @@ export function toEditableTranscript(
     })),
     turns: normalized.map((turn) => {
       const speaker = speakers.find(
-        (candidate) => candidate.index === turn.speakerIndex
+        (candidate) => candidate.index === turn.speakerIndex,
       );
       const overlap = turn.overlap
         ? {
@@ -211,7 +233,7 @@ export function toEditableTranscript(
             kind: turn.overlap.kind,
             resolution: normalizeResolution(
               turn.overlap.resolution,
-              turn.overlap.kind
+              turn.overlap.kind,
             ),
           }
         : null;
@@ -231,7 +253,7 @@ export function toEditableTranscript(
         delivery: normalizeDelivery(
           turn.delivery,
           turn.overlap,
-          turn.expectedCategory
+          turn.expectedCategory,
         ),
         dialogue: {
           act: turn.expectedCategory || "positions",
@@ -250,23 +272,34 @@ export function toEditableTranscript(
 
 export function turnsFromEditableTranscript(
   raw: unknown,
-  speakers: ScenarioSpeaker[]
+  speakers: ScenarioSpeaker[],
 ): ScenarioTurn[] {
   const rawTurns = (raw as any)?.turns;
   if (!Array.isArray(rawTurns)) {
     throw new Error("The model response did not contain transcript turns.");
   }
   const rawIds = rawTurns.map((turn: any) => cleanId(turn?.id));
-  if (rawIds.some((id: string) => !id) || new Set(rawIds).size !== rawIds.length) {
-    throw new Error("The model response contains missing or duplicate turn IDs.");
+  if (
+    rawIds.some((id: string) => !id) ||
+    new Set(rawIds).size !== rawIds.length
+  ) {
+    throw new Error(
+      "The model response contains missing or duplicate turn IDs.",
+    );
   }
   for (let index = 0; index < rawTurns.length; index++) {
     const turn = rawTurns[index];
     if (Number(turn?.order) !== index) {
-      throw new Error("The model response must use contiguous transcript order.");
+      throw new Error(
+        "The model response must use contiguous transcript order.",
+      );
     }
-    if (!speakers.some((speaker) => speaker.index === Number(turn?.speakerIndex))) {
-      throw new Error(`Turn ${turn?.id || index} references an unknown speaker.`);
+    if (
+      !speakers.some((speaker) => speaker.index === Number(turn?.speakerIndex))
+    ) {
+      throw new Error(
+        `Turn ${turn?.id || index} references an unknown speaker.`,
+      );
     }
   }
   const turns = normalizeScenarioTurns((raw as any)?.turns, speakers.length);
@@ -281,7 +314,7 @@ export function turnsFromEditableTranscript(
 
 export function analyzeTranscriptQuality(
   turns: ScenarioTurn[],
-  speakers: ScenarioSpeaker[]
+  speakers: ScenarioSpeaker[],
 ): TranscriptQualityReport {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -289,7 +322,8 @@ export function analyzeTranscriptQuality(
   const mainTurns = normalized.filter((turn) => !turn.isCalibration);
   const duplicateMap = new Map<string, ScenarioTurn[]>();
   for (const turn of mainTurns) {
-    if (turn.expected?.substantive === false || wordCount(turn.text) < 4) continue;
+    if (turn.expected?.substantive === false || wordCount(turn.text) < 4)
+      continue;
     const key = normalizeSpokenText(turn.text);
     const group = duplicateMap.get(key) || [];
     group.push(turn);
@@ -302,18 +336,18 @@ export function analyzeTranscriptQuality(
       turnIds: group.map((turn) => turn.id || `t${turn.index}`),
       speakerNames: group.map(
         (turn) =>
-          speakers.find((speaker) => speaker.index === turn.speakerIndex)?.name ||
-          `Speaker ${turn.speakerIndex + 1}`
+          speakers.find((speaker) => speaker.index === turn.speakerIndex)
+            ?.name || `Speaker ${turn.speakerIndex + 1}`,
       ),
     }));
   if (duplicateGroups.length) {
     errors.push(
-      `${duplicateGroups.length} exact duplicate substantive line${duplicateGroups.length === 1 ? "" : "s"} found.`
+      `${duplicateGroups.length} exact duplicate substantive line${duplicateGroups.length === 1 ? "" : "s"} found.`,
     );
   }
 
   const idToIndex = new Map(
-    normalized.map((turn, index) => [turn.id || `t${index}`, index])
+    normalized.map((turn, index) => [turn.id || `t${index}`, index]),
   );
   const overlapStarts = new Set<number>();
   let overlapCount = 0;
@@ -327,7 +361,9 @@ export function analyzeTranscriptQuality(
       continue;
     }
     if (turn.index - anchorIndex !== 1) {
-      errors.push(`Turn ${turn.id} must overlap the immediately preceding utterance.`);
+      errors.push(
+        `Turn ${turn.id} must overlap the immediately preceding utterance.`,
+      );
     }
     const anchor = normalized[anchorIndex];
     if (anchor.speakerIndex === turn.speakerIndex) {
@@ -340,7 +376,9 @@ export function analyzeTranscriptQuality(
       errors.push(`Turn ${turn.id} exceeds the 1500 ms overlap limit.`);
     }
     if (overlapStarts.has(turn.index - 1)) {
-      errors.push(`Consecutive overlap starts at turn ${turn.id} could create three-way speech.`);
+      errors.push(
+        `Consecutive overlap starts at turn ${turn.id} could create three-way speech.`,
+      );
     }
   }
 
@@ -356,35 +394,41 @@ export function analyzeTranscriptQuality(
   const roundRobinRatio =
     mainTurns.length > 1 ? roundRobinMatches / (mainTurns.length - 1) : 0;
   if (mainTurns.length >= 12 && roundRobinRatio >= 0.95) {
-    errors.push("Speaker order is effectively round-robin rather than conversational.");
+    errors.push(
+      "Speaker order is effectively round-robin rather than conversational.",
+    );
   } else if (mainTurns.length >= 12 && roundRobinRatio >= 0.75) {
     warnings.push("Speaker order is unusually close to round-robin.");
   }
 
   const reactionCandidates = mainTurns.slice(1);
   const reactionCount = reactionCandidates.filter(
-    (turn) => turn.expected?.reactsToTurnId
+    (turn) => turn.expected?.reactsToTurnId,
   ).length;
   const reactionCoverage = reactionCandidates.length
     ? reactionCount / reactionCandidates.length
     : 1;
   if (mainTurns.length >= 8 && reactionCoverage < 0.75) {
-    warnings.push("Too few utterances identify the earlier point they respond to.");
+    warnings.push(
+      "Too few utterances identify the earlier point they respond to.",
+    );
   }
 
   const realizedTimingCount = normalized.filter(
-    (turn) => Number.isFinite(turn.startMs) && Number.isFinite(turn.endMs)
+    (turn) => Number.isFinite(turn.startMs) && Number.isFinite(turn.endMs),
   ).length;
   const realizedTimingCoverage = normalized.length
     ? realizedTimingCount / normalized.length
     : 0;
   if (overlapCount === 0 && mainTurns.length >= 30) {
-    warnings.push("Long discussion contains no authored overlap or backchannel.");
+    warnings.push(
+      "Long discussion contains no authored overlap or backchannel.",
+    );
   }
 
   const speakerTurnCounts = speakers.map((speaker) => {
     const speakerTurns = mainTurns.filter(
-      (turn) => turn.speakerIndex === speaker.index
+      (turn) => turn.speakerIndex === speaker.index,
     );
     return {
       speakerIndex: speaker.index,
@@ -404,11 +448,14 @@ export function analyzeTranscriptQuality(
 
   const score = clamp(
     100 -
-      duplicateGroups.reduce((sum, group) => sum + group.turnIds.length * 4, 0) -
+      duplicateGroups.reduce(
+        (sum, group) => sum + group.turnIds.length * 4,
+        0,
+      ) -
       errors.length * 12 -
       warnings.length * 4,
     0,
-    100
+    100,
   );
 
   return {
@@ -426,10 +473,12 @@ export function analyzeTranscriptQuality(
 
 export function validateTranscriptForRevision(
   turns: ScenarioTurn[],
-  speakers: ScenarioSpeaker[]
+  speakers: ScenarioSpeaker[],
 ): TranscriptQualityReport {
-  if (turns.length < 3) throw new Error("A transcript needs at least three utterances.");
-  if (turns.length > 180) throw new Error("A transcript cannot exceed 180 utterances.");
+  if (turns.length < 3)
+    throw new Error("A transcript needs at least three utterances.");
+  if (turns.length > 180)
+    throw new Error("A transcript cannot exceed 180 utterances.");
   const ids = turns.map((turn, index) => turn.id || `t${index}`);
   if (new Set(ids).size !== ids.length) {
     throw new Error("Every transcript utterance needs a unique stable ID.");
@@ -441,33 +490,37 @@ export function validateTranscriptForRevision(
   }
   const report = analyzeTranscriptQuality(turns, speakers);
   if (report.errors.length) {
-    throw new Error(`Transcript revision failed quality checks: ${report.errors.join(" ")}`);
+    throw new Error(
+      `Transcript revision failed quality checks: ${report.errors.join(" ")}`,
+    );
   }
   return report;
 }
 
 export function transcriptFingerprint(
   speakers: ScenarioSpeaker[],
-  turns: ScenarioTurn[]
+  turns: ScenarioTurn[],
 ): string {
-  const normalized = normalizeScenarioTurns(turns, speakers.length).map((turn) => ({
-    id: turn.id,
-    speakerIndex: turn.speakerIndex,
-    text: turn.text,
-    pauseBeforeMs: turn.pauseBeforeMs,
-    overlap: turn.overlap
-      ? {
-          withTurnId: turn.overlap.withTurnId,
-          startBeforeEndMs: getOverlapLeadMs(turn.overlap),
-          kind: turn.overlap.kind,
-          resolution: normalizeResolution(
-            turn.overlap.resolution,
-            turn.overlap.kind
-          ),
-        }
-      : null,
-    delivery: turn.delivery,
-  }));
+  const normalized = normalizeScenarioTurns(turns, speakers.length).map(
+    (turn) => ({
+      id: turn.id,
+      speakerIndex: turn.speakerIndex,
+      text: turn.text,
+      pauseBeforeMs: turn.pauseBeforeMs,
+      overlap: turn.overlap
+        ? {
+            withTurnId: turn.overlap.withTurnId,
+            startBeforeEndMs: getOverlapLeadMs(turn.overlap),
+            kind: turn.overlap.kind,
+            resolution: normalizeResolution(
+              turn.overlap.resolution,
+              turn.overlap.kind,
+            ),
+          }
+        : null,
+      delivery: turn.delivery,
+    }),
+  );
   return createHash("sha256")
     .update(
       JSON.stringify({
@@ -478,14 +531,14 @@ export function transcriptFingerprint(
           speakingRate: speaker.speakingRate,
         })),
         turns: normalized,
-      })
+      }),
     )
     .digest("hex");
 }
 
 export function buildTranscriptRevisionPrompts(
   document: EditableTranscriptDocument,
-  options: TranscriptRevisionOptions
+  options: TranscriptRevisionOptions,
 ): { system: string; user: string } {
   const focus =
     options.preset === "timing"
@@ -519,6 +572,7 @@ NON-NEGOTIABLE INVARIANTS
 - backchannel: 1–4 words, non-substantive, soft, resolution backchannel. eager_agreement adds a specific point and usually continues. interruption must indicate whether the earlier speaker yields or continues; use delivery.disfluency cut_off when the interrupting or interrupted wording audibly breaks off.
 - Never overlap calibration, the first two main utterances, consecutive new starts, or three speakers.
 - Remove realizedStartMs and realizedEndMs by returning null. Those values are measured after TTS and must not be invented.
+- Preserve the supplied objective and evaluation criteria. Match the target duration with substantive talk (roughly 125–165 spoken words per minute), never by padding, repeated conclusions, or generic filler.
 - Preserve an evolving argument: specific evidence, disagreement, repair, a changed idea, an emerging decision, owned action, and at least one unresolved material concern.
 
 TIMING MEANING
@@ -657,21 +711,20 @@ export const EDITABLE_TRANSCRIPT_JSON_SCHEMA = {
 function normalizeOverlap(
   value: any,
   previousId: string | undefined,
-  originalToNormalized: Map<string, string>
+  originalToNormalized: Map<string, string>,
 ): ScenarioOverlap | undefined {
   if (!value || !previousId) return undefined;
-  const kind = OVERLAP_KINDS.has(value.kind)
-    ? value.kind
-    : "interruption";
+  const kind = OVERLAP_KINDS.has(value.kind) ? value.kind : "interruption";
   const requestedAnchor = String(value.withTurnId || previousId);
-  const withTurnId = originalToNormalized.get(requestedAnchor) || requestedAnchor;
+  const withTurnId =
+    originalToNormalized.get(requestedAnchor) || requestedAnchor;
   return {
     withTurnId,
     startBeforeEndMs: clamp(
       Number(value.startBeforeEndMs ?? value.startOffsetMs) ||
         (kind === "backchannel" ? 320 : 650),
       kind === "backchannel" ? 120 : 250,
-      1500
+      1500,
     ),
     kind,
     resolution: normalizeResolution(value.resolution, kind),
@@ -680,7 +733,7 @@ function normalizeOverlap(
 
 function normalizeResolution(
   value: unknown,
-  kind: ScenarioOverlap["kind"]
+  kind: ScenarioOverlap["kind"],
 ): "yield" | "continue" | "backchannel" {
   if (OVERLAP_RESOLUTIONS.has(String(value))) {
     return value as "yield" | "continue" | "backchannel";
@@ -695,7 +748,7 @@ function normalizeResolution(
 function normalizeDelivery(
   value: any,
   overlap: ScenarioOverlap | undefined,
-  category: DiscussionCategory | undefined
+  category: DiscussionCategory | undefined,
 ): ScenarioDelivery {
   return {
     pace: PACES.has(value?.pace)
@@ -729,9 +782,14 @@ function normalizeEarlierReference(
   value: unknown,
   currentIndex: number,
   ids: string[],
-  originalToNormalized: Map<string, string>
+  originalToNormalized: Map<string, string>,
 ): string | undefined {
-  if (currentIndex <= 0 || value === null || value === undefined || value === "") {
+  if (
+    currentIndex <= 0 ||
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
     return undefined;
   }
   const requested = String(value);
@@ -747,7 +805,8 @@ function normalizeEarlierReference(
 
 function inferIntent(turn: ScenarioTurn): string {
   if (turn.isCalibration) return "calibrate voice and introduce perspective";
-  if (turn.overlap?.kind === "backchannel") return "acknowledge without taking the floor";
+  if (turn.overlap?.kind === "backchannel")
+    return "acknowledge without taking the floor";
   switch (turn.expectedCategory) {
     case "questions":
       return "ask a question that can change the discussion";

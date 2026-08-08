@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { invalidateScenarioAudioMix } from "@/lib/scenario-audio";
 import { requestStructuredJson } from "@/lib/openai-structured";
-import { safeParseJson, serializeScenarioRecord } from "@/lib/scenario-serialization";
+import {
+  safeParseJson,
+  serializeScenarioRecord,
+} from "@/lib/scenario-serialization";
 import {
   buildTranscriptRevisionPrompts,
   EDITABLE_TRANSCRIPT_JSON_SCHEMA,
@@ -20,38 +23,49 @@ type RevisionPreset = "naturalize" | "timing" | "custom";
 
 export async function POST(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
   try {
     const body = await request.json();
     const passes = clamp(Number(body.passes) || 1, 1, 3);
     const preset: RevisionPreset = ["naturalize", "timing", "custom"].includes(
-      body.preset
+      body.preset,
     )
       ? body.preset
       : "naturalize";
-    const instruction = String(body.instruction || "").trim().slice(0, 5000);
+    const instruction = String(body.instruction || "")
+      .trim()
+      .slice(0, 5000);
     if (preset === "custom" && !instruction) {
       return NextResponse.json(
         { error: "Describe the transcript change for a custom revision." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const scenario = await prisma.scenario.findUnique({ where: { id } });
     if (!scenario) {
-      return NextResponse.json({ error: "Scenario not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Scenario not found" },
+        { status: 404 },
+      );
     }
-    const speakers = safeParseJson<ScenarioSpeaker[]>(scenario.speakersJson, []);
+    const speakers = safeParseJson<ScenarioSpeaker[]>(
+      scenario.speakersJson,
+      [],
+    );
     let turns = normalizeScenarioTurns(
       safeParseJson<ScenarioTurn[]>(scenario.turnsJson, []),
-      speakers.length
+      speakers.length,
     );
     if (!speakers.length || !turns.length) {
       return NextResponse.json(
-        { error: "Scenario needs a speaker cast and transcript before revision." },
-        { status: 400 }
+        {
+          error:
+            "Scenario needs a speaker cast and transcript before revision.",
+        },
+        { status: 400 },
       );
     }
 
@@ -59,8 +73,11 @@ export async function POST(
     const apiKey = process.env.OPENAI_API_KEY;
     if (!isStub && !apiKey) {
       return NextResponse.json(
-        { error: "Transcript revision is unavailable because OPENAI_API_KEY is not configured." },
-        { status: 503 }
+        {
+          error:
+            "Transcript revision is unavailable because OPENAI_API_KEY is not configured.",
+        },
+        { status: 503 },
       );
     }
 
@@ -70,7 +87,12 @@ export async function POST(
         scenario.topic,
         scenario.objective,
         speakers,
-        turns
+        turns,
+        {
+          targetDurationMinutes: scenario.durationMinutes,
+          phase: scenario.phase,
+          criteria: safeParseJson<string[]>(scenario.criteria, []),
+        },
       );
       const prompts = buildTranscriptRevisionPrompts(document, {
         instruction,
@@ -97,7 +119,9 @@ export async function POST(
           });
       turns = turnsFromEditableTranscript(revised, speakers);
       summaries.push(
-        String((revised as any).changeSummary || `Completed revision pass ${pass}.`)
+        String(
+          (revised as any).changeSummary || `Completed revision pass ${pass}.`,
+        ),
       );
     }
 
@@ -126,7 +150,7 @@ export async function POST(
     console.error("Transcript revision failed:", error?.message || error);
     return NextResponse.json(
       { error: error?.message || "Transcript revision failed" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -150,7 +174,8 @@ function stubRevision(document: EditableTranscriptDocument, pass: number) {
     version: 2 as const,
     timeUnit: "ms" as const,
     turns,
-    changeSummary: "Normalized conversational timing with the deterministic development editor.",
+    changeSummary:
+      "Normalized conversational timing with the deterministic development editor.",
   };
 }
 
