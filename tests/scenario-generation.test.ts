@@ -62,7 +62,8 @@ describe("discussion generation contract", () => {
     expect(new Set(result.speakers.map((speaker) => speaker.instructions)).size).toBe(3);
     expect(result.turns.slice(0, 3).every((turn) => turn.isCalibration)).toBe(true);
     expect(result.turns[4].expected?.reactsToTurnId).toBe("t3");
-    expect(result.turns[4].overlap?.startOffsetMs).toBe(1500);
+    expect(result.turns[4].overlap?.startBeforeEndMs).toBe(1500);
+    expect(result.turns[4].overlap?.resolution).toBe("yield");
     expect(result.turns[4].pauseBeforeMs).toBe(0);
   });
 });

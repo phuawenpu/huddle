@@ -50,6 +50,11 @@ export async function POST(request: NextRequest) {
         status: "ready", // Ready means audio is available
         speakersJson: JSON.stringify([]),
         turnsJson: JSON.stringify([]),
+        expectedWindowOutcomeJson: JSON.stringify({
+          source: "upload",
+          filename,
+          contentType: file.type,
+        }),
       },
     });
 

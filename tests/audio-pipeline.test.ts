@@ -61,6 +61,33 @@ describe("multi-speaker audio pipeline", () => {
           text: "The recovery step is still unclear.",
           pauseBeforeMs: 300,
         },
+        {
+          id: "t4",
+          index: 4,
+          speakerIndex: 2,
+          text: "Before changing it, we should check where recovery actually fails.",
+          pauseBeforeMs: 380,
+        },
+        {
+          id: "t5",
+          index: 5,
+          speakerIndex: 0,
+          text: "The timeout cases are the ones I can bring into the next test.",
+          pauseBeforeMs: 260,
+        },
+        {
+          id: "t6",
+          index: 6,
+          speakerIndex: 1,
+          text: "Right—the missing recovery cue.",
+          pauseBeforeMs: 0,
+          overlap: {
+            withTurnId: "t5",
+            startBeforeEndMs: 420,
+            kind: "eager_agreement",
+            resolution: "continue",
+          },
+        },
       ],
     });
 
@@ -72,10 +99,16 @@ describe("multi-speaker audio pipeline", () => {
     expect(mp3.subarray(0, 4).toString()).not.toBe("RIFF");
     expect((await stat(wavPath)).size).toBeGreaterThan(10_000);
     expect((await stat(mp3Path)).size).toBeGreaterThan(1_000);
-    expect(manifest.turns).toHaveLength(4);
+    expect(manifest.version).toBe(2);
+    expect(manifest.transcriptFingerprint).toMatch(/^[a-f0-9]{64}$/);
+    expect(manifest.turns).toHaveLength(7);
     expect(manifest.turns[1].scheduledStartMs).toBeGreaterThan(
       manifest.turns[0].scheduledEndMs
     );
+    expect(manifest.turns[6].scheduledStartMs).toBeLessThan(
+      manifest.turns[5].scheduledEndMs
+    );
+    expect(manifest.turns[6].overlapMs).toBeGreaterThan(0);
     expect(manifest.durationMs).toBeGreaterThan(3_000);
     const validation = await validateRenderedSpeech(manifest);
     expect(validation).toMatchObject({

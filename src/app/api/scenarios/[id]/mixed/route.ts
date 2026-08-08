@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readFileSync, existsSync, statSync } from "fs";
 import { join } from "path";
+import { prisma } from "@/lib/db";
+import {
+  hasValidatedScenarioAudio,
+  scenarioAudioDirectory,
+} from "@/lib/scenario-audio";
+import { transcriptFingerprint } from "@/lib/scenario-transcript";
+import type { ScenarioSpeaker, ScenarioTurn } from "@/lib/types";
 
-function audioDir() {
-  return process.env.ASSET_DIR || join(process.cwd(), "data", "audio");
-}
 
 export async function GET(
   request: NextRequest,
@@ -30,13 +34,21 @@ async function serveAudio(
   const format = url.searchParams.get("format") || "wav";
   const isMp3 = format === "mp3";
   const ext = isMp3 ? "mp3" : "wav";
-  const scenarioDir = join(audioDir(), id);
+  const scenarioDir = scenarioAudioDirectory(id);
   const filePath = join(scenarioDir, `mixed.${ext}`);
+
+  const scenario = await prisma.scenario.findUnique({ where: { id } });
+  if (!scenario) {
+    return NextResponse.json({ error: "Scenario not found" }, { status: 404 });
+  }
+  const speakers = safeParse<ScenarioSpeaker[]>(scenario.speakersJson, []);
+  const turns = safeParse<ScenarioTurn[]>(scenario.turnsJson, []);
+  const expectedFingerprint = transcriptFingerprint(speakers, turns);
 
   if (!existsSync(filePath)) {
     return NextResponse.json({ error: "Audio not synthesized yet. Run synthesis first." }, { status: 404 });
   }
-  if (!hasValidatedManifest(scenarioDir)) {
+  if (!hasValidatedScenarioAudio(id, expectedFingerprint)) {
     return NextResponse.json(
       {
         error:
@@ -83,18 +95,11 @@ async function serveAudio(
   });
 }
 
-function hasValidatedManifest(scenarioDir: string) {
-  if (!existsSync(join(scenarioDir, "manifest.json"))) return false;
+function safeParse<T>(value: string | null, fallback: T): T {
+  if (!value) return fallback;
   try {
-    const validation = JSON.parse(
-      readFileSync(join(scenarioDir, "validation.json"), "utf8")
-    );
-    return process.env.TTS_STUB === "1"
-      ? validation?.method === "tone_fixture"
-      : validation?.method === "independent_asr" &&
-          validation?.speechExpected === true &&
-          validation?.passed === true;
+    return JSON.parse(value) as T;
   } catch {
-    return false;
+    return fallback;
   }
 }

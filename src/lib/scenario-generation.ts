@@ -1,5 +1,9 @@
 import { estimateBudget, expectedOverlapCount } from "./budget";
 import { createDefaultCasting } from "./voice-casting";
+import {
+  analyzeTranscriptQuality,
+  normalizeScenarioTurns,
+} from "./scenario-transcript";
 import type {
   CrossTalkLevel,
   ScenarioBudget,
@@ -40,6 +44,136 @@ const CATEGORY_VALUES = new Set([
   "actions",
   "themes",
 ]);
+
+export const GENERATED_SCENARIO_JSON_SCHEMA = {
+  name: "generated_timed_scenario",
+  strict: true,
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["title", "description", "objective", "criteria", "speakers", "turns"],
+    properties: {
+      title: { type: "string" },
+      description: { type: "string" },
+      objective: { type: "string" },
+      criteria: {
+        type: "array",
+        minItems: 1,
+        maxItems: 5,
+        items: { type: "string" },
+      },
+      speakers: {
+        type: "array",
+        minItems: 3,
+        maxItems: 6,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: [
+            "index",
+            "name",
+            "role",
+            "viewpoint",
+            "discourseStyle",
+            "habitualMove",
+            "accent",
+            "targetTalkShare",
+          ],
+          properties: {
+            index: { type: "integer", minimum: 0, maximum: 5 },
+            name: { type: "string" },
+            role: { type: "string" },
+            viewpoint: { type: "string" },
+            discourseStyle: { type: "string" },
+            habitualMove: { type: "string" },
+            accent: { type: "string" },
+            targetTalkShare: { type: "number", minimum: 0.05, maximum: 0.7 },
+          },
+        },
+      },
+      turns: {
+        type: "array",
+        minItems: 6,
+        maxItems: 180,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: [
+            "id",
+            "index",
+            "speakerIndex",
+            "text",
+            "isCalibration",
+            "pauseBeforeMs",
+            "expectedCategory",
+            "expected",
+            "overlap",
+            "delivery",
+          ],
+          properties: {
+            id: { type: "string" },
+            index: { type: "integer", minimum: 0 },
+            speakerIndex: { type: "integer", minimum: 0, maximum: 5 },
+            text: { type: "string", minLength: 1 },
+            isCalibration: { type: "boolean" },
+            pauseBeforeMs: { type: "integer", minimum: 0, maximum: 5000 },
+            expectedCategory: {
+              type: "string",
+              enum: ["evidence", "questions", "positions", "decisions", "actions", "themes"],
+            },
+            expected: {
+              type: "object",
+              additionalProperties: false,
+              required: ["substantive", "category", "potentialSignal", "reactsToTurnId"],
+              properties: {
+                substantive: { type: "boolean" },
+                category: {
+                  type: "string",
+                  enum: ["evidence", "questions", "positions", "decisions", "actions", "themes"],
+                },
+                potentialSignal: { type: "string" },
+                reactsToTurnId: { type: ["string", "null"] },
+              },
+            },
+            overlap: {
+              anyOf: [
+                { type: "null" },
+                {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["withTurnId", "startBeforeEndMs", "kind", "resolution"],
+                  properties: {
+                    withTurnId: { type: "string" },
+                    startBeforeEndMs: { type: "integer", minimum: 120, maximum: 1500 },
+                    kind: {
+                      type: "string",
+                      enum: ["interruption", "eager_agreement", "backchannel"],
+                    },
+                    resolution: {
+                      type: "string",
+                      enum: ["yield", "continue", "backchannel"],
+                    },
+                  },
+                },
+              ],
+            },
+            delivery: {
+              type: "object",
+              additionalProperties: false,
+              required: ["pace", "tone", "volume", "disfluency"],
+              properties: {
+                pace: { type: "string", enum: ["slow", "natural", "quick"] },
+                tone: { type: "string" },
+                volume: { type: "string", enum: ["soft", "normal", "raised"] },
+                disfluency: { type: "string", enum: ["none", "light", "cut_off"] },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+} as const;
 
 export function buildDiscussionPrompts(input: ScenarioGenerationInput): {
   system: string;
@@ -115,8 +249,14 @@ OUTPUT SHAPE
     },
     "overlap": null | {
       "withTurnId": "t<number>",
-      "startOffsetMs": number,
-      "kind": "interruption"|"eager_agreement"|"backchannel"
+      "startBeforeEndMs": number,
+      "kind": "interruption"|"eager_agreement"|"backchannel",
+      "resolution": "yield"|"continue"|"backchannel"
+    },
+    "delivery": {
+      "pace": "slow"|"natural"|"quick", "tone": string,
+      "volume": "soft"|"normal"|"raised",
+      "disfluency": "none"|"light"|"cut_off"
     }
   }]
 }
@@ -125,9 +265,10 @@ TARGETS
 - ${budget.targetTurns} main turns plus ${input.speakerCount} calibration turns.
 - About ${budget.targetCharacters} main-discussion characters, within 15%.
 - At least ${budget.minTurnsPerSpeaker} main turns per speaker.
-- Exactly ${overlapCount} overlap starts and about ${backchannelCount} non-substantive backchannels.
-- Overlap only the immediately preceding main turn, never the first two main turns, never the same speaker, 300–1500 ms, and no consecutive overlap starts.
-- pauseBeforeMs is normally 180–850 ms; use 900–1600 ms after a difficult question or before a consequential response; overlap turns use 0.
+- Aim for about ${overlapCount} motivated overlap starts and about ${backchannelCount} non-substantive backchannels; do not place them at regular intervals.
+- Overlap only the immediately preceding main turn, never the first two main turns, never the same speaker, 120–1500 ms before the anchor ends, and no consecutive overlap starts.
+- pauseBeforeMs is normally varied across 120–700 ms; use 750–1600 ms after a difficult question or before a resistant or consequential response; overlap turns use 0.
+- Most overlaps resolve quickly. Backchannels are soft and keep the prior speaker's floor. For an interruption, say whether the prior speaker yields or continues and use cut-off language only when it is audible in the text.
 
 Fill every field. JSON only.`;
 
@@ -167,7 +308,7 @@ export function normalizeGeneratedScenario(
     Array.isArray(raw?.speakers) ? raw.speakers : []
   );
   const sourceTurns = Array.isArray(raw?.turns) ? raw.turns : [];
-  const turns: ScenarioTurn[] = sourceTurns
+  let turns: ScenarioTurn[] = sourceTurns
     .map((source: any, index: number): ScenarioTurn | null => {
       const text = cleanText(source?.text);
       if (!text) return null;
@@ -186,15 +327,30 @@ export function normalizeGeneratedScenario(
         !isCalibration && source?.overlap
           ? {
               withTurnId: `t${Math.max(0, index - 1)}`,
-              startOffsetMs: Math.min(
+              startBeforeEndMs: Math.min(
                 1500,
-                Math.max(300, Number(source.overlap.startOffsetMs) || 500)
+                Math.max(
+                  source.overlap.kind === "backchannel" ? 120 : 250,
+                  Number(
+                    source.overlap.startBeforeEndMs ??
+                      source.overlap.startOffsetMs
+                  ) || 500
+                )
               ),
               kind: ["interruption", "eager_agreement", "backchannel"].includes(
                 source.overlap.kind
               )
                 ? source.overlap.kind
                 : "interruption",
+              resolution: ["yield", "continue", "backchannel"].includes(
+                source.overlap.resolution
+              )
+                ? source.overlap.resolution
+                : source.overlap.kind === "backchannel"
+                  ? "backchannel"
+                  : source.overlap.kind === "interruption"
+                    ? "yield"
+                    : "continue",
             }
           : undefined;
       return {
@@ -224,6 +380,7 @@ export function normalizeGeneratedScenario(
               : normalizeReactionId(source?.expected?.reactsToTurnId, index),
         },
         overlap,
+        delivery: source?.delivery,
       };
     })
     .filter((turn: ScenarioTurn | null): turn is ScenarioTurn => turn !== null);
@@ -242,6 +399,8 @@ export function normalizeGeneratedScenario(
       potentialSignal: "none",
     };
   }
+
+  turns = normalizeScenarioTurns(turns, input.speakerCount);
 
   const mainTurns = turns.slice(input.speakerCount);
   const mainCharacters = mainTurns.reduce((sum, turn) => sum + turn.text.length, 0);
@@ -264,6 +423,9 @@ export function normalizeGeneratedScenario(
       );
     }
   }
+
+  const quality = analyzeTranscriptQuality(turns, speakers);
+  warnings.push(...quality.errors, ...quality.warnings);
 
   return {
     title: cleanText(raw?.title) || `${input.topic} — Critique`,

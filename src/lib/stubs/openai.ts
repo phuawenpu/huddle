@@ -125,13 +125,19 @@ export function stubGenerateScenario(params: {
       overlapTargets.has(mainIndex) && mainIndex > 2
         ? {
             withTurnId: `t${index - 1}`,
-            startOffsetMs: 350 + Math.round(rng() * 500),
+            startBeforeEndMs: 350 + Math.round(rng() * 500),
             kind:
               move.text.split(/\s+/).length <= 3
                 ? ("backchannel" as const)
                 : rng() > 0.5
                   ? ("interruption" as const)
                   : ("eager_agreement" as const),
+            resolution:
+              move.text.split(/\s+/).length <= 3
+                ? ("backchannel" as const)
+                : rng() > 0.45
+                  ? ("yield" as const)
+                  : ("continue" as const),
           }
         : undefined;
     turns.push({
@@ -232,10 +238,28 @@ function stubDialogueMove(
   ] as const;
   const pool = progress < 0.2 ? opening : progress < 0.78 ? middle : closing;
   const selected = pool[index % pool.length];
-  const text =
+  let text =
     rng() > 0.86 && selected[0].split(/\s+/).length > 5
       ? selected[0].replace(/^That /, "No—wait, that ")
       : selected[0];
+  const cycle = Math.floor(index / pool.length);
+  if (cycle > 0 && text.split(/\s+/).length > 3) {
+    const lenses = [
+      "first-time use",
+      "a rushed return visit",
+      "shared-device privacy",
+      "staff handoff",
+      "an interrupted session",
+      "low-confidence users",
+      "recovery after an error",
+      "the busiest operating hour",
+      "assistive technology",
+      "the next prototype test",
+      "what the screen leaves implicit",
+      "who has to act next",
+    ];
+    text = `${text} I'm thinking specifically about ${lenses[(index + cycle) % lenses.length]}.`;
+  }
   return {
     text,
     category: selected[1] as DiscussionCategory,
@@ -300,40 +324,6 @@ export function stubEstimateScenario(durationMinutes: number, speakerCount: numb
     characterBudget: totalCharacters + 5000,
     turnBudget: totalTurns + 5,
   };
-}
-
-function generateTurnText(topic: string, speakerName: string, turnIndex: number, totalTurns: number, rng: () => number): string {
-  const phases = [
-    // Opening — framing
-    [
-      `I'd like to start by framing our discussion around ${topic}. What specific user needs are we addressing?`,
-      `Looking at the current design, my first observation is that the user flow seems disconnected from the core problem statement.`,
-      `Before we dive into details, let's establish our criteria. What does success look like for this solution?`,
-    ],
-    // Middle — evidence and critique
-    [
-      `That's an interesting point. The usability data from last quarter showed a ${Math.floor(30 + rng() * 50)}% improvement when we simplified similar flows.`,
-      `I want to challenge that assumption. Our user interviews revealed that people actually prefer having more control, not less.`,
-      `From a technical perspective, this approach would require significant changes to the backend architecture. Can we prototype a lighter version first?`,
-      `The research paper by Nielsen on heuristic evaluation suggests we should test this against all ten principles before committing.`,
-      `One thing I noticed is that the design assumes users will always have stable internet. What about offline scenarios?`,
-      `Actually, I have a different take. The real problem isn't the interface — it's that the underlying data model doesn't match how users think about their tasks.`,
-      `That's a valid concern. Could we address it by adding a progressive disclosure pattern? Show the basics first, then reveal advanced options.`,
-      `Let me add some context from the competitive analysis. Three of our top competitors already solved this with a card-based layout, and their engagement went up ${Math.floor(10 + rng() * 30)}%.`,
-    ],
-    // Closing — decisions and actions
-    [
-      `So to summarize, we've identified three key issues: the data model mismatch, the connectivity assumption, and the over-complexity of the initial view.`,
-      `I think we're converging. Let's agree on the top two priorities and assign owners before we wrap up.`,
-      `My action item would be to run a quick A/B test on the simplified version by next sprint. Who can I partner with on that?`,
-      `Before we end, I want to flag that we haven't discussed accessibility. This needs to work with screen readers from day one.`,
-      `Good discussion. I'll document our decisions and share the notes. Let's reconvene next week with prototypes for the two approaches we settled on.`,
-    ],
-  ];
-
-  const phaseIndex = turnIndex < totalTurns * 0.2 ? 0 : turnIndex < totalTurns * 0.7 ? 1 : 2;
-  const pool = phases[phaseIndex];
-  return pool[Math.floor(rng() * pool.length)];
 }
 
 export { VOICE_POOL, NAMES, CATEGORIES };

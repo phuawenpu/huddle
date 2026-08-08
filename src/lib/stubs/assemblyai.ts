@@ -123,7 +123,7 @@ export function startASRStub(config: StubASRConfig = {}): Promise<{ port: number
   return new Promise((resolve, reject) => {
     const port = config.port || STUB_ASR_PORT;
     const latencyMs = config.latencyMs ?? 100;
-    const events: ASRStubEvent[] = config.events || getDefaultEvents();
+    const sourceEvents: ASRStubEvent[] = config.events || getDefaultEvents();
     const validateAudio = config.validateAudio ?? false;
     const faults = config.faults;
 
@@ -145,6 +145,10 @@ export function startASRStub(config: StubASRConfig = {}): Promise<{ port: number
     wss.on("error", reject);
 
     wss.on("connection", (ws, _req: IncomingMessage) => {
+      // Each WebSocket session receives an independent fixture sequence.
+      // Sharing and shifting one array made every connection after the first
+      // silently receive no Begin or Turn messages.
+      const events = sourceEvents.map((event) => ({ ...event }));
       const sessionId = `stub-session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       let audioReceived = false;
       let turnOrder = 0;

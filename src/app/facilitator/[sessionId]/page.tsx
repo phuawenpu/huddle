@@ -16,11 +16,14 @@ interface SessionData {
   speakerCount: number;
   status: string;
   runMode: string;
+  scenarioId?: string | null;
+  sourceAudioUrl?: string | null;
 }
 
 interface TranscriptTurn {
   id: string;
   providerSessionId: string;
+  providerTurnOrder: number;
   providerSpeakerLabel: string;
   originalProviderSpeakerLabel: string;
   participantName?: string;
@@ -64,6 +67,8 @@ export default function FacilitatorPage() {
   const [asrConnected, setAsrConnected] = useState(false);
   const [activeSpeaker, setActiveSpeaker] = useState<string | null>(null);
   const [livePartial, setLivePartial] = useState<string>("");
+  const [starting, setStarting] = useState(false);
+  const [pcmReady, setPcmReady] = useState(false);
   
   const [intentObjective, setIntentObjective] = useState("");
   const [intentPhase, setIntentPhase] = useState("");
@@ -72,12 +77,31 @@ export default function FacilitatorPage() {
   const asrRef = useRef<ASRClient | null>(null);
   const streamingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pcm16CountRef = useRef(0);
+  const pendingPcmRef = useRef<ArrayBuffer[]>([]);
+  const recordingEndedHandlerRef = useRef<() => void>(() => {});
 
   // Audio capture hook
-  const { start: startCapture, stop: stopCapture, isCapturing, settings, meter, error: captureError, workletLoaded, analyserNode } = 
+  const {
+    start: startCapture,
+    startRecording,
+    stop: stopCapture,
+    isCapturing,
+    sourceKind,
+    settings,
+    meter,
+    error: captureError,
+    workletLoaded,
+    analyserNode,
+  } =
     useAudioCapture({
       onPcm16: (buffer: ArrayBuffer, frameIndex: number) => {
-        asrRef.current?.sendAudio(buffer);
+        if (pcm16CountRef.current === 0) setPcmReady(true);
+        if (asrRef.current) {
+          asrRef.current.sendAudio(buffer);
+        } else if (pendingPcmRef.current.length < 100) {
+          // Preserve up to five seconds while token/WebSocket setup completes.
+          pendingPcmRef.current.push(buffer);
+        }
         pcm16CountRef.current++;
       },
       onSettingsReadback: (s) => {
@@ -86,6 +110,7 @@ export default function FacilitatorPage() {
       onError: (err) => {
         setError(`Audio capture error: ${err.message}`);
       },
+      onSourceEnded: () => recordingEndedHandlerRef.current(),
     });
 
   // Wake lock
@@ -238,19 +263,33 @@ export default function FacilitatorPage() {
 
   // Start session
   const handleStart = async () => {
+    if (starting || isCapturing) return;
+    setStarting(true);
     setError("");
+    pendingPcmRef.current = [];
+    pcm16CountRef.current = 0;
+    setPcmReady(false);
     try {
-      // Start session on server
-      await fetch(`/api/sessions/${sessionId}/start`, { method: "POST" });
+      // Ask for microphone permission immediately from the click gesture.
+      // PCM frames wait briefly in pendingPcmRef while ASR connects.
+      if (session?.runMode === "live") {
+        await startCapture();
+      }
 
       // Get ASR token
-      const tokenRes = await fetch("/api/providers/assemblyai/token");
+      const tokenRes = await fetch(
+        `/api/providers/assemblyai/token?max_speakers=${Math.max(2, session?.speakerCount || 2)}`
+      );
       const tokenData = await tokenRes.json();
-      if (tokenData.error) throw new Error(tokenData.error);
+      if (!tokenRes.ok || tokenData.error) {
+        throw new Error(tokenData.error || "Could not obtain an ASR session token.");
+      }
 
       // Create ASR client
       const asr = createASRClient({
-        wsUrl: tokenData.wsUrl || `${tokenData.wsBase}/v3/ws?sample_rate=16000&speech_model=universal-3-5-pro&mode=balanced&token=${tokenData.token}`,
+        wsUrl:
+          tokenData.wsUrl ||
+          `${tokenData.wsBase}/v3/ws?sample_rate=16000&speech_model=u3-rt-pro&format_turns=true&speaker_labels=true&max_speakers=${Math.max(2, session?.speakerCount || 2)}&token=${encodeURIComponent(tokenData.token)}`,
         onTurn: (turn) => {
           if (turn.endOfTurn) {
             setActiveSpeaker(null);
@@ -267,8 +306,10 @@ export default function FacilitatorPage() {
           // Apply revisions to existing turns
           for (const rev of revision.revisions) {
             setTurns(prev => prev.map(t => {
-              if (t.providerSessionId === asr.getState().sessionId) {
-                // Update if turn order matches
+              if (
+                t.providerSessionId === asr.getState().sessionId &&
+                t.providerTurnOrder === rev.turnOrder
+              ) {
                 return { ...t, providerSpeakerLabel: rev.speakerLabel, wasSpeakerRevised: true };
               }
               return t;
@@ -293,23 +334,50 @@ export default function FacilitatorPage() {
       
       // Connect ASR
       await asr.connect();
-      
-      // Start audio capture
-      await startCapture();
+
+      for (const frame of pendingPcmRef.current) asr.sendAudio(frame);
+      pendingPcmRef.current = [];
+
+      const startResponse = await fetch(`/api/sessions/${sessionId}/start`, {
+        method: "POST",
+      });
+      if (!startResponse.ok) {
+        const detail = await startResponse.json().catch(() => null);
+        throw new Error(detail?.error || "Could not start the session.");
+      }
+
+      if (session?.runMode !== "live") {
+        if (!session?.scenarioId) {
+          throw new Error("This recorded session has no scenario audio source.");
+        }
+        await startRecording(
+          session.sourceAudioUrl ||
+            `/api/scenarios/${session.scenarioId}/mixed?format=wav`
+        );
+      }
       await acquireWakeLock();
 
       setSession(s => s ? { ...s, status: "active" } : s);
     } catch (e: any) {
       setError(e.message || "Failed to start session");
+      asrRef.current?.disconnect();
+      asrRef.current = null;
       stopCapture();
+      setPcmReady(false);
+      pendingPcmRef.current = [];
       releaseWakeLock();
+    } finally {
+      setStarting(false);
     }
   };
 
   // Stop session
   const handleStop = async () => {
     asrRef.current?.terminate();
+    asrRef.current = null;
     stopCapture();
+    setPcmReady(false);
+    pendingPcmRef.current = [];
     releaseWakeLock();
     
     try {
@@ -317,6 +385,10 @@ export default function FacilitatorPage() {
     } catch {}
 
     setSession(s => s ? { ...s, status: "terminated" } : s);
+  };
+
+  recordingEndedHandlerRef.current = () => {
+    if (session?.status === "active") void handleStop();
   };
 
   // Update intent
@@ -414,7 +486,9 @@ export default function FacilitatorPage() {
         <div className="flex gap-2 text-sm">
           <span className="text-hud-muted">{streamingMins.toFixed(1)} min</span>
           {workletLoaded && <span className="text-green-400">Worklet ✓</span>}
+          {pcmReady && <span className="text-green-400">PCM ✓</span>}
           {asrConnected && <span className="text-green-400">ASR ✓</span>}
+          {sourceKind === "recording" && <span className="text-hud-accent">Recorded demo</span>}
         </div>
       </header>
 
@@ -439,11 +513,17 @@ export default function FacilitatorPage() {
         ) : (
           <button
             onClick={handleStart}
-            disabled={session?.status === "terminated"}
+            disabled={session?.status === "terminated" || starting}
             className="px-6 py-3 bg-hud-accent text-white rounded-xl font-semibold touch-manipulation active:scale-95 disabled:opacity-50"
             style={{ minHeight: 44 }}
           >
-            {session?.status === "terminated" ? "Ended" : "Start Capture"}
+            {session?.status === "terminated"
+              ? "Ended"
+              : starting
+                ? "Starting…"
+                : session?.runMode === "live"
+                  ? "Start Mic"
+                  : "Start Recorded Demo"}
           </button>
         )}
       </div>

@@ -1,20 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { existsSync, readFileSync, statSync } from "fs";
-import { join } from "path";
+import { resolve, sep } from "path";
 
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ key: string[] }> }
 ) {
   const { key } = await context.params;
-  const assetPath = join(process.cwd(), process.env.ASSET_DIR || "./data/audio", ...key);
+  const assetRoot = resolve(
+    process.cwd(),
+    process.env.ASSET_DIR || "./data/audio"
+  );
+  const assetPath = resolve(assetRoot, ...key);
 
   try {
+    if (!assetPath.startsWith(`${assetRoot}${sep}`)) {
+      return NextResponse.json({ error: "Invalid asset path" }, { status: 400 });
+    }
     if (!existsSync(assetPath)) {
       return NextResponse.json({ error: "Asset not found" }, { status: 404 });
     }
 
     const stat = statSync(assetPath);
+    if (!stat.isFile()) {
+      return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+    }
     const rangeHeader = request.headers.get("range");
 
     // Determine content type

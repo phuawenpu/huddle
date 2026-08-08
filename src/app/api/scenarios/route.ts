@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { serializeScenarioRecord } from "@/lib/scenario-serialization";
+import {
+  normalizeScenarioTurns,
+  validateTranscriptForRevision,
+} from "@/lib/scenario-transcript";
+import type { ScenarioSpeaker, ScenarioTurn } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,7 +20,7 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
       take: 50,
     });
-    return NextResponse.json(scenarios.map(serializeScenario));
+    return NextResponse.json(scenarios.map(serializeScenarioRecord));
   } catch {
     return NextResponse.json({ error: "Failed to list scenarios" }, { status: 500 });
   }
@@ -23,6 +29,15 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    const speakers = Array.isArray(body.speakers)
+      ? (body.speakers as ScenarioSpeaker[])
+      : [];
+    const turns = Array.isArray(body.turns)
+      ? normalizeScenarioTurns(body.turns as ScenarioTurn[], speakers.length)
+      : [];
+    if (turns.length && speakers.length) {
+      validateTranscriptForRevision(turns, speakers);
+    }
     const scenario = await prisma.scenario.create({
       data: {
         title: body.title || "Untitled Scenario",
@@ -40,34 +55,17 @@ export async function POST(request: NextRequest) {
         crossTalkLevel: body.crossTalkLevel || "occasional",
         participationProfile: body.participationProfile || "even",
         budgetJson: body.budget ? JSON.stringify(body.budget) : null,
-        speakersJson: body.speakers ? JSON.stringify(body.speakers) : null,
-        turnsJson: body.turns ? JSON.stringify(body.turns) : null,
+        speakersJson: body.speakers ? JSON.stringify(speakers) : null,
+        turnsJson: body.turns ? JSON.stringify(turns) : null,
         expectedWindowOutcomeJson: body.expectedWindowOutcome ? JSON.stringify(body.expectedWindowOutcome) : null,
         status: body.status || "draft",
       },
     });
-    return NextResponse.json(serializeScenario(scenario), { status: 201 });
-  } catch (error) {
-    return NextResponse.json({ error: "Failed to create scenario" }, { status: 500 });
+    return NextResponse.json(serializeScenarioRecord(scenario), { status: 201 });
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error?.message || "Failed to create scenario" },
+      { status: 400 }
+    );
   }
-}
-
-function serializeScenario(s: any) {
-  return {
-    ...s,
-    criteria: safeParseJson(s.criteria, []),
-    budget: safeParseJson(s.budgetJson, null),
-    speakers: safeParseJson(s.speakersJson, null),
-    turns: safeParseJson(s.turnsJson, null),
-    expectedWindowOutcome: safeParseJson(s.expectedWindowOutcomeJson, null),
-    preflight: safeParseJson(s.preflightJson, null),
-    createdAt: s.createdAt?.toISOString(),
-    updatedAt: s.updatedAt?.toISOString(),
-    approvedAt: s.approvedAt?.toISOString() || null,
-  };
-}
-
-function safeParseJson(val: string | null, fallback: any) {
-  if (!val) return fallback;
-  try { return JSON.parse(val); } catch { return fallback; }
 }

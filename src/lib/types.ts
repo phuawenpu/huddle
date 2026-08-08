@@ -176,6 +176,8 @@ export interface ScenarioData {
   overlapRatioPct?: number;
   speakers?: ScenarioSpeaker[];
   turns?: ScenarioTurn[];
+  transcriptVersion?: number;
+  transcriptQuality?: TranscriptQualityReport;
   status: ScenarioStatus;
   preflight?: PreflightResult;
   approvedAt?: string;
@@ -212,8 +214,19 @@ export interface ScenarioSpeaker {
 
 export interface ScenarioOverlap {
   withTurnId: string;
-  startOffsetMs: number;
+  /** Milliseconds before the anchor utterance ends that this utterance starts. */
+  startBeforeEndMs?: number;
+  /** Legacy alias retained while stored version-1 transcripts are migrated. */
+  startOffsetMs?: number;
   kind: "interruption" | "eager_agreement" | "backchannel";
+  resolution?: "yield" | "continue" | "backchannel";
+}
+
+export interface ScenarioDelivery {
+  pace: "slow" | "natural" | "quick";
+  tone: string;
+  volume: "soft" | "normal" | "raised";
+  disfluency: "none" | "light" | "cut_off";
 }
 
 export interface ScenarioTurn {
@@ -231,10 +244,34 @@ export interface ScenarioTurn {
   isCalibration?: boolean;
   pauseBeforeMs?: number;
   overlap?: ScenarioOverlap;
+  delivery?: ScenarioDelivery;
   startMs?: number;
   endMs?: number;
   overlapWith?: number[];
   hash?: string;
+}
+
+export interface TranscriptDuplicateGroup {
+  normalizedText: string;
+  turnIds: string[];
+  speakerNames: string[];
+}
+
+export interface TranscriptQualityReport {
+  score: number;
+  errors: string[];
+  warnings: string[];
+  duplicateGroups: TranscriptDuplicateGroup[];
+  roundRobinRatio: number;
+  reactionCoverage: number;
+  overlapCount: number;
+  realizedTimingCoverage: number;
+  speakerTurnCounts: Array<{
+    speakerIndex: number;
+    speakerName: string;
+    turns: number;
+    words: number;
+  }>;
 }
 
 export interface PreflightResult {

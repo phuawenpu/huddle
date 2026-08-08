@@ -3,10 +3,13 @@ import { stubGenerateScenario } from "@/lib/stubs/openai";
 import { validateScenarioParams } from "@/lib/budget";
 import {
   buildDiscussionPrompts,
+  GENERATED_SCENARIO_JSON_SCHEMA,
   normalizeGeneratedScenario,
   type ScenarioGenerationInput,
 } from "@/lib/scenario-generation";
 import type { CrossTalkLevel } from "@/lib/types";
+import { requestStructuredJson } from "@/lib/openai-structured";
+import { analyzeTranscriptQuality } from "@/lib/scenario-transcript";
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,9 +67,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const content = await generateDialogue(apiKey, prompts.system, prompts.user);
-    const generated = normalizeGeneratedScenario(content, input, prompts.budget);
-    return NextResponse.json({ ...generated, stubbed: false });
+    let qualityFeedback = "";
+    for (let qualityAttempt = 0; qualityAttempt < 2; qualityAttempt++) {
+      const content = await requestStructuredJson<any>({
+        apiKey,
+        model: process.env.SCENARIO_MODEL || "gpt-5.6-terra",
+        system: prompts.system,
+        user: `${prompts.user}${qualityFeedback}`,
+        schema: GENERATED_SCENARIO_JSON_SCHEMA,
+        maxCompletionTokens: 32_000,
+      });
+      const generated = normalizeGeneratedScenario(content, input, prompts.budget);
+      const quality = analyzeTranscriptQuality(generated.turns, generated.speakers);
+      if (!quality.errors.length) {
+        return NextResponse.json({ ...generated, transcriptQuality: quality, stubbed: false });
+      }
+      qualityFeedback = `\n\nThe previous draft was rejected. Regenerate the complete scenario and fix these exact issues: ${quality.errors.join(" ")}`;
+    }
+    throw new Error("The dialogue model could not produce a transcript that passed realism checks after two attempts.");
   } catch (error: any) {
     console.error("Scenario generation failed:", error?.message || error);
     return NextResponse.json(
@@ -74,40 +92,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-async function generateDialogue(
-  apiKey: string,
-  systemPrompt: string,
-  userPrompt: string
-): Promise<any> {
-  let lastError = "OpenAI dialogue generation failed";
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: process.env.SCENARIO_MODEL || process.env.ANALYSIS_MODEL || "gpt-5-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        response_format: { type: "json_object" },
-      }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const text = data?.choices?.[0]?.message?.content;
-      if (!text) throw new Error("The dialogue model returned no content.");
-      return JSON.parse(text);
-    }
-    const detail = await res.text();
-    lastError = `Dialogue model returned ${res.status}: ${detail.slice(0, 300)}`;
-    if (res.status !== 429 && res.status < 500) break;
-    await new Promise((resolve) => setTimeout(resolve, 750 * 2 ** attempt));
-  }
-  throw new Error(lastError);
 }

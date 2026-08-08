@@ -7,7 +7,14 @@ export async function GET(
 ) {
   const { id } = await context.params;
   try {
-    const session = await prisma.session.findUnique({ where: { id } });
+    const session = await prisma.session.findUnique({
+      where: { id },
+      include: {
+        scenario: {
+          select: { topic: true, expectedWindowOutcomeJson: true },
+        },
+      },
+    });
     if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
     return NextResponse.json(serializeSession(session));
   } catch {
@@ -51,8 +58,17 @@ export async function DELETE(
 }
 
 function serializeSession(s: any) {
+  const sourceMetadata = safeParseJson(
+    s.scenario?.expectedWindowOutcomeJson,
+    null
+  );
   return {
     ...s,
+    scenario: undefined,
+    sourceAudioUrl:
+      s.scenario?.topic === "uploaded_recording" && sourceMetadata?.filename
+        ? `/api/assets/uploads/${encodeURIComponent(sourceMetadata.filename)}`
+        : null,
     criteria: safeParseJson(s.criteria, []),
     createdAt: s.createdAt.toISOString(),
     updatedAt: s.updatedAt.toISOString(),

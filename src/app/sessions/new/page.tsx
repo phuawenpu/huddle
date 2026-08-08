@@ -304,8 +304,13 @@ export default function NewSessionPage() {
                     onClick={() => {
                       setSelectedRecordingId(rec.id);
                       setTitle(rec.title);
+                      setObjective(rec.description || "Run the recorded discussion through the live critique pipeline.");
                       setSpeakerCount(rec.speakerCount || 4);
-                      setParticipants(Array(rec.speakerCount || 4).fill(""));
+                      setParticipants(
+                        rec.speakers?.length
+                          ? rec.speakers.map((speaker) => speaker.name)
+                          : Array(rec.speakerCount || 4).fill("")
+                      );
                     }}
                     className={`w-full text-left p-3 rounded-lg border transition-all ${
                       selectedRecordingId === rec.id
@@ -464,7 +469,15 @@ export default function NewSessionPage() {
             disabled:opacity-50 disabled:cursor-not-allowed"
           style={{ minHeight: 56 }}
         >
-          {uploading ? "Uploading…" : loading ? "Creating…" : audioSource === "mic" ? "🎤 Start Live Critique" : "▶ Start Critique Session"}
+          {uploading
+            ? "Uploading…"
+            : loading
+              ? "Creating…"
+              : audioSource === "mic"
+                ? "🎤 Start Live Critique"
+                : audioSource === "recording"
+                  ? "▶ Prepare Recorded Demo"
+                  : "▶ Start Critique Session"}
         </button>
 
         <p className="text-xs text-hud-muted text-center">
@@ -472,7 +485,7 @@ export default function NewSessionPage() {
             ? "Browser microphone will be used for live transcription."
             : audioSource === "upload"
             ? "Your uploaded audio will be processed through the critique pipeline."
-            : "Selected recording will be used for playback-based critique."}
+            : "The selected discussion will be decoded into the same PCM16 → ASR → live HUD pipeline as a microphone."}
         </p>
       </div>
     </main>

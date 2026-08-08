@@ -37,6 +37,97 @@ export interface WordEvent {
   speaker?: string;
 }
 
+function isUnknownSpeakerLabel(label: string | undefined): boolean {
+  return !label || label.toUpperCase() === "UNKNOWN";
+}
+
+function normalizeWord(word: any): WordEvent {
+  return {
+    text: String(word?.text || word?.word || ""),
+    start: Number(word?.start) || 0,
+    end: Number(word?.end) || 0,
+    confidence: Number(word?.confidence) || 0,
+    wordIsFinal: Boolean(word?.wordIsFinal ?? word?.word_is_final ?? true),
+    speaker: word?.speaker ? String(word.speaker) : undefined,
+  };
+}
+
+function joinWordText(words: WordEvent[]): string {
+  return words
+    .map((word) => word.text)
+    .join(" ")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .trim();
+}
+
+/**
+ * Split a finalized provider turn whenever word-level diarization changes
+ * speaker. AssemblyAI can put a brief interjection and the surrounding speech
+ * in one Turn, so persisting the whole Turn under its dominant label loses a
+ * participant even when the word labels are present.
+ */
+export function segmentFinalTurn(
+  turn: TurnEvent,
+  providerSessionId: string,
+  receivedAtMs: number
+): IngestTurnData[] {
+  const words = (turn.words || []).map(normalizeWord);
+  if (words.length === 0) {
+    const label = turn.speakerLabel || "";
+    return [{
+      providerSessionId,
+      providerTurnOrder: turn.turnOrder,
+      segmentIndex: 0,
+      providerSpeakerLabel: label,
+      startMs: 0,
+      endMs: 0,
+      receivedAtMs,
+      originalText: turn.transcript,
+      currentText: turn.transcript,
+      isFinal: true,
+      isUnknownSpeaker: isUnknownSpeakerLabel(label),
+      possibleOverlap: false,
+    }];
+  }
+
+  const groups: Array<{ label: string; words: WordEvent[] }> = [];
+  for (const word of words) {
+    const label = word.speaker || turn.speakerLabel || "";
+    const previous = groups.at(-1);
+    if (previous && previous.label === label) {
+      previous.words.push(word);
+    } else {
+      groups.push({ label, words: [word] });
+    }
+  }
+
+  const knownLabels = new Set(
+    groups
+      .map((group) => group.label)
+      .filter((label) => !isUnknownSpeakerLabel(label))
+  );
+  const hasMixedSpeakers = knownLabels.size > 1;
+  const hasOverlappingWords = words.some(
+    (word, index) => index > 0 && word.start < words[index - 1].end
+  );
+
+  return groups.map((group, segmentIndex) => ({
+    providerSessionId,
+    providerTurnOrder: turn.turnOrder,
+    segmentIndex,
+    providerSpeakerLabel: group.label,
+    startMs: group.words[0].start,
+    endMs: group.words[group.words.length - 1].end,
+    receivedAtMs,
+    originalText: joinWordText(group.words),
+    currentText: joinWordText(group.words),
+    wordsJson: group.words,
+    isFinal: true,
+    isUnknownSpeaker: isUnknownSpeakerLabel(group.label),
+    possibleOverlap: hasMixedSpeakers || hasOverlappingWords,
+  }));
+}
+
 export interface SpeechStartedEvent {
   timestamp: number;
   speakerLabel?: string;
@@ -98,6 +189,8 @@ export function createASRClient(options: ASRClientOptions) {
   let streamingTimer: ReturnType<typeof setInterval> | null = null;
   let audioBuffer: ArrayBuffer[] = [];
   let bufferByteLength = 0;
+  let intentionallyClosed = false;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   const MAX_BUFFER_BYTES = 5 * 32000; // 5s of audio at 16kHz mono
 
   function connect(): Promise<void> {
@@ -107,20 +200,43 @@ export function createASRClient(options: ASRClientOptions) {
         return;
       }
       if (ws && ws.readyState === WebSocket.CONNECTING) {
-        ws.addEventListener("open", () => resolve());
+        ws.addEventListener("open", () => resolve(), { once: true });
         return;
       }
+
+      intentionallyClosed = false;
+      let settled = false;
+      let opened = false;
+      const settleResolve = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(connectionTimeout);
+        resolve();
+      };
+      const settleReject = (error: Error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(connectionTimeout);
+        reject(error);
+      };
+      const connectionTimeout = setTimeout(() => {
+        intentionallyClosed = true;
+        ws?.close(1000, "Connection timeout");
+        ws = null;
+        settleReject(new Error("ASR connection timed out after 12 seconds."));
+      }, 12_000);
 
       try {
         ws = new WebSocket(wsUrl);
       } catch (err: any) {
-        reject(new Error(`WebSocket creation failed: ${err.message}`));
+        settleReject(new Error(`WebSocket creation failed: ${err.message}`));
         return;
       }
 
       ws.binaryType = "arraybuffer";
 
       ws.onopen = () => {
+        opened = true;
         connectTime = Date.now();
         onConnectionChange?.(true);
 
@@ -141,7 +257,7 @@ export function createASRClient(options: ASRClientOptions) {
           }
         }, 5000);
 
-        resolve();
+        settleResolve();
       };
 
       ws.onmessage = (event) => {
@@ -162,12 +278,15 @@ export function createASRClient(options: ASRClientOptions) {
             
             case "Turn": {
               turnCount++;
+              const words = Array.isArray(msg.words)
+                ? msg.words.map(normalizeWord)
+                : [];
               const turn: TurnEvent = {
                 turnOrder: msg.turn_order,
                 endOfTurn: msg.end_of_turn,
                 transcript: msg.transcript || "",
                 speakerLabel: msg.speaker_label,
-                words: msg.words,
+                words,
                 languageCode: msg.language_code,
                 languageConfidence: msg.language_confidence,
               };
@@ -175,36 +294,51 @@ export function createASRClient(options: ASRClientOptions) {
 
               // If final, ingest to server
               if (msg.end_of_turn && onTurnIngest && sessionId) {
-                const words = msg.words || [];
-                const startMs = words.length > 0 ? words[0].start : 0;
-                const endMs = words.length > 0 ? words[words.length - 1].end : 0;
-                
-                onTurnIngest({
-                  providerSessionId: sessionId,
-                  providerTurnOrder: msg.turn_order,
-                  segmentIndex: 0,
-                  providerSpeakerLabel: msg.speaker_label || "",
-                  startMs,
-                  endMs,
-                  receivedAtMs: Date.now() - connectTime,
-                  originalText: msg.transcript,
-                  currentText: msg.transcript,
-                  wordsJson: words,
-                  isFinal: true,
-                  isUnknownSpeaker: !msg.speaker_label,
-                  possibleOverlap: false,
-                }).catch(() => {});
+                const segments = segmentFinalTurn(
+                  turn,
+                  sessionId,
+                  Date.now() - connectTime
+                );
+                void (async () => {
+                  for (const segment of segments) {
+                    await onTurnIngest(segment);
+                  }
+                })().catch((error) => {
+                  onError?.(
+                    error instanceof Error
+                      ? error
+                      : new Error("Final ASR turn could not be ingested.")
+                  );
+                });
               }
               break;
             }
             
             case "SpeakerRevision":
-              onSpeakerRevision?.(msg);
+              onSpeakerRevision?.({
+                revisions: (msg.revisions || []).map((revision: any) => ({
+                  turnOrder: revision.turn_order ?? revision.turnOrder,
+                  speakerLabel:
+                    revision.speaker_label ?? revision.speakerLabel ?? "",
+                  words: (revision.words || []).map((word: any) => ({
+                    text: String(word?.text || word?.word || ""),
+                    start: Number(word?.start) || 0,
+                    end: Number(word?.end) || 0,
+                    confidence: Number(word?.confidence) || 0,
+                    speaker: word?.speaker ? String(word.speaker) : "",
+                  })),
+                })),
+              });
               break;
             
             case "Termination":
               if (streamingTimer) clearInterval(streamingTimer);
-              onTermination?.(msg);
+              onTermination?.({
+                audioDurationSeconds:
+                  msg.audio_duration_seconds ?? msg.audioDurationSeconds ?? 0,
+                sessionDurationSeconds:
+                  msg.session_duration_seconds ?? msg.sessionDurationSeconds ?? 0,
+              });
               break;
 
             case "Error":
@@ -217,18 +351,33 @@ export function createASRClient(options: ASRClientOptions) {
       };
 
       ws.onerror = (event) => {
-        onError?.(new Error("ASR WebSocket error"));
+        const error = new Error("ASR WebSocket connection failed");
+        onError?.(error);
+        settleReject(error);
       };
 
       ws.onclose = (event) => {
+        const wasOpen = opened;
         ws = null;
         sessionId = null;
         if (streamingTimer) clearInterval(streamingTimer);
         onConnectionChange?.(false);
+        if (!wasOpen) {
+          settleReject(
+            new Error(
+              `ASR connection closed before it opened (code ${event.code || "unknown"}).`
+            )
+          );
+        }
 
         // Auto-reconnect on abnormal close (not clean termination)
-        if (event.code !== 1000 && event.code !== 1005) {
-          setTimeout(() => {
+        if (
+          wasOpen &&
+          !intentionallyClosed &&
+          event.code !== 1000 &&
+          event.code !== 1005
+        ) {
+          reconnectTimer = setTimeout(() => {
             connect().catch(() => {});
           }, 2000);
         }
@@ -249,6 +398,8 @@ export function createASRClient(options: ASRClientOptions) {
   }
 
   function terminate() {
+    intentionallyClosed = true;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
     if (ws?.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "Terminate" }));
       // Wait for Termination message, then close
@@ -263,6 +414,11 @@ export function createASRClient(options: ASRClientOptions) {
   }
 
   function disconnect() {
+    intentionallyClosed = true;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
     if (ws) {
       ws.onclose = null; // Prevent auto-reconnect
       ws.close(1000, "User disconnected");

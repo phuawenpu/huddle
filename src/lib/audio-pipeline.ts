@@ -6,6 +6,11 @@ import { join } from "path";
 import { promisify } from "util";
 import type { ScenarioSpeaker, ScenarioTurn } from "./types";
 import { validateOverlapRules } from "./overlap";
+import {
+  getOverlapLeadMs,
+  normalizeScenarioTurns,
+  transcriptFingerprint,
+} from "./scenario-transcript";
 import { createTtsProvider } from "./tts";
 
 const execFileAsync = promisify(execFile);
@@ -27,8 +32,9 @@ export interface RenderedTurn {
 }
 
 export interface AudioManifest {
-  version: 1;
+  version: 2;
   scenarioId: string;
+  transcriptFingerprint: string;
   ttsModel: string;
   stubbed: boolean;
   sampleRate: 16000;
@@ -57,14 +63,15 @@ export async function synthesizeScenarioAudio(input: {
   if (!input.turns.length) throw new Error("Scenario has no turns to synthesize.");
   if (!input.speakers.length) throw new Error("Scenario has no voice cast.");
 
+  const sourceTurns = normalizeScenarioTurns(input.turns, input.speakers.length);
   const scenarioDir = join(assetRoot(), input.scenarioId);
   const clipsDir = join(scenarioDir, "turns");
   await mkdir(clipsDir, { recursive: true });
   const provider = createTtsProvider();
   const failures: Array<{ turn: number; reason: string }> = [];
-  const rendered = new Array<RenderedTurn>(input.turns.length);
+  const rendered = new Array<RenderedTurn>(sourceTurns.length);
 
-  await mapConcurrent(input.turns, 4, async (turn, index) => {
+  await mapConcurrent(sourceTurns, 4, async (turn, index) => {
     try {
       const speaker = input.speakers.find(
         (candidate) => candidate.index === turn.speakerIndex
@@ -74,7 +81,7 @@ export async function synthesizeScenarioAudio(input: {
       const turnInstructions = composeTurnInstructions(
         speaker.instructions || "",
         turn,
-        input.turns[index - 1]
+        sourceTurns[index - 1]
       );
       const renderKey = createHash("sha256")
         .update(
@@ -161,7 +168,7 @@ export async function synthesizeScenarioAudio(input: {
           0,
           turn.pauseBeforeMs ?? (turn.isCalibration ? 1200 : 420)
         ),
-        overlapMs: turn.overlap?.startOffsetMs || 0,
+        overlapMs: getOverlapLeadMs(turn.overlap),
         isCalibration: Boolean(turn.isCalibration),
       };
     } catch (error: any) {
@@ -178,8 +185,8 @@ export async function synthesizeScenarioAudio(input: {
     );
   }
 
-  scheduleTurns(rendered, input.turns);
-  validateSchedule(rendered, input.turns);
+  scheduleTurns(rendered, sourceTurns);
+  validateSchedule(rendered, sourceTurns);
 
   const mixedWav = join(scenarioDir, "mixed.wav");
   const mixedMp3 = join(scenarioDir, "mixed.mp3");
@@ -204,8 +211,9 @@ export async function synthesizeScenarioAudio(input: {
   const wavStat = await stat(mixedWav);
   const mp3Stat = await stat(mixedMp3);
   const manifest: AudioManifest = {
-    version: 1,
+    version: 2,
     scenarioId: input.scenarioId,
+    transcriptFingerprint: transcriptFingerprint(input.speakers, sourceTurns),
     ttsModel: process.env.TTS_MODEL || "gpt-4o-mini-tts",
     stubbed: process.env.TTS_STUB === "1",
     sampleRate: 16000,
@@ -269,6 +277,20 @@ function composeTurnInstructions(
       "Make the commitment concrete and conversational, without sales or presentation cadence."
     );
   }
+  if (turn.overlap?.resolution === "yield") {
+    directions.push(
+      "The prior speaker yields soon after you enter. Sound decisive enough to take the floor, but not theatrical."
+    );
+  } else if (turn.overlap?.resolution === "continue") {
+    directions.push(
+      "The prior speaker continues briefly under your entrance. Stay intelligible without sounding like a staged argument."
+    );
+  }
+  if (turn.delivery) {
+    directions.push(
+      `Delivery: ${turn.delivery.pace} pace; ${turn.delivery.tone}; ${turn.delivery.volume} volume; ${turn.delivery.disfluency.replace("_", " ")} disfluency.`
+    );
+  }
   return directions.filter(Boolean).join(" ");
 }
 
@@ -276,15 +298,37 @@ function scheduleTurns(
   rendered: RenderedTurn[],
   sourceTurns: ScenarioTurn[]
 ): void {
-  let previousEnd = 0;
+  let timelineEnd = 0;
+  const byId = new Map<string, RenderedTurn>();
   for (let index = 0; index < rendered.length; index++) {
     const turn = rendered[index];
     const source = sourceTurns[index];
     const pause = index === 0 ? 2000 : turn.pauseBeforeMs;
-    const overlap = source.overlap ? turn.overlapMs : 0;
-    turn.scheduledStartMs = Math.max(0, previousEnd + pause - overlap);
+    if (source.overlap) {
+      const anchor = byId.get(source.overlap.withTurnId);
+      if (!anchor) {
+        throw new Error(
+          `Turn ${turn.id} overlaps missing anchor ${source.overlap.withTurnId}.`
+        );
+      }
+      const requested = getOverlapLeadMs(source.overlap);
+      const safeOverlap = Math.max(
+        0,
+        Math.min(
+          requested,
+          1500,
+          Math.floor(Math.min(anchor.durationMs, turn.durationMs) * 0.6)
+        )
+      );
+      turn.scheduledStartMs = Math.max(0, anchor.scheduledEndMs - safeOverlap);
+      turn.overlapMs = Math.max(0, anchor.scheduledEndMs - turn.scheduledStartMs);
+    } else {
+      turn.scheduledStartMs = Math.max(0, timelineEnd + pause);
+      turn.overlapMs = 0;
+    }
     turn.scheduledEndMs = turn.scheduledStartMs + turn.durationMs;
-    previousEnd = turn.scheduledEndMs;
+    timelineEnd = Math.max(timelineEnd, turn.scheduledEndMs);
+    byId.set(turn.id, turn);
   }
 }
 

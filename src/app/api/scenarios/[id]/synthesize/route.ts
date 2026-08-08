@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { synthesizeScenarioAudio } from "@/lib/audio-pipeline";
 import { validateRenderedSpeech } from "@/lib/audio-validation";
+import {
+  normalizeScenarioTurns,
+  validateTranscriptForRevision,
+} from "@/lib/scenario-transcript";
 import type { ScenarioSpeaker, ScenarioTurn } from "@/lib/types";
 
 export const maxDuration = 300;
@@ -16,14 +20,16 @@ export async function POST(
     if (!scenario) {
       return NextResponse.json({ error: "Scenario not found" }, { status: 404 });
     }
-    const turns = safeParse<ScenarioTurn[]>(scenario.turnsJson, []);
+    const storedTurns = safeParse<ScenarioTurn[]>(scenario.turnsJson, []);
     const speakers = safeParse<ScenarioSpeaker[]>(scenario.speakersJson, []);
-    if (!turns.length || !speakers.length) {
+    if (!storedTurns.length || !speakers.length) {
       return NextResponse.json(
         { error: "Scenario needs a complete script and voice cast before synthesis." },
         { status: 400 }
       );
     }
+    const turns = normalizeScenarioTurns(storedTurns, speakers.length);
+    validateTranscriptForRevision(turns, speakers);
 
     await prisma.scenario.update({
       where: { id },

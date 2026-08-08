@@ -13,12 +13,14 @@ interface ScenarioItem {
   difficulty: string;
   status: string;
   createdAt: string;
+  transcriptQuality?: { score: number; errors: string[]; warnings: string[] };
 }
 
 export default function ScenariosPage() {
   const router = useRouter();
   const [scenarios, setScenarios] = useState<ScenarioItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     fetch("/api/scenarios")
@@ -35,6 +37,7 @@ export default function ScenariosPage() {
   };
 
   const handleDuplicate = async (id: string) => {
+    setError("");
     const res = await fetch(`/api/scenarios/${id}`);
     const scenario = await res.json();
     const newRes = await fetch("/api/scenarios", {
@@ -48,6 +51,10 @@ export default function ScenariosPage() {
       }),
     });
     const newScenario = await newRes.json();
+    if (!newRes.ok) {
+      setError(newScenario.error || "Could not duplicate scenario");
+      return;
+    }
     setScenarios(prev => [newScenario, ...prev]);
   };
 
@@ -107,6 +114,12 @@ export default function ScenariosPage() {
           </button>
         </header>
 
+        {error && (
+          <div className="rounded-xl border border-hud-danger/30 bg-hud-danger/10 p-3 text-sm text-hud-danger">
+            {error}
+          </div>
+        )}
+
         {loading ? (
           <div className="text-hud-muted text-center py-12 animate-pulse">Loading…</div>
         ) : scenarios.length === 0 ? (
@@ -133,7 +146,7 @@ export default function ScenariosPage() {
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-hud-text truncate">{s.title}</h3>
                     <p className="text-sm text-hud-muted truncate">{s.topic}</p>
-                    <div className="flex gap-3 mt-2 text-xs">
+                    <div className="flex flex-wrap gap-3 mt-2 text-xs">
                       <span className="text-hud-accent">{s.durationMinutes}min</span>
                       <span className="text-hud-muted">{s.speakerCount} speakers</span>
                       <span className="text-hud-muted">{s.crossTalkLevel}</span>
@@ -145,12 +158,27 @@ export default function ScenariosPage() {
                       }`}>
                         {s.status}
                       </span>
+                      {s.transcriptQuality && (
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+                          s.transcriptQuality.errors.length
+                            ? "bg-hud-danger/20 text-hud-danger"
+                            : s.transcriptQuality.warnings.length
+                              ? "bg-hud-warn/20 text-hud-warn"
+                              : "bg-hud-success/20 text-hud-success"
+                        }`}>
+                          transcript {s.transcriptQuality.score}/100
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex gap-1 ml-3" onClick={e => e.stopPropagation()}>
                     <button
                       onClick={() => handleLaunch(s)}
-                      className="px-3 py-2 text-xs bg-hud-accent text-white rounded-lg touch-manipulation"
+                      disabled={
+                        !["ready", "approved"].includes(s.status) ||
+                        Boolean(s.transcriptQuality?.errors.length)
+                      }
+                      className="px-3 py-2 text-xs bg-hud-accent text-white rounded-lg touch-manipulation disabled:opacity-35 disabled:cursor-not-allowed"
                       style={{ minHeight: 36 }}
                       title="Launch simulation"
                     >
