@@ -2,8 +2,8 @@
 
 ## Detailed system atlas
 
-[`critique-intelligence-system-detailed-2026-08-07.pdf`](critique-intelligence-system-detailed-2026-08-07.pdf)
-is the complete 11-page atlas that preceded the shorter current-facing brief.
+The detailed-system generator produces the complete 11-page atlas that preceded
+the shorter current-facing brief. Generated PDF output is intentionally not tracked.
 It retains the executive spine, signal compiler, live sequence, Critique Ledger,
 evaluation twin, experience/governance model, production architecture, business
 wedge, investor gates, repository traceability, and source guide.
@@ -22,13 +22,13 @@ These five diagrams correspond to the five highest-ranked system versions in [`.
 
 They were archived on 2026-08-07 because they blend the source-paper concepts with an earlier, narrower interpretation of the application. They are retained for research history and should not be treated as the current product architecture or roadmap.
 
-| PDF                                                          | System version                   | Page                 |
-| ------------------------------------------------------------ | -------------------------------- | -------------------- |
-| [`01-live-critique-mirror.pdf`](01-live-critique-mirror.pdf) | Live Critique Mirror             | A3 landscape, vector |
-| [`02-intent-ledger.pdf`](02-intent-ledger.pdf)               | Intent Ledger                    | A3 landscape, vector |
-| [`03-studio-commons.pdf`](03-studio-commons.pdf)             | Agency-Preserving Studio Commons | A3 landscape, vector |
-| [`04-jury-bridge.pdf`](04-jury-bridge.pdf)                   | Jury Bridge                      | A3 landscape, vector |
-| [`05-reflective-twin.pdf`](05-reflective-twin.pdf)           | Reflective Twin                  | A3 landscape, vector |
+| System version                   | Page                 |
+| -------------------------------- | -------------------- |
+| Live Critique Mirror             | A3 landscape, vector |
+| Intent Ledger                    | A3 landscape, vector |
+| Agency-Preserving Studio Commons | A3 landscape, vector |
+| Jury Bridge                      | A3 landscape, vector |
+| Reflective Twin                  | A3 landscape, vector |
 
 ## Quality
 

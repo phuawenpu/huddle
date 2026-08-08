@@ -5,12 +5,12 @@
 The local research corpus contains two complementary studies:
 
 1. **Student Perceptions of Large Language Models Use in Self-Reflection and Design Critique in Architecture Studio**
-   [`DCC FINAL DRAFT 2026_JUANSALAZAR.pdf`](../../workspace/DCC%20FINAL%20DRAFT%202026_JUANSALAZAR.pdf)
    Mixed-methods study with 22 SUTD architecture students, including three surveys and seven follow-up interviews.
 
 2. **Designing the dialogue: A participatory study to develop AI-mediated architecture critiques**
-   [`ACM SIGGRAPH SUBMISSION.pdf`](../../workspace/ACM%20SIGGRAPH%20SUBMISSION.pdf)
    Participatory-design study with 22 students using ideation, affinity mapping, prioritization, role play, and low-fidelity paper prototypes.
+
+The source-paper PDFs are intentionally not retained in this repository.
 
 The first paper establishes the problem and desired roles from students’ reported experience. The second converts those needs into interaction patterns and a proposed platform, Studioboard. Together they form a progression:
 

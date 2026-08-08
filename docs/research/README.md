@@ -1,7 +1,7 @@
 # Critique HUD research, product evolution, and system diagrams
 
 **Audit date:** 2026-08-07
-**Scope:** the two papers in [`workspace/`](../../workspace/), the current `main` codebase, and a targeted online prior-art review.
+**Scope:** two source studies (whose PDFs are not retained in the repository), the current `main` codebase, and a targeted online prior-art review.
 
 This folder separates four questions that should not be collapsed:
 
@@ -14,8 +14,6 @@ This folder separates four questions that should not be collapsed:
 
 | Artifact                                                                                         | Purpose                                                                                                                      |
 | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| [`critique-intelligence-system-2026-08-07.pdf`](critique-intelligence-system-2026-08-07.pdf)     | Three-page system brief: current code, one product direction, and a proof-or-stop plan                                       |
-| [`business-feasibility-one-pager-2026-08-07.pdf`](business-feasibility-one-pager-2026-08-07.pdf) | One-page investor view: verdict, market seam, present proof, commercial hypotheses, 90-day gates, risks, and stop conditions |
 | [`06-product-and-investor-assessment.md`](06-product-and-investor-assessment.md)                 | Detailed demand evidence, competitive boundary, beachhead, moat, risks, pricing hypotheses, sources, and falsifiable gates   |
 | [`01-research-synthesis.md`](01-research-synthesis.md)                                           | Novel aspects of the two studies and the design requirements they establish                                                  |
 | [`02-codebase-audit.md`](02-codebase-audit.md)                                                   | Detailed architecture, data flow, implementation coverage, risks, and evidence                                               |
@@ -28,7 +26,7 @@ This folder separates four questions that should not be collapsed:
 
 ## Current synthesized brief
 
-The current PDF deliberately has three pages rather than an encyclopedic atlas:
+The current brief generator deliberately produces three pages rather than an encyclopedic atlas:
 
 1. **What the repository is now** — the exact live/simulated audio-to-Critique-Radar pathway, a real source contract, code traceability, test evidence, and current boundary.
 2. **One product direction** — a single Critique Ledger workflow from capture through human confirmation, disposition, artifact linking, and revision response.
@@ -54,14 +52,15 @@ python docs/research/generate_critique_intelligence_system.py
 python docs/research/generate_business_feasibility_one_pager.py
 ```
 
-The generators write both PDFs beside themselves. ReportLab keeps the diagrams
-vector-based and selectable; PyMuPDF is used only for page rendering and
-boundary inspection during visual QA.
+The generators can produce local PDF outputs beside themselves. Those generated
+outputs are intentionally not tracked. ReportLab keeps the diagrams vector-based
+and selectable; PyMuPDF is used only for page rendering and boundary inspection
+during visual QA.
 
 ## Archived detail and earlier variations
 
-The prior 11-page system atlas remains available as
-[`critique-intelligence-system-detailed-2026-08-07.pdf`](archive/diagrams-2026-08-07/critique-intelligence-system-detailed-2026-08-07.pdf).
+The prior 11-page system atlas can be reproduced from
+[`generate_critique_intelligence_system_detailed.py`](archive/diagrams-2026-08-07/generate_critique_intelligence_system_detailed.py).
 It contains the executive spine, signal compiler, live sequence, Critique
 Ledger, evaluation twin, experience/governance, production architecture,
 business wedge, investor gates, and source traceability. Its source is
@@ -69,11 +68,11 @@ business wedge, investor gates, and source traceability. Its source is
 
 These diagrams are retained as a dated research artifact rather than the current product direction. They blended findings from the two papers with an earlier reading of the application and may understate the implemented system and its broader potential.
 
-1. [`01-live-critique-mirror.pdf`](archive/diagrams-2026-08-07/01-live-critique-mirror.pdf) — Version 1: live, dual-surface cognitive mirror
-2. [`02-intent-ledger.pdf`](archive/diagrams-2026-08-07/02-intent-ledger.pdf) — Version 2: longitudinal critique-to-revision provenance
-3. [`03-studio-commons.pdf`](archive/diagrams-2026-08-07/03-studio-commons.pdf) — Version 3: identity and audience-controlled peer critique
-4. [`04-jury-bridge.pdf`](archive/diagrams-2026-08-07/04-jury-bridge.pdf) — Version 4: accessible real-time and post-jury cognitive offloading
-5. [`05-reflective-twin.pdf`](archive/diagrams-2026-08-07/05-reflective-twin.pdf) — Version 5: multimodal, intent-grounded reflective twin
+1. Live Critique Mirror — Version 1: live, dual-surface cognitive mirror
+2. Intent Ledger — Version 2: longitudinal critique-to-revision provenance
+3. Studio Commons — Version 3: identity and audience-controlled peer critique
+4. Jury Bridge — Version 4: accessible real-time and post-jury cognitive offloading
+5. Reflective Twin — Version 5: multimodal, intent-grounded reflective twin
 
 ## Headline conclusion
 

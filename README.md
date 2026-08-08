@@ -45,7 +45,7 @@ Both modes drive the same pipeline: audio → worklet → PCM16 → ASR → tran
 
 ## Research and system-design study
 
-The research papers in `workspace/`, the current implementation, and adjacent 2023–2026 systems have been analyzed as a single design-research program. The study distinguishes empirical findings, implemented behavior, scaffolding, and future novelty claims.
+The source studies, current implementation, and adjacent 2023–2026 systems have been analyzed as a single design-research program. The study distinguishes empirical findings, implemented behavior, scaffolding, and future novelty claims. Source-paper PDFs are intentionally not retained in this repository.
 
 - [Research artifact index](docs/research/README.md)
 - [Research synthesis](docs/research/01-research-synthesis.md)
@@ -54,11 +54,8 @@ The research papers in `workspace/`, the current implementation, and adjacent 20
 - [Seven system versions](docs/research/04-system-versions.md)
 - [Evaluation roadmap](docs/research/05-evaluation-roadmap.md)
 - [Product and investor assessment](docs/research/06-product-and-investor-assessment.md)
-- [Critique Intelligence System — three-page synthesized PDF](docs/research/critique-intelligence-system-2026-08-07.pdf)
-- [Business feasibility — investor one-pager](docs/research/business-feasibility-one-pager-2026-08-07.pdf)
 - [System brief generator](docs/research/generate_critique_intelligence_system.py)
 - [Business one-pager generator](docs/research/generate_business_feasibility_one_pager.py)
-- [Archived detailed 11-page system atlas](docs/research/archive/diagrams-2026-08-07/critique-intelligence-system-detailed-2026-08-07.pdf)
 - [Archived conceptual diagram set](docs/research/archive/diagrams-2026-08-07/)
 
 ### New API Endpoints (since prototype)
