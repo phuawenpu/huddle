@@ -156,8 +156,11 @@ Open [http://localhost:3000](http://localhost:3000).
 | `LLM_STUB`                  | Use deterministic stubs                  | `1`                      |
 | `ANALYSIS_TIMEOUT_MS`       | Provider deadline before safe fallback   | `12000`                  |
 | `ANALYSIS_REASONING_EFFORT` | GPT reasoning effort for live extraction | `minimal`                |
+| `SCENARIO_MODEL`            | Structured scenario generation model     | `gpt-5.6-terra`          |
+| `SCENARIO_EDIT_MODEL`       | Structured transcript revision model     | `SCENARIO_MODEL`         |
 | `TTS_STUB`                  | Use tone-based TTS stubs                 | `1`                      |
 | `ASR_STUB`                  | Use in-process ASR stub                  | `1`                      |
+| `ASSEMBLYAI_SPEECH_MODEL`   | Streaming diarization model              | `u3-rt-pro`              |
 
 ## Routes
 
@@ -176,10 +179,10 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Testing
 
 ```bash
-npm test                    # 93 unit tests (including decision-evidence gating)
+npm test                    # 98 unit tests (including transcript/ASR/audio gates)
 npx tsc --noEmit           # TypeScript check
 npm run build              # production Next.js build
-npm run test:e2e           # 54 cases across Chromium, Firefox, WebKit, iPhone, Android, iPad
+npm run test:e2e           # cross-browser UI suite plus Chromium mic/recording pipeline cases
 ```
 
 ## Architecture

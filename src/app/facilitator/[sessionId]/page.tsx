@@ -3,7 +3,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAudioCapture } from "@/lib/client/audio-capture";
-import { createASRClient, type ASRClient, type IngestTurnData } from "@/lib/client/asr-client";
+import {
+  createASRClient,
+  type ASRClient,
+  type IngestTurnData,
+} from "@/lib/client/asr-client";
 import { useWakeLock } from "@/lib/client/wake-lock";
 import { AudioVisualizer } from "@/lib/client/audio-visualizer";
 
@@ -69,11 +73,11 @@ export default function FacilitatorPage() {
   const [livePartial, setLivePartial] = useState<string>("");
   const [starting, setStarting] = useState(false);
   const [pcmReady, setPcmReady] = useState(false);
-  
+
   const [intentObjective, setIntentObjective] = useState("");
   const [intentPhase, setIntentPhase] = useState("");
   const [intentCriteria, setIntentCriteria] = useState("");
-  
+
   const asrRef = useRef<ASRClient | null>(null);
   const streamingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pcm16CountRef = useRef(0);
@@ -92,29 +96,33 @@ export default function FacilitatorPage() {
     error: captureError,
     workletLoaded,
     analyserNode,
-  } =
-    useAudioCapture({
-      onPcm16: (buffer: ArrayBuffer, frameIndex: number) => {
-        if (pcm16CountRef.current === 0) setPcmReady(true);
-        if (asrRef.current) {
-          asrRef.current.sendAudio(buffer);
-        } else if (pendingPcmRef.current.length < 100) {
-          // Preserve up to five seconds while token/WebSocket setup completes.
-          pendingPcmRef.current.push(buffer);
-        }
-        pcm16CountRef.current++;
-      },
-      onSettingsReadback: (s) => {
-        console.log("Audio settings:", s);
-      },
-      onError: (err) => {
-        setError(`Audio capture error: ${err.message}`);
-      },
-      onSourceEnded: () => recordingEndedHandlerRef.current(),
-    });
+  } = useAudioCapture({
+    onPcm16: (buffer: ArrayBuffer, frameIndex: number) => {
+      if (pcm16CountRef.current === 0) setPcmReady(true);
+      if (asrRef.current) {
+        asrRef.current.sendAudio(buffer);
+      } else if (pendingPcmRef.current.length < 100) {
+        // Preserve up to five seconds while token/WebSocket setup completes.
+        pendingPcmRef.current.push(buffer);
+      }
+      pcm16CountRef.current++;
+    },
+    onSettingsReadback: (s) => {
+      console.log("Audio settings:", s);
+    },
+    onError: (err) => {
+      setError(`Audio capture error: ${err.message}`);
+    },
+    onSourceEnded: () => recordingEndedHandlerRef.current(),
+  });
 
   // Wake lock
-  const { locked: wakeLocked, supported: wakeLockSupported, acquire: acquireWakeLock, release: releaseWakeLock } = useWakeLock();
+  const {
+    locked: wakeLocked,
+    supported: wakeLockSupported,
+    acquire: acquireWakeLock,
+    release: releaseWakeLock,
+  } = useWakeLock();
 
   // Load session data
   useEffect(() => {
@@ -154,7 +162,25 @@ export default function FacilitatorPage() {
       try {
         const data = JSON.parse(e.data);
         if (data.turns) setTurns(data.turns);
-        if (data.session) setSession(data.session);
+        if (data.session) {
+          setSession((current) => {
+            if (!current) return data.session;
+            const preserveTerminalOrActiveState =
+              (current.status === "active" ||
+                current.status === "terminated") &&
+              data.session.status === "setup";
+            return {
+              ...current,
+              ...data.session,
+              scenarioId: data.session.scenarioId ?? current.scenarioId,
+              sourceAudioUrl:
+                data.session.sourceAudioUrl ?? current.sourceAudioUrl,
+              status: preserveTerminalOrActiveState
+                ? current.status
+                : data.session.status,
+            };
+          });
+        }
         if (data.speakerMappings) setMappings(data.speakerMappings);
         if (data.participants) setParticipants(data.participants);
       } catch {}
@@ -164,8 +190,8 @@ export default function FacilitatorPage() {
       lastId = e.lastEventId;
       try {
         const turn = JSON.parse(e.data);
-        setTurns(prev => {
-          const idx = prev.findIndex(t => t.id === turn.id);
+        setTurns((prev) => {
+          const idx = prev.findIndex((t) => t.id === turn.id);
           if (idx >= 0) {
             const next = [...prev];
             next[idx] = turn;
@@ -181,7 +207,7 @@ export default function FacilitatorPage() {
     es.addEventListener("turn.updated", (e) => {
       try {
         const turn = JSON.parse(e.data);
-        setTurns(prev => prev.map(t => t.id === turn.id ? turn : t));
+        setTurns((prev) => prev.map((t) => (t.id === turn.id ? turn : t)));
       } catch {}
     });
 
@@ -189,7 +215,7 @@ export default function FacilitatorPage() {
       try {
         const data = JSON.parse(e.data);
         if (data.status === "terminated") {
-          setSession(s => s ? { ...s, status: "terminated" } : s);
+          setSession((s) => (s ? { ...s, status: "terminated" } : s));
         }
       } catch {}
     });
@@ -214,8 +240,8 @@ export default function FacilitatorPage() {
   useEffect(() => {
     if (isCapturing) {
       streamingTimerRef.current = setInterval(() => {
-        setStreamingMins(prev => {
-          const newVal = prev + (5 / 60);
+        setStreamingMins((prev) => {
+          const newVal = prev + 5 / 60;
           return Math.round(newVal * 10) / 10;
         });
       }, 5000);
@@ -248,22 +274,40 @@ export default function FacilitatorPage() {
   }, []);
 
   // Ingest finalized turns to server
-  const ingestTurn = useCallback(async (turnData: IngestTurnData) => {
-    try {
-      const res = await fetch(`/api/sessions/${sessionId}/turns`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(turnData),
-      });
-      if (!res.ok) console.error("Turn ingest failed:", await res.text());
-    } catch (err) {
-      console.error("Turn ingest error:", err);
-    }
-  }, [sessionId]);
+  const ingestTurn = useCallback(
+    async (turnData: IngestTurnData) => {
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}/turns`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(turnData),
+        });
+        if (!res.ok) {
+          console.error("Turn ingest failed:", await res.text());
+          return;
+        }
+        const saved = await res.json();
+        setTurns((current) => {
+          const existing = current.findIndex((turn) => turn.id === saved.id);
+          if (existing < 0) return [...current, saved];
+          const next = [...current];
+          next[existing] = saved;
+          return next;
+        });
+      } catch (err) {
+        console.error("Turn ingest error:", err);
+      }
+    },
+    [sessionId],
+  );
 
   // Start session
   const handleStart = async () => {
     if (starting || isCapturing) return;
+    if (!session) {
+      setError("Session details are still loading. Please try again.");
+      return;
+    }
     setStarting(true);
     setError("");
     pendingPcmRef.current = [];
@@ -278,11 +322,13 @@ export default function FacilitatorPage() {
 
       // Get ASR token
       const tokenRes = await fetch(
-        `/api/providers/assemblyai/token?max_speakers=${Math.max(2, session?.speakerCount || 2)}`
+        `/api/providers/assemblyai/token?max_speakers=${Math.max(2, session?.speakerCount || 2)}`,
       );
       const tokenData = await tokenRes.json();
       if (!tokenRes.ok || tokenData.error) {
-        throw new Error(tokenData.error || "Could not obtain an ASR session token.");
+        throw new Error(
+          tokenData.error || "Could not obtain an ASR session token.",
+        );
       }
 
       // Create ASR client
@@ -305,21 +351,35 @@ export default function FacilitatorPage() {
         onSpeakerRevision: (revision) => {
           // Apply revisions to existing turns
           for (const rev of revision.revisions) {
-            setTurns(prev => prev.map(t => {
-              if (
-                t.providerSessionId === asr.getState().sessionId &&
-                t.providerTurnOrder === rev.turnOrder
-              ) {
-                return { ...t, providerSpeakerLabel: rev.speakerLabel, wasSpeakerRevised: true };
-              }
-              return t;
-            }));
+            setTurns((prev) =>
+              prev.map((t) => {
+                if (
+                  t.providerSessionId === asr.getState().sessionId &&
+                  t.providerTurnOrder === rev.turnOrder
+                ) {
+                  return {
+                    ...t,
+                    providerSpeakerLabel: rev.speakerLabel,
+                    wasSpeakerRevised: true,
+                  };
+                }
+                return t;
+              }),
+            );
           }
         },
         onTermination: () => {
           setAsrConnected(false);
           stopCapture();
+          setPcmReady(false);
           releaseWakeLock();
+          asrRef.current = null;
+          void fetch(`/api/sessions/${sessionId}/terminate`, {
+            method: "POST",
+          });
+          setSession((current) =>
+            current ? { ...current, status: "terminated" } : current,
+          );
         },
         onError: (err) => {
           setError(`ASR error: ${err.message}`);
@@ -331,7 +391,7 @@ export default function FacilitatorPage() {
       });
 
       asrRef.current = asr;
-      
+
       // Connect ASR
       await asr.connect();
 
@@ -348,16 +408,18 @@ export default function FacilitatorPage() {
 
       if (session?.runMode !== "live") {
         if (!session?.scenarioId) {
-          throw new Error("This recorded session has no scenario audio source.");
+          throw new Error(
+            "This recorded session has no scenario audio source.",
+          );
         }
         await startRecording(
           session.sourceAudioUrl ||
-            `/api/scenarios/${session.scenarioId}/mixed?format=wav`
+            `/api/scenarios/${session.scenarioId}/mixed?format=wav`,
         );
       }
       await acquireWakeLock();
 
-      setSession(s => s ? { ...s, status: "active" } : s);
+      setSession((s) => (s ? { ...s, status: "active" } : s));
     } catch (e: any) {
       setError(e.message || "Failed to start session");
       asrRef.current?.disconnect();
@@ -379,12 +441,12 @@ export default function FacilitatorPage() {
     setPcmReady(false);
     pendingPcmRef.current = [];
     releaseWakeLock();
-    
+
     try {
       await fetch(`/api/sessions/${sessionId}/terminate`, { method: "POST" });
     } catch {}
 
-    setSession(s => s ? { ...s, status: "terminated" } : s);
+    setSession((s) => (s ? { ...s, status: "terminated" } : s));
   };
 
   recordingEndedHandlerRef.current = () => {
@@ -398,7 +460,7 @@ export default function FacilitatorPage() {
         .split("\n")
         .map((c: string) => c.trim())
         .filter((c: string) => c.length > 0);
-      
+
       await fetch(`/api/sessions/${sessionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -409,7 +471,11 @@ export default function FacilitatorPage() {
         }),
       });
 
-      setSession(s => s ? { ...s, objective: intentObjective, phase: intentPhase, criteria } : s);
+      setSession((s) =>
+        s
+          ? { ...s, objective: intentObjective, phase: intentPhase, criteria }
+          : s,
+      );
     } catch {
       setError("Failed to update session intent");
     }
@@ -421,11 +487,17 @@ export default function FacilitatorPage() {
       const res = await fetch(`/api/sessions/${sessionId}/speaker-mappings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ speakerLabel: label, participantId: participantId || null }),
+        body: JSON.stringify({
+          speakerLabel: label,
+          participantId: participantId || null,
+        }),
       });
       if (res.ok) {
         const mapping = await res.json();
-        setMappings(prev => [...prev.filter(m => m.speakerLabel !== label), mapping]);
+        setMappings((prev) => [
+          ...prev.filter((m) => m.speakerLabel !== label),
+          mapping,
+        ]);
       }
     } catch {}
   };
@@ -438,15 +510,21 @@ export default function FacilitatorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ currentText: newText }),
       });
-      setTurns(prev => prev.map(t => t.id === turnId ? { ...t, currentText: newText, isManuallyCorrected: true } : t));
+      setTurns((prev) =>
+        prev.map((t) =>
+          t.id === turnId
+            ? { ...t, currentText: newText, isManuallyCorrected: true }
+            : t,
+        ),
+      );
     } catch {}
   };
 
-  const finalizedTurns = turns.filter(t => t.isFinal);
+  const finalizedTurns = turns.filter((t) => t.isFinal);
   const getParticipantName = (label: string) => {
-    const mapping = mappings.find(m => m.speakerLabel === label);
+    const mapping = mappings.find((m) => m.speakerLabel === label);
     if (mapping?.participantId) {
-      const p = participants.find(p => p.id === mapping.participantId);
+      const p = participants.find((p) => p.id === mapping.participantId);
       return p?.displayName || label;
     }
     return label;
@@ -459,7 +537,10 @@ export default function FacilitatorPage() {
       <main className="min-h-dvh flex items-center justify-center p-4 safe-top safe-bottom">
         <div className="text-center">
           <p className="text-red-400 mb-4">{error}</p>
-          <button onClick={() => router.push("/")} className="text-hud-accent underline">
+          <button
+            onClick={() => router.push("/")}
+            className="text-hud-accent underline"
+          >
             Return Home
           </button>
         </div>
@@ -472,12 +553,18 @@ export default function FacilitatorPage() {
       {/* Header */}
       <header className="px-4 py-3 border-b border-hud-border flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-bold">{session?.title || "Loading..."}</h1>
+          <h1 className="text-lg font-bold">
+            {session?.title || "Loading..."}
+          </h1>
           <div className="flex gap-2 items-center text-sm text-hud-muted">
-            <span className={`w-2 h-2 rounded-full ${isActive ? "bg-green-400 animate-pulse" : "bg-gray-500"}`} />
+            <span
+              className={`w-2 h-2 rounded-full ${isActive ? "bg-green-400 animate-pulse" : "bg-gray-500"}`}
+            />
             <span>{session?.status || "..."}</span>
             {isActive && wakeLockSupported && (
-              <span className={wakeLocked ? "text-green-400" : "text-yellow-400"}>
+              <span
+                className={wakeLocked ? "text-green-400" : "text-yellow-400"}
+              >
                 {wakeLocked ? "🔒" : "⚠️"}
               </span>
             )}
@@ -488,7 +575,9 @@ export default function FacilitatorPage() {
           {workletLoaded && <span className="text-green-400">Worklet ✓</span>}
           {pcmReady && <span className="text-green-400">PCM ✓</span>}
           {asrConnected && <span className="text-green-400">ASR ✓</span>}
-          {sourceKind === "recording" && <span className="text-hud-accent">Recorded demo</span>}
+          {sourceKind === "recording" && (
+            <span className="text-hud-accent">Recorded demo</span>
+          )}
         </div>
       </header>
 
@@ -513,17 +602,19 @@ export default function FacilitatorPage() {
         ) : (
           <button
             onClick={handleStart}
-            disabled={session?.status === "terminated" || starting}
+            disabled={!session || session.status === "terminated" || starting}
             className="px-6 py-3 bg-hud-accent text-white rounded-xl font-semibold touch-manipulation active:scale-95 disabled:opacity-50"
             style={{ minHeight: 44 }}
           >
-            {session?.status === "terminated"
-              ? "Ended"
-              : starting
-                ? "Starting…"
-                : session?.runMode === "live"
-                  ? "Start Mic"
-                  : "Start Recorded Demo"}
+            {!session
+              ? "Loading…"
+              : session.status === "terminated"
+                ? "Ended"
+                : starting
+                  ? "Starting…"
+                  : session?.runMode === "live"
+                    ? "Start Mic"
+                    : "Start Recorded Demo"}
           </button>
         )}
       </div>
@@ -546,22 +637,33 @@ export default function FacilitatorPage() {
         <div className="mt-2 space-y-2">
           <input
             value={intentObjective}
-            onChange={e => setIntentObjective(e.target.value)}
+            onChange={(e) => setIntentObjective(e.target.value)}
             placeholder="Objective"
             className="w-full bg-hud-surface border border-hud-border rounded-lg px-3 py-2 text-sm text-hud-text"
           />
           <select
             value={intentPhase}
-            onChange={e => setIntentPhase(e.target.value)}
+            onChange={(e) => setIntentPhase(e.target.value)}
             className="w-full bg-hud-surface border border-hud-border rounded-lg px-3 py-2 text-sm text-hud-text"
           >
-            {["frame","empathize","define","ideate","evaluate","decide","plan_experiment","reflect"].map(p => (
-              <option key={p} value={p}>{p}</option>
+            {[
+              "frame",
+              "empathize",
+              "define",
+              "ideate",
+              "evaluate",
+              "decide",
+              "plan_experiment",
+              "reflect",
+            ].map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
             ))}
           </select>
           <textarea
             value={intentCriteria}
-            onChange={e => setIntentCriteria(e.target.value)}
+            onChange={(e) => setIntentCriteria(e.target.value)}
             placeholder="Criteria (one per line)"
             rows={3}
             className="w-full bg-hud-surface border border-hud-border rounded-lg px-3 py-2 text-sm text-hud-text"
@@ -596,18 +698,24 @@ export default function FacilitatorPage() {
       <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2 overscroll-contain">
         {finalizedTurns.length === 0 && !isActive && (
           <p className="text-hud-muted text-sm py-8 text-center">
-            {session?.status === "terminated" ? "Session ended. No turns recorded." : "Start capture to begin transcription."}
+            {session?.status === "terminated"
+              ? "Session ended. No turns recorded."
+              : "Start capture to begin transcription."}
           </p>
         )}
         {finalizedTurns.length === 0 && isActive && (
-          <p className="text-hud-muted text-sm py-8 text-center">Listening… speak to begin.</p>
+          <p className="text-hud-muted text-sm py-8 text-center">
+            Listening… speak to begin.
+          </p>
         )}
 
         {finalizedTurns.map((turn) => (
           <div
             key={turn.id}
             className={`p-3 rounded-lg border ${
-              turn.isSubstantive ? "border-hud-border bg-hud-surface" : "border-hud-border/50 bg-hud-surface/50"
+              turn.isSubstantive
+                ? "border-hud-border bg-hud-surface"
+                : "border-hud-border/50 bg-hud-surface/50"
             }`}
           >
             <div className="flex items-center justify-between mb-1">
@@ -633,9 +741,11 @@ export default function FacilitatorPage() {
 
             {/* Turn actions */}
             <details className="mt-1">
-              <summary className="text-xs text-hud-muted cursor-pointer">Actions ▸</summary>
+              <summary className="text-xs text-hud-muted cursor-pointer">
+                Actions ▸
+              </summary>
               <div className="mt-1 flex flex-wrap gap-1">
-                {["A", "B", "C", "D", "E", "F"].map(label => (
+                {["A", "B", "C", "D", "E", "F"].map((label) => (
                   <button
                     key={label}
                     onClick={() => mapSpeaker(turn.providerSpeakerLabel, label)}
