@@ -5,6 +5,10 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     console.log("Critique HUD server starting...");
+    // Do not accept the first API request until a fresh SQLite database has
+    // finished creating its schema. Route modules share this same promise.
+    const { databaseReady } = await import("@/lib/db");
+    await databaseReady;
     if (process.env.ASR_STUB === "1") {
       // Next's server bundler can expose an incompatible optional bufferutil
       // shim to ws. Force ws's built-in JavaScript mask implementation in the
