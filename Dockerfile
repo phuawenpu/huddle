@@ -24,6 +24,10 @@ COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
+# Sprite workspaces use restrictive source modes. Public assets must remain
+# readable after the container drops privileges to the nextjs user.
+RUN chown -R nextjs:nodejs /app/public && chmod -R u=rwX,go=rX /app/public
+
 USER nextjs
 EXPOSE 3000
 ENV NODE_ENV=production
