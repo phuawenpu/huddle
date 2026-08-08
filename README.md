@@ -179,7 +179,7 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Testing
 
 ```bash
-npm test                    # 98 unit tests (including transcript/ASR/audio gates)
+npm test                    # 100 unit tests (including transcript/ASR/audio gates)
 npx tsc --noEmit           # TypeScript check
 npm run build              # production Next.js build
 npm run test:e2e           # cross-browser UI suite plus Chromium mic/recording pipeline cases

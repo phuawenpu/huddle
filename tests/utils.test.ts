@@ -72,6 +72,21 @@ describe("wordErrorRate", () => {
   it("is case-insensitive", () => {
     expect(wordErrorRate("Hello World", "hello world")).toBe(0);
   });
+
+  it("ignores punctuation and Unicode apostrophe formatting", () => {
+    expect(
+      wordErrorRate(
+        "Exactly—especially the uncertainty label.",
+        "Exactly, especially the uncertainty label.",
+      ),
+    ).toBe(0);
+    expect(wordErrorRate("I’m ready.", "I'm ready")).toBe(0);
+  });
+
+  it("treats hyphenated and slash-delimited words as lexical boundaries", () => {
+    expect(wordErrorRate("capital-project", "capital project")).toBe(0);
+    expect(wordErrorRate("sharing-governance", "sharing/governance")).toBe(0);
+  });
 });
 
 describe("hungarianMatch", () => {
@@ -97,7 +112,7 @@ describe("hungarianMatch", () => {
     ];
     const assignment = hungarianMatch(costs);
     expect(assignment.length).toBe(2);
-    expect(assignment.every(a => a !== -1)).toBe(true);
+    expect(assignment.every((a) => a !== -1)).toBe(true);
   });
 });
 

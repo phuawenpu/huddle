@@ -10,13 +10,31 @@ export function isSubstantiveTurn(text: string, durationMs: number): boolean {
   const cleaned = text.trim().toLowerCase();
   // Bare acknowledgements
   const bareAcks = new Set([
-    "ok", "okay", "yes", "yeah", "no", "right", "sure", "thanks",
-    "thank you", "got it", "hmm", "uh-huh", "mhm", "i see", "agreed",
-    "alright", "fine", "good", "great", "cool", "nice",
+    "ok",
+    "okay",
+    "yes",
+    "yeah",
+    "no",
+    "right",
+    "sure",
+    "thanks",
+    "thank you",
+    "got it",
+    "hmm",
+    "uh-huh",
+    "mhm",
+    "i see",
+    "agreed",
+    "alright",
+    "fine",
+    "good",
+    "great",
+    "cool",
+    "nice",
   ]);
   if (bareAcks.has(cleaned) || cleaned.length <= 3) return false;
 
-  const wordCount = cleaned.split(/\s+/).filter(w => w.length > 0).length;
+  const wordCount = cleaned.split(/\s+/).filter((w) => w.length > 0).length;
   const durationSeconds = durationMs / 1000;
 
   return wordCount >= 4 || durationSeconds >= 1.2;
@@ -26,14 +44,16 @@ export function isSubstantiveTurn(text: string, durationMs: number): boolean {
  * Word error rate (WER) between reference and hypothesis strings.
  */
 export function wordErrorRate(reference: string, hypothesis: string): number {
-  const refWords = reference.trim().toLowerCase().split(/\s+/);
-  const hypWords = hypothesis.trim().toLowerCase().split(/\s+/);
+  const refWords = normalizeAsrWords(reference);
+  const hypWords = normalizeAsrWords(hypothesis);
 
   if (refWords.length === 0) return hypWords.length === 0 ? 0 : 1;
 
   const m = refWords.length;
   const n = hypWords.length;
-  const d: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  const d: number[][] = Array.from({ length: m + 1 }, () =>
+    Array(n + 1).fill(0),
+  );
 
   for (let i = 0; i <= m; i++) d[i][0] = i;
   for (let j = 0; j <= n; j++) d[0][j] = j;
@@ -44,12 +64,25 @@ export function wordErrorRate(reference: string, hypothesis: string): number {
       d[i][j] = Math.min(
         d[i - 1][j] + 1,
         d[i][j - 1] + 1,
-        d[i - 1][j - 1] + cost
+        d[i - 1][j - 1] + cost,
       );
     }
   }
 
   return d[m][n] / m;
+}
+
+/** Compare lexical content rather than punctuation formatting from the ASR. */
+function normalizeAsrWords(value: string): string[] {
+  return (
+    value
+      .normalize("NFKC")
+      .toLowerCase()
+      .replace(/[’‘`]/g, "'")
+      // ASR commonly changes compounds and em-dash boundaries into spaces.
+      .replace(/[\p{Pd}/]/gu, " ")
+      .match(/[\p{L}\p{N}]+(?:'[\p{L}\p{N}]+)*/gu) || []
+  );
 }
 
 /**
