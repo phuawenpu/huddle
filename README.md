@@ -95,6 +95,108 @@ repeatable semantic-state revision; magenta is optional visual context; amber
 is the safe fallback. Green is the human control boundary: AI interpretations
 remain private until the facilitator reviews and explicitly publishes them.
 
+### AI behavior, step by step
+
+```text
+                         CAPTURE NEVER PAUSES
+                                  |
+            Mic / recorded discussion / participant audio
+                                  |
+                                  v
+                       AudioWorklet -> PCM16
+                                  |
+                                  v
+                      Streaming ASR + diarization
+                                  |
+                         finalized speaker turns
+                                  |
+                                  v
+                      [ Persisted transcript ]
+                         |                  |
+                         |                  +--> continuous turn signals
+                         |                       interruptions, questions,
+                         |                       repetition, participation
+                         |                              |
+                         |                              v
+                         |                    [Private facilitator HUD]
+                         |
+ Facilitator supplies intent, phase, and criteria
+                         |
+                         v
+             [Immutable logical transcript cutoff]
+             All substantive turns available at that instant
+                         |
+              +----------+-------------------+
+              |                              |
+              v                              v
+   Previous meeting-state revision    Optional visual context
+              |                       only when explicitly captured
+              +--------------+---------------+
+                             |
+                             v
+                 [Structured AI synthesis]
+                             |
+          +------------------+-------------------+
+          |                  |                   |
+          v                  v                   v
+   Semantic nodes       Relationships      Speaker stances
+   issue                supports           agreement targets
+   need                 challenges         uncertainty
+   proposal             depends_on
+   evidence             tests
+   question             addresses
+   decision             results_in
+   action
+   experiment
+                             |
+                             v
+                    Exact source anchors
+                 turn ID + verbatim quote +
+                 speaker + time + confidence
+                             |
+                             v
+                      [Grounding gate]
+                             |
+             +---------------+----------------+
+             |                                |
+       output grounded?                invalid / timeout /
+             |                         unsupported quote
+            YES                               |
+             |                                v
+             |                   [Deterministic fallback]
+             |                    still source-linked
+             +---------------+----------------+
+                             |
+                             v
+                  [Versioned meeting state]
+                             |
+         AI suggestions remain private and require approval
+                             |
+                             v
+                 Facilitator reviews or edits
+                title / summary / status / owner
+                             |
+                    explicitly publish?
+                     /              \
+                   NO                YES
+                   |                  |
+           remains private            v
+                           Revalidate source quotes
+                           against current transcript
+                                  /         \
+                              valid          stale
+                                |              |
+                                v              v
+                         SSE map.patch    reject and
+                                |         resynthesize
+                                v
+                      [Shared meeting display]
+
+Meanwhile, new transcript turns continue accumulating. The next facilitator
+intent creates a fresh cutoff and a new state revision without rewriting the
+earlier analysis.
+```
+
 Key runtime guarantees:
 
 - Transcript capture does not wait for turn analysis or whole-transcript synthesis; an analysis-provider failure cannot stop already-running audio capture.
