@@ -2,8 +2,8 @@
 // Analysis Queue — Batched LLM turn analysis
 // ============================================
 // Collects finalized substantive turns and batches them
-// for analysis. Window analysis runs every 20s or after
-// 5 new analyzed substantive turns.
+// for analysis. Window analysis runs every 10s or after
+// 3 new analyzed substantive turns.
 
 import { prisma } from "./db";
 import { analyzeTurnBatch, analyzeWindow, generatePrompt } from "./analysis";

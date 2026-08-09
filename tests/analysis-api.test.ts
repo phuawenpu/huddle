@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   analyzeTurnBatch,
   analyzeWindow,
+  generatePrompt,
   type AnalysisConfig,
 } from "@/lib/analysis";
 
@@ -130,6 +131,72 @@ describe("OpenAI analysis request compatibility", () => {
     expect(result.actions).toEqual([]);
     expect(result.agreementState).toBe("emerging");
     expect(result.supportingTurnIds).toEqual([]);
+  });
+
+  it("keeps chronological turn evidence attached to its private prompt", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "test-only");
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  theme: "Recovery tradeoffs",
+                  discussionState: "The group is comparing two approaches.",
+                  phaseAllocation: {
+                    problemAndEvidence: 20,
+                    ideas: 20,
+                    evaluation: 50,
+                    decisionsAndActions: 10,
+                  },
+                  openQuestions: ["Which recovery path protects privacy?"],
+                  positions: [],
+                  decisions: [],
+                  actions: [],
+                  agreementState: "divided",
+                  supportingTurnIds: [
+                    "turn-latest",
+                    "invented-turn",
+                    "turn-first",
+                  ],
+                }),
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    const turns = [
+      {
+        id: "turn-first",
+        speakerLabel: "Speaker A",
+        text: "Start with assisted recovery.",
+        isSubstantive: true,
+      },
+      {
+        id: "turn-latest",
+        speakerLabel: "Speaker B",
+        text: "That exposes account details in shared settings.",
+        isSubstantive: true,
+      },
+    ];
+
+    const result = await analyzeWindow(turns, [], config);
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as {
+      messages: Array<{ content: string }>;
+    };
+    const prompt = generatePrompt(result, config);
+
+    expect(body.messages[0].content.indexOf("turn-first")).toBeLessThan(
+      body.messages[0].content.indexOf("turn-latest"),
+    );
+    expect(result.supportingTurnIds).toEqual(["turn-latest", "turn-first"]);
+    expect(prompt).toMatchObject({
+      text: "Which recovery path protects privacy?",
+      supportingTurnIds: ["turn-latest", "turn-first"],
+    });
   });
 
   it("falls back to bounded local analysis when the provider misses its deadline", async () => {

@@ -247,7 +247,7 @@ Return JSON: { "analyses": [{ "id": "<turn_id>", ... }] }`;
 
 /**
  * Perform window analysis on recent turns.
- * Called every 20s or after 5 new substantive turns.
+ * Called every 10s or after 3 new substantive turns.
  */
 export async function analyzeWindow(
   recentTurns: TurnContext[],
