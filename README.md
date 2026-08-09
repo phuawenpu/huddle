@@ -248,6 +248,15 @@ Key runtime guarantees:
   expanded inspector remain reachable without horizontal overflow. Full-suite and
   deployed-app verification are next.
 
+#### Verification resumed — 2026-08-09T23:27:05Z
+
+- Reconciled the workspace with GitHub commits `d34172a`, `98ef39a`, and
+  `07250e7`; the portrait waveform, Now Lens, mobile browser assertions, and
+  chronological rolling-analysis evidence test are present on `main`.
+- Focused unit/type checks and the earlier portrait-browser slice passed. Full
+  unit, build, six-profile browser, Fly redeployment, and production live-session
+  checks are now in progress; deployment is not yet claimed complete.
+
 | Stage                         | Status         | Summary                                                                                                                                                                                                                                   |
 | ----------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **1 — Speech proof**          | ✅ Implemented | AudioWorklet PCM16 resampler, `useAudioCapture` hook (getUserMedia + analyser meter + settings readback), ASR WebSocket client (AssemblyAI v3 protocol), wake lock, sendBeacon termination                                                |
