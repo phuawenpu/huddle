@@ -31,6 +31,118 @@ not prove that the model's interpretation follows from the quote, that a claim
 is factually correct, or that a visual caption is accurate. Those remain human
 review responsibilities.
 
+## Repeated intent analysis
+
+Audio capture and intent-driven synthesis are separate concurrent processes.
+Each analysis reads a new immutable transcript cutoff; it never resets the
+stream or overwrites an earlier result.
+
+```mermaid
+---
+config:
+  theme: base
+  sequence:
+    diagramMarginX: 16
+    diagramMarginY: 12
+    actorMargin: 36
+    messageMargin: 24
+  themeVariables:
+    fontFamily: "Inter, Segoe UI, sans-serif"
+    fontSize: "17px"
+    background: "#ffffff"
+    primaryTextColor: "#0f172a"
+    lineColor: "#475569"
+    actorBkg: "#ecfeff"
+    actorBorder: "#0e7490"
+    actorTextColor: "#0f172a"
+    signalColor: "#334155"
+    signalTextColor: "#0f172a"
+    noteBkgColor: "#fffbeb"
+    noteBorderColor: "#b45309"
+    noteTextColor: "#451a03"
+---
+sequenceDiagram
+  autonumber
+  participant Stream as Audio + streaming ASR
+  participant HUD as Facilitator HUD
+  participant Session as Session API + durable store
+  participant AI as Synthesis + quote gate
+
+  loop Every finalized turn
+    Stream->>Session: Persist speaker-labelled text
+    Session-->>HUD: SSE transcript patch
+  end
+
+  HUD->>Session: Intent A + phase + criteria
+  Session->>Session: Snapshot all substantive turns at T1
+  Session->>AI: Exhaustive chunks + intent A
+  alt Valid exact-quote anchors
+    AI-->>Session: Grounded findings and assessments
+  else Timeout or no grounded findings
+    AI-->>Session: Request deterministic fallback
+    Session->>Session: Build source-linked fallback
+  end
+  Session->>Session: Persist analysis A at T1
+  Session-->>HUD: SSE synthesis snapshot
+
+  Note over Stream,HUD: Audio capture and transcript updates continue
+  Stream->>Session: Persist additional finalized turns
+  Session-->>HUD: SSE transcript patch + stale-turn count
+
+  HUD->>Session: Intent B + revised phase or criteria
+  Session->>Session: Snapshot all substantive turns at T2
+  Note over Session,AI: T2 includes T1 plus every new finalized turn
+  Session->>AI: Complete transcript through T2 + intent B
+  AI-->>Session: New grounded result or safe fallback
+  Session->>Session: Persist analysis B and retain analysis A
+  Session-->>HUD: SSE latest synthesis while history remains available
+```
+
+## Visual evidence consent flow
+
+The visual path is intentionally discrete. Merely enabling the camera does not
+upload a stream or frame.
+
+```mermaid
+---
+config:
+  theme: base
+  htmlLabels: false
+  flowchart:
+    curve: monotoneY
+    nodeSpacing: 24
+    rankSpacing: 34
+    diagramPadding: 8
+  themeVariables:
+    fontFamily: "Inter, Segoe UI, sans-serif"
+    fontSize: "18px"
+    background: "#ffffff"
+    primaryTextColor: "#0f172a"
+    lineColor: "#475569"
+---
+flowchart TB
+  Off["Camera off by default"]:::private
+  Preview["Facilitator enables local preview"]:::private
+  Choice{"Deliberate capture?"}:::decision
+  Local["Nothing leaves the browser"]:::safe
+  Validate["Validate type, signature, and size"]:::visual
+  Describe["Describe frame or use safe fallback"]:::visual
+  Link["Attach note, session time, and nearest turn"]:::visual
+  Store[("Private no-store evidence")]:::store
+  Analyze["Available to the next intent snapshot"]:::analysis
+
+  Off --> Preview --> Choice
+  Choice -->|No| Local
+  Choice -->|Capture or choose image| Validate --> Describe --> Link --> Store --> Analyze
+
+  classDef private fill:#f8fafc,stroke:#475569,color:#0f172a,stroke-width:2px;
+  classDef decision fill:#fdf4ff,stroke:#a21caf,color:#0f172a,stroke-width:2px;
+  classDef safe fill:#ecfdf5,stroke:#047857,color:#052e16,stroke-width:2px;
+  classDef visual fill:#fdf4ff,stroke:#a21caf,color:#0f172a,stroke-width:2px;
+  classDef store fill:#f8fafc,stroke:#475569,color:#0f172a,stroke-width:2px;
+  classDef analysis fill:#f5f3ff,stroke:#6d28d9,color:#0f172a,stroke-width:2px;
+```
+
 ## Visual direction
 
 The implementation adapts the two tracked references rather than copying their

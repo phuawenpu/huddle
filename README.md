@@ -13,113 +13,69 @@ The Critique HUD supports two modes:
 
 Both modes drive the same pipeline: audio → worklet → PCM16 → ASR → transcript → analysis → SSE → display.
 
-## Live session AI: detailed data flow
+## Live session AI: system overview
 
 The live session has two deliberately independent loops. The **capture loop**
 keeps accepting audio and persisting transcript turns. The **synthesis loop**
 runs only when a facilitator submits an intent, reads an immutable snapshot of
 the complete substantive transcript through that moment, and can be repeated
 without stopping capture. A third, consent-driven visual path adds individual
-frames only after an explicit capture or file-selection action.
+frames only after an explicit capture or file-selection action. The
+[Live Critique verification guide](docs/live-critique-verification.md) contains
+focused diagrams for the repeated-analysis and visual-consent paths.
 
 ```mermaid
+---
+config:
+  theme: base
+  htmlLabels: false
+  flowchart:
+    curve: monotoneY
+    nodeSpacing: 24
+    rankSpacing: 38
+    diagramPadding: 8
+  themeVariables:
+    fontFamily: "Inter, Segoe UI, sans-serif"
+    fontSize: "18px"
+    background: "#ffffff"
+    primaryColor: "#f8fafc"
+    primaryTextColor: "#0f172a"
+    primaryBorderColor: "#64748b"
+    lineColor: "#475569"
+---
 flowchart TB
-  subgraph Room["Discussion room"]
-    People["Multiple speakers"]
-    Artifact["Physical artifact / sketch / screen"]
-  end
+  Audio["Mic or recorded discussion"]:::capture
+  PCM["AudioWorklet to PCM16"]:::capture
+  ASR["Streaming ASR and diarization"]:::capture
+  Turns[("Persisted transcript")]:::store
+  Signals["Continuous critique signals"]:::analysis
+  Events["SSE snapshots and patches"]:::transport
+  Views["Facilitator HUD and shared display"]:::view
 
-  subgraph Browser["Facilitator browser — capture and interaction"]
-    Source{"Audio source"}
-    Mic["Room microphone"]
-    Recording["Approved recorded discussion"]
-    Worklet["AudioWorklet<br/>resample + PCM16 frames"]
-    ASRClient["Streaming ASR client<br/>partials, finals, speaker labels"]
-    TranscriptViewport["Bounded transcript viewport<br/>follow latest or browse history"]
-    IntentForm["Analysis intent<br/>objective + phase + criteria"]
-    CameraGate["Camera preview stays local"]
-    CaptureAction["Explicit Capture frame<br/>or Choose image"]
-    LiveHUD["Live synthesis HUD<br/>signals, phase graph, findings, quote anchors"]
-  end
+  Intent["New facilitator intent"]:::intent
+  Cutoff["All substantive turns through now"]:::analysis
+  Synthesis["Exhaustive whole-transcript synthesis"]:::analysis
+  Grounding["Exact-quote validation"]:::analysis
+  History[("Immutable analysis history")]:::store
+  Fallback["Source-linked fallback"]:::fallback
 
-  subgraph Providers["External AI providers"]
-    AssemblyAI["AssemblyAI realtime ASR<br/>word timing + diarization labels"]
-    OpenAIText["OpenAI structured synthesis"]
-    OpenAIVision["OpenAI visual description"]
-  end
+  Frame["Explicit visual capture"]:::visual
+  Context["Validate, describe, and timeline-link"]:::visual
 
-  subgraph Server["Next.js server — session authority"]
-    TokenAPI["Short-lived ASR token endpoint"]
-    TurnAPI["Idempotent final-turn ingest"]
-    TurnQueue["Bounded turn/window analysis queue"]
-    Intelligence["Continuous critique intelligence<br/>categories, evidence gaps, open loops"]
-    AnalysisAPI["Whole-transcript analysis endpoint"]
-    Cutoff["Immutable analysis cutoff<br/>all final, substantive, non-calibration turns"]
-    Chunker["Exhaustive chunking<br/>first + middle + latest turns retained"]
-    Grounding["Exact-quote grounding gate<br/>reject unknown IDs and non-verbatim quotes"]
-    Fallback["Deterministic source-linked fallback<br/>on timeout or invalid model output"]
-    VisualAPI["Validated image ingest<br/>JPEG / PNG / WebP, size + magic bytes"]
-    VisualContext["Session-relative timestamp<br/>nearest turn + facilitator note"]
-    PubSub["SSE pub/sub<br/>snapshot + live patches"]
-  end
+  Audio --> PCM --> ASR --> Turns --> Signals --> Events --> Views
+  Intent --> Cutoff
+  Turns --> Cutoff --> Synthesis --> Grounding --> History --> Events
+  Frame --> Context -. optional context .-> Cutoff
+  Grounding -. invalid output .-> Fallback --> History
 
-  subgraph Persistence["Durable session record"]
-    SessionDB[(SQLite / Prisma<br/>Session + IntentRevision)]
-    TurnDB[(TranscriptTurn<br/>text, timing, speaker, corrections)]
-    AnalysisDB[(LiveAnalysis<br/>intent + cutoff + result + engine)]
-    EvidenceDB[(VisualEvidence metadata)]
-    EvidenceFiles[(Private no-store image files)]
-  end
-
-  subgraph Audience["Rendered views"]
-    FacilitatorView["Facilitator HUD<br/>controls + complete transcript"]
-    SharedDisplay["Shared display<br/>latest synthesis + phase allocation"]
-  end
-
-  People --> Mic
-  Recording --> Source
-  Mic --> Source
-  Source --> Worklet --> ASRClient
-  ASRClient <-->|"WebSocket audio and ASR events"| AssemblyAI
-  ASRClient -.->|"requests token"| TokenAPI
-  ASRClient -->|"finalized turns"| TurnAPI
-  ASRClient -->|"live partial text"| TranscriptViewport
-  TurnAPI --> TurnDB
-  TurnAPI --> PubSub
-  TurnAPI --> TurnQueue --> Intelligence --> PubSub
-
-  IntentForm -->|"Analyze all turns through now"| AnalysisAPI
-  AnalysisAPI -->|"persist revised intent"| SessionDB
-  AnalysisAPI --> Cutoff
-  TurnDB --> Cutoff
-  EvidenceDB -.->|"captured context through cutoff"| Cutoff
-  Cutoff --> Chunker --> OpenAIText --> Grounding
-  Grounding -->|"valid exact quote anchors"| AnalysisDB
-  Grounding -->|"no grounded findings"| Fallback --> AnalysisDB
-  AnalysisDB --> PubSub
-  AnalysisDB -.->|"next intent creates a new snapshot;<br/>earlier snapshots remain immutable"| AnalysisAPI
-
-  Artifact --> CameraGate
-  CameraGate -->|"nothing leaves browser before consent"| CaptureAction
-  CaptureAction --> VisualAPI
-  VisualAPI --> EvidenceFiles
-  VisualAPI --> VisualContext --> OpenAIVision
-  OpenAIVision -->|"caption + observations<br/>or safe fallback"| EvidenceDB
-  EvidenceDB --> PubSub
-
-  PubSub --> LiveHUD
-  PubSub --> FacilitatorView
-  PubSub --> SharedDisplay
-  TurnDB --> TranscriptViewport
-  TranscriptViewport --> FacilitatorView
-  LiveHUD --> FacilitatorView
-
-  classDef ai fill:#11233a,stroke:#67e8f9,color:#e6fbff;
-  classDef durable fill:#211936,stroke:#d8b4fe,color:#faf5ff;
-  classDef consent fill:#32152f,stroke:#f0abfc,color:#fff1ff;
-  class AssemblyAI,OpenAIText,OpenAIVision,Grounding,Fallback,Intelligence ai;
-  class SessionDB,TurnDB,AnalysisDB,EvidenceDB,EvidenceFiles durable;
-  class CameraGate,CaptureAction,VisualAPI consent;
+  classDef capture fill:#ecfeff,stroke:#0e7490,color:#0f172a,stroke-width:2px;
+  classDef analysis fill:#f5f3ff,stroke:#6d28d9,color:#0f172a,stroke-width:2px;
+  classDef intent fill:#ede9fe,stroke:#6d28d9,color:#0f172a,stroke-width:2px;
+  classDef visual fill:#fdf4ff,stroke:#a21caf,color:#0f172a,stroke-width:2px;
+  classDef store fill:#f8fafc,stroke:#475569,color:#0f172a,stroke-width:2px;
+  classDef fallback fill:#fffbeb,stroke:#b45309,color:#451a03,stroke-width:2px;
+  classDef transport fill:#eff6ff,stroke:#1d4ed8,color:#0f172a,stroke-width:2px;
+  classDef view fill:#ecfdf5,stroke:#047857,color:#052e16,stroke-width:2px;
 ```
 
 Key runtime guarantees:
