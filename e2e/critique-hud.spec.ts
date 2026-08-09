@@ -436,7 +436,6 @@ test.describe("Critique HUD — E2E", () => {
     await expect(
       hud.getByRole("button", { name: "Analyze all 12 turns" }),
     ).toBeEnabled({ timeout: 30_000 });
-
     const firstHistoryResponse = await request.get(
       `/api/sessions/${session.id}/analyses`,
     );
@@ -513,7 +512,6 @@ test.describe("Critique HUD — E2E", () => {
     await expect(
       hud.getByRole("button", { name: "Analyze all 16 turns" }),
     ).toBeEnabled({ timeout: 30_000 });
-
     const historyResponse = await request.get(
       `/api/sessions/${session.id}/analyses`,
     );

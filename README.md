@@ -13,6 +13,124 @@ The Critique HUD supports two modes:
 
 Both modes drive the same pipeline: audio → worklet → PCM16 → ASR → transcript → analysis → SSE → display.
 
+## Live session AI: detailed data flow
+
+The live session has two deliberately independent loops. The **capture loop**
+keeps accepting audio and persisting transcript turns. The **synthesis loop**
+runs only when a facilitator submits an intent, reads an immutable snapshot of
+the complete substantive transcript through that moment, and can be repeated
+without stopping capture. A third, consent-driven visual path adds individual
+frames only after an explicit capture or file-selection action.
+
+```mermaid
+flowchart TB
+  subgraph Room["Discussion room"]
+    People["Multiple speakers"]
+    Artifact["Physical artifact / sketch / screen"]
+  end
+
+  subgraph Browser["Facilitator browser — capture and interaction"]
+    Source{"Audio source"}
+    Mic["Room microphone"]
+    Recording["Approved recorded discussion"]
+    Worklet["AudioWorklet<br/>resample + PCM16 frames"]
+    ASRClient["Streaming ASR client<br/>partials, finals, speaker labels"]
+    TranscriptViewport["Bounded transcript viewport<br/>follow latest or browse history"]
+    IntentForm["Analysis intent<br/>objective + phase + criteria"]
+    CameraGate["Camera preview stays local"]
+    CaptureAction["Explicit Capture frame<br/>or Choose image"]
+    LiveHUD["Live synthesis HUD<br/>signals, phase graph, findings, quote anchors"]
+  end
+
+  subgraph Providers["External AI providers"]
+    AssemblyAI["AssemblyAI realtime ASR<br/>word timing + diarization labels"]
+    OpenAIText["OpenAI structured synthesis"]
+    OpenAIVision["OpenAI visual description"]
+  end
+
+  subgraph Server["Next.js server — session authority"]
+    TokenAPI["Short-lived ASR token endpoint"]
+    TurnAPI["Idempotent final-turn ingest"]
+    TurnQueue["Bounded turn/window analysis queue"]
+    Intelligence["Continuous critique intelligence<br/>categories, evidence gaps, open loops"]
+    AnalysisAPI["Whole-transcript analysis endpoint"]
+    Cutoff["Immutable analysis cutoff<br/>all final, substantive, non-calibration turns"]
+    Chunker["Exhaustive chunking<br/>first + middle + latest turns retained"]
+    Grounding["Exact-quote grounding gate<br/>reject unknown IDs and non-verbatim quotes"]
+    Fallback["Deterministic source-linked fallback<br/>on timeout or invalid model output"]
+    VisualAPI["Validated image ingest<br/>JPEG / PNG / WebP, size + magic bytes"]
+    VisualContext["Session-relative timestamp<br/>nearest turn + facilitator note"]
+    PubSub["SSE pub/sub<br/>snapshot + live patches"]
+  end
+
+  subgraph Persistence["Durable session record"]
+    SessionDB[(SQLite / Prisma<br/>Session + IntentRevision)]
+    TurnDB[(TranscriptTurn<br/>text, timing, speaker, corrections)]
+    AnalysisDB[(LiveAnalysis<br/>intent + cutoff + result + engine)]
+    EvidenceDB[(VisualEvidence metadata)]
+    EvidenceFiles[(Private no-store image files)]
+  end
+
+  subgraph Audience["Rendered views"]
+    FacilitatorView["Facilitator HUD<br/>controls + complete transcript"]
+    SharedDisplay["Shared display<br/>latest synthesis + phase allocation"]
+  end
+
+  People --> Mic
+  Recording --> Source
+  Mic --> Source
+  Source --> Worklet --> ASRClient
+  ASRClient <-->|"WebSocket audio and ASR events"| AssemblyAI
+  ASRClient -.->|"requests token"| TokenAPI
+  ASRClient -->|"finalized turns"| TurnAPI
+  ASRClient -->|"live partial text"| TranscriptViewport
+  TurnAPI --> TurnDB
+  TurnAPI --> PubSub
+  TurnAPI --> TurnQueue --> Intelligence --> PubSub
+
+  IntentForm -->|"Analyze all turns through now"| AnalysisAPI
+  AnalysisAPI -->|"persist revised intent"| SessionDB
+  AnalysisAPI --> Cutoff
+  TurnDB --> Cutoff
+  EvidenceDB -.->|"captured context through cutoff"| Cutoff
+  Cutoff --> Chunker --> OpenAIText --> Grounding
+  Grounding -->|"valid exact quote anchors"| AnalysisDB
+  Grounding -->|"no grounded findings"| Fallback --> AnalysisDB
+  AnalysisDB --> PubSub
+  AnalysisDB -.->|"next intent creates a new snapshot;<br/>earlier snapshots remain immutable"| AnalysisAPI
+
+  Artifact --> CameraGate
+  CameraGate -->|"nothing leaves browser before consent"| CaptureAction
+  CaptureAction --> VisualAPI
+  VisualAPI --> EvidenceFiles
+  VisualAPI --> VisualContext --> OpenAIVision
+  OpenAIVision -->|"caption + observations<br/>or safe fallback"| EvidenceDB
+  EvidenceDB --> PubSub
+
+  PubSub --> LiveHUD
+  PubSub --> FacilitatorView
+  PubSub --> SharedDisplay
+  TurnDB --> TranscriptViewport
+  TranscriptViewport --> FacilitatorView
+  LiveHUD --> FacilitatorView
+
+  classDef ai fill:#11233a,stroke:#67e8f9,color:#e6fbff;
+  classDef durable fill:#211936,stroke:#d8b4fe,color:#faf5ff;
+  classDef consent fill:#32152f,stroke:#f0abfc,color:#fff1ff;
+  class AssemblyAI,OpenAIText,OpenAIVision,Grounding,Fallback,Intelligence ai;
+  class SessionDB,TurnDB,AnalysisDB,EvidenceDB,EvidenceFiles durable;
+  class CameraGate,CaptureAction,VisualAPI consent;
+```
+
+Key runtime guarantees:
+
+- Transcript capture does not wait for turn analysis or whole-transcript synthesis; an analysis-provider failure cannot stop already-running audio capture.
+- Scrolling away from the newest turn pauses auto-follow and counts unseen turns. “Jump to latest” resumes follow mode without discarding history.
+- Every intent submission creates a persisted analysis revision with exact first/last turn IDs, word/turn counts, and a session-relative cutoff.
+- Long transcripts are partitioned exhaustively and synthesized from all chunks rather than truncating to the latest screenful.
+- Prominent findings and criterion assessments must carry exact substrings from known transcript turns. Invalid anchors are removed; an ungrounded result is replaced by the deterministic fallback.
+- The camera is opt-in and preview-only until a facilitator captures one frame. Stored images are type-checked, path-confined, served with `private, no-store`, and treated as context rather than proof about a person.
+
 ## Current Status
 
 **Active development — live capture, overlap-aware scenario authoring, natural-audio simulation, repeatable whole-transcript intent analysis, deliberate visual evidence capture, and source-linked critique extraction are implemented. Human disposition, artifact revision linkage, broader real-device evaluation, access control, and production governance remain next.**
