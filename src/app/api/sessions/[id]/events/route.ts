@@ -9,6 +9,8 @@ import {
   normalizeTurnAnalysis,
 } from "@/lib/critique-intelligence";
 import { calculateMetrics } from "@/lib/metrics";
+import { serializeLiveAnalysis } from "@/lib/live-analysis-record";
+import { serializeVisualEvidence } from "@/lib/visual-evidence";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +38,11 @@ export async function GET(
             },
             discussionItems: true,
             intentRevisions: { orderBy: { createdAt: "desc" }, take: 1 },
+            liveAnalyses: { orderBy: { createdAt: "desc" }, take: 1 },
+            visualEvidence: {
+              orderBy: { capturedAtMs: "desc" },
+              take: 12,
+            },
           },
         });
 
@@ -59,6 +66,10 @@ export async function GET(
               isSourceLinkedDiscussionItem(item, serializedTurns),
             ),
             intent: session.intentRevisions[0] || null,
+            liveAnalysis: session.liveAnalyses[0]
+              ? serializeLiveAnalysis(session.liveAnalyses[0])
+              : null,
+            visualEvidence: session.visualEvidence.map(serializeVisualEvidence),
             metrics: calculateMetrics(serializedTurns),
             intelligence: buildCritiqueIntelligence(serializedTurns, criteria),
           }),
@@ -85,6 +96,8 @@ function serializeSession(s: any) {
     transcriptTurns,
     discussionItems,
     intentRevisions,
+    liveAnalyses,
+    visualEvidence,
     ...session
   } = s;
   return {

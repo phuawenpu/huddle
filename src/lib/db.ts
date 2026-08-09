@@ -18,7 +18,6 @@ if (process.env.NODE_ENV !== "production") {
 async function initializeDatabase(client: PrismaClient): Promise<void> {
   try {
     await client.$queryRaw`SELECT 1 FROM Session LIMIT 1`;
-    return;
   } catch {
     try {
       await client.$executeRawUnsafe(
@@ -68,5 +67,25 @@ async function initializeDatabase(client: PrismaClient): Promise<void> {
       console.error("DB init error:", e.message);
       throw e;
     }
+  }
+
+  // Additive runtime migrations must also run for existing mounted databases.
+  // CREATE TABLE/INDEX IF NOT EXISTS keeps startup idempotent across deploys.
+  try {
+    await client.$executeRawUnsafe(
+      `CREATE TABLE IF NOT EXISTS "LiveAnalysis" ("id" TEXT PRIMARY KEY NOT NULL, "sessionId" TEXT NOT NULL, "objective" TEXT NOT NULL, "phase" TEXT NOT NULL, "criteria" TEXT NOT NULL DEFAULT '[]', "transcriptTurnCount" INTEGER NOT NULL, "transcriptWordCount" INTEGER NOT NULL, "transcriptThroughMs" INTEGER NOT NULL, "firstTurnId" TEXT NOT NULL, "lastTurnId" TEXT NOT NULL, "visualEvidenceCount" INTEGER NOT NULL DEFAULT 0, "resultJson" TEXT NOT NULL, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY ("sessionId") REFERENCES "Session"("id") ON DELETE CASCADE ON UPDATE CASCADE)`,
+    );
+    await client.$executeRawUnsafe(
+      `CREATE INDEX IF NOT EXISTS "LiveAnalysis_sessionId_createdAt_idx" ON "LiveAnalysis"("sessionId", "createdAt")`,
+    );
+    await client.$executeRawUnsafe(
+      `CREATE TABLE IF NOT EXISTS "VisualEvidence" ("id" TEXT PRIMARY KEY NOT NULL, "sessionId" TEXT NOT NULL, "capturedAtMs" INTEGER NOT NULL, "nearestTurnId" TEXT, "note" TEXT, "storageKey" TEXT NOT NULL, "contentType" TEXT NOT NULL, "byteSize" INTEGER NOT NULL, "analysisJson" TEXT NOT NULL, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY ("sessionId") REFERENCES "Session"("id") ON DELETE CASCADE ON UPDATE CASCADE)`,
+    );
+    await client.$executeRawUnsafe(
+      `CREATE INDEX IF NOT EXISTS "VisualEvidence_sessionId_capturedAtMs_idx" ON "VisualEvidence"("sessionId", "capturedAtMs")`,
+    );
+  } catch (e: any) {
+    console.error("DB additive migration error:", e.message);
+    throw e;
   }
 }

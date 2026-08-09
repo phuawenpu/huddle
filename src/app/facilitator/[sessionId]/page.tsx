@@ -10,6 +10,13 @@ import {
 } from "@/lib/client/asr-client";
 import { useWakeLock } from "@/lib/client/wake-lock";
 import { AudioVisualizer } from "@/lib/client/audio-visualizer";
+import type {
+  CritiqueIntelligenceSnapshot,
+  LiveAnalysisSnapshot,
+  VisualEvidenceData,
+} from "@/lib/types";
+import { LiveAnalysisHud } from "./live-analysis-hud";
+import { VisualEvidenceCapture } from "./visual-evidence-capture";
 
 interface SessionData {
   id: string;
@@ -73,6 +80,15 @@ export default function FacilitatorPage() {
   const [livePartial, setLivePartial] = useState<string>("");
   const [starting, setStarting] = useState(false);
   const [pcmReady, setPcmReady] = useState(false);
+  const [intelligence, setIntelligence] =
+    useState<CritiqueIntelligenceSnapshot | null>(null);
+  const [liveAnalysis, setLiveAnalysis] = useState<LiveAnalysisSnapshot | null>(
+    null,
+  );
+  const [visualEvidence, setVisualEvidence] = useState<VisualEvidenceData[]>(
+    [],
+  );
+  const [analyzing, setAnalyzing] = useState(false);
 
   const [intentObjective, setIntentObjective] = useState("");
   const [intentPhase, setIntentPhase] = useState("");
@@ -141,14 +157,28 @@ export default function FacilitatorPage() {
         setIntentCriteria((data.criteria || []).join("\n"));
 
         // Load turns, mappings, participants
-        const [tRes, mRes, pRes] = await Promise.all([
+        const [tRes, mRes, pRes, aRes, vRes] = await Promise.all([
           fetch(`/api/sessions/${sessionId}/turns`),
           fetch(`/api/sessions/${sessionId}/speaker-mappings`),
           fetch(`/api/sessions/${sessionId}/participants`),
+          fetch(`/api/sessions/${sessionId}/analyses?limit=1`),
+          fetch(`/api/sessions/${sessionId}/visual-evidence`),
         ]);
         if (tRes.ok) setTurns(await tRes.json());
         if (mRes.ok) setMappings(await mRes.json());
         if (pRes.ok) setParticipants(await pRes.json());
+        if (aRes.ok) {
+          const analyses = await aRes.json();
+          setLiveAnalysis((current) =>
+            newestAnalysis(current, analyses[0] || null),
+          );
+        }
+        if (vRes.ok) {
+          const evidence = await vRes.json();
+          setVisualEvidence((current) =>
+            mergeVisualEvidence(current, evidence),
+          );
+        }
       } catch (e: any) {
         setError(e.message || "Failed to load session");
       }
@@ -187,6 +217,17 @@ export default function FacilitatorPage() {
         }
         if (data.speakerMappings) setMappings(data.speakerMappings);
         if (data.participants) setParticipants(data.participants);
+        if (data.intelligence) setIntelligence(data.intelligence);
+        if (data.liveAnalysis !== undefined) {
+          setLiveAnalysis((current) =>
+            newestAnalysis(current, data.liveAnalysis),
+          );
+        }
+        if (data.visualEvidence) {
+          setVisualEvidence((current) =>
+            mergeVisualEvidence(current, data.visualEvidence),
+          );
+        }
       } catch {}
     });
 
@@ -230,6 +271,29 @@ export default function FacilitatorPage() {
         if (data.streamingMinutesUsed !== undefined) {
           setStreamingMins(data.streamingMinutesUsed);
         }
+      } catch {}
+    });
+
+    es.addEventListener("intelligence", (e) => {
+      try {
+        setIntelligence(JSON.parse(e.data));
+      } catch {}
+    });
+
+    es.addEventListener("live.analysis", (e) => {
+      try {
+        const analysis = JSON.parse(e.data) as LiveAnalysisSnapshot;
+        setLiveAnalysis((current) => newestAnalysis(current, analysis));
+      } catch {}
+    });
+
+    es.addEventListener("visual.evidence", (e) => {
+      try {
+        const evidence = JSON.parse(e.data) as VisualEvidenceData;
+        setVisualEvidence((current) => [
+          evidence,
+          ...current.filter((item) => item.id !== evidence.id),
+        ]);
       } catch {}
     });
 
@@ -457,16 +521,20 @@ export default function FacilitatorPage() {
     if (session?.status === "active") void handleStop();
   };
 
-  // Update intent
-  const handleUpdateIntent = async () => {
+  // Snapshot the complete transcript through the current finalized turn under
+  // the facilitator's current intent. Audio capture continues independently.
+  const handleRunAnalysis = async () => {
+    if (analyzing) return;
+    setAnalyzing(true);
+    setError("");
     try {
       const criteria = intentCriteria
         .split("\n")
         .map((c: string) => c.trim())
         .filter((c: string) => c.length > 0);
 
-      await fetch(`/api/sessions/${sessionId}`, {
-        method: "PATCH",
+      const response = await fetch(`/api/sessions/${sessionId}/analyses`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           objective: intentObjective,
@@ -475,13 +543,24 @@ export default function FacilitatorPage() {
         }),
       });
 
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to analyze the transcript");
+      }
+      setLiveAnalysis(result);
       setSession((s) =>
         s
           ? { ...s, objective: intentObjective, phase: intentPhase, criteria }
           : s,
       );
-    } catch {
-      setError("Failed to update session intent");
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Failed to analyze the transcript",
+      );
+    } finally {
+      setAnalyzing(false);
     }
   };
 
@@ -621,13 +700,22 @@ export default function FacilitatorPage() {
       </header>
 
       {/* Controls */}
-      <div className="shrink-0 px-4 py-3 border-b border-hud-border flex gap-3 items-center">
-        {/* Meter */}
-        <div className="flex-1 h-3 bg-hud-surface rounded-full overflow-hidden">
-          <div
-            className="h-full bg-green-400 transition-all duration-100"
-            style={{ width: `${Math.min(100, meter * 100)}%` }}
+      <div className="shrink-0 flex items-center gap-3 border-b border-hud-border bg-hud-surface/50 px-4 py-2">
+        <div className="relative h-10 min-w-0 flex-1 overflow-hidden rounded-lg border border-cyan-300/10 bg-black/30">
+          <AudioVisualizer
+            analyser={analyserNode}
+            bars={56}
+            height={40}
+            active={isActive}
+            color="#22d3ee"
+            className="opacity-80"
           />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-white/5">
+            <div
+              className="h-full bg-cyan-300 transition-[width] duration-100"
+              style={{ width: `${Math.min(100, meter * 100)}%` }}
+            />
+          </div>
         </div>
 
         {isActive ? (
@@ -668,54 +756,20 @@ export default function FacilitatorPage() {
         </div>
       )}
 
-      {/* Session intent editor */}
-      <details className="shrink-0 max-h-[40dvh] overflow-y-auto px-4 py-2 border-b border-hud-border">
-        <summary className="text-sm text-hud-muted cursor-pointer font-medium">
-          Session Intent ▸
-        </summary>
-        <div className="mt-2 space-y-2">
-          <input
-            value={intentObjective}
-            onChange={(e) => setIntentObjective(e.target.value)}
-            placeholder="Objective"
-            className="w-full bg-hud-surface border border-hud-border rounded-lg px-3 py-2 text-sm text-hud-text"
-          />
-          <select
-            value={intentPhase}
-            onChange={(e) => setIntentPhase(e.target.value)}
-            className="w-full bg-hud-surface border border-hud-border rounded-lg px-3 py-2 text-sm text-hud-text"
-          >
-            {[
-              "frame",
-              "empathize",
-              "define",
-              "ideate",
-              "evaluate",
-              "decide",
-              "plan_experiment",
-              "reflect",
-            ].map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-          <textarea
-            value={intentCriteria}
-            onChange={(e) => setIntentCriteria(e.target.value)}
-            placeholder="Criteria (one per line)"
-            rows={3}
-            className="w-full bg-hud-surface border border-hud-border rounded-lg px-3 py-2 text-sm text-hud-text"
-          />
-          <button
-            onClick={handleUpdateIntent}
-            className="px-4 py-2 bg-hud-accent text-white rounded-lg text-sm touch-manipulation"
-            style={{ minHeight: 44 }}
-          >
-            Update Intent
-          </button>
-        </div>
-      </details>
+      <LiveAnalysisHud
+        analysis={liveAnalysis}
+        intelligence={intelligence}
+        turns={finalizedTurns}
+        objective={intentObjective}
+        phase={intentPhase}
+        criteriaText={intentCriteria}
+        analyzing={analyzing}
+        ready={Boolean(session)}
+        onObjectiveChange={setIntentObjective}
+        onPhaseChange={setIntentPhase}
+        onCriteriaChange={setIntentCriteria}
+        onAnalyze={handleRunAnalysis}
+      />
 
       {/* Error display */}
       {(error || captureError) && (
@@ -733,100 +787,143 @@ export default function FacilitatorPage() {
         </div>
       )}
 
-      {/* Transcript */}
-      <section className="relative flex-1 min-h-0" aria-label="Live transcript">
-        <div
-          ref={transcriptViewportRef}
-          data-testid="transcript-scroll"
-          data-following={followTranscript ? "true" : "false"}
-          onScroll={handleTranscriptScroll}
-          className="h-full overflow-y-scroll px-4 py-2 space-y-2 overscroll-contain touch-pan-y [scrollbar-gutter:stable]"
-        >
-          {finalizedTurns.length === 0 && !isActive && (
-            <p className="text-hud-muted text-sm py-8 text-center">
-              {session?.status === "terminated"
-                ? "Session ended. No turns recorded."
-                : "Start capture to begin transcription."}
-            </p>
-          )}
-          {finalizedTurns.length === 0 && isActive && (
-            <p className="text-hud-muted text-sm py-8 text-center">
-              Listening… speak to begin.
-            </p>
-          )}
-
-          {finalizedTurns.map((turn) => (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="grid min-h-0 flex-1 xl:grid-cols-[minmax(0,1fr)_22rem]">
+          {/* Transcript */}
+          <section
+            className="relative min-h-0 min-w-0"
+            aria-label="Live transcript"
+          >
             <div
-              key={turn.id}
-              className={`p-3 rounded-lg border ${
-                turn.isSubstantive
-                  ? "border-hud-border bg-hud-surface"
-                  : "border-hud-border/50 bg-hud-surface/50"
-              }`}
+              ref={transcriptViewportRef}
+              data-testid="transcript-scroll"
+              data-following={followTranscript ? "true" : "false"}
+              onScroll={handleTranscriptScroll}
+              className="h-full overflow-y-scroll px-4 py-2 space-y-2 overscroll-contain touch-pan-y [scrollbar-gutter:stable]"
             >
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-medium px-2 py-0.5 rounded bg-hud-accent/20 text-hud-accent">
-                  {turn.isUnknownSpeaker
-                    ? "Unassigned"
-                    : getParticipantName(turn.providerSpeakerLabel)}
-                </span>
-                <span className="text-xs text-hud-muted">
-                  {turn.isSubstantive ? "substantive" : "backchannel"}
-                  {turn.isCalibration && " · calibration"}
-                  {turn.possibleOverlap && " · overlap"}
-                  {turn.isManuallyCorrected && " · corrected"}
-                  {turn.wasSpeakerRevised && " · revised"}
-                </span>
-              </div>
-              <p className="text-sm">{turn.currentText || turn.originalText}</p>
-              {turn.analysis?.category && (
-                <span className="inline-block mt-1 text-xs px-1.5 py-0.5 rounded bg-hud-accent/10 text-hud-accent/70">
-                  {turn.analysis.category}
-                </span>
+              {finalizedTurns.length === 0 && !isActive && (
+                <p className="text-hud-muted text-sm py-8 text-center">
+                  {session?.status === "terminated"
+                    ? "Session ended. No turns recorded."
+                    : "Start capture to begin transcription."}
+                </p>
+              )}
+              {finalizedTurns.length === 0 && isActive && (
+                <p className="text-hud-muted text-sm py-8 text-center">
+                  Listening… speak to begin.
+                </p>
               )}
 
-              {/* Turn actions */}
-              <details className="mt-1">
-                <summary className="text-xs text-hud-muted cursor-pointer">
-                  Actions ▸
-                </summary>
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {["A", "B", "C", "D", "E", "F"].map((label) => (
-                    <button
-                      key={label}
-                      onClick={() =>
-                        mapSpeaker(turn.providerSpeakerLabel, label)
-                      }
-                      className="px-2 py-1 text-xs rounded bg-hud-surface border border-hud-border text-hud-text"
-                    >
-                      → {label}
-                    </button>
-                  ))}
-                  <button
-                    onClick={() => {
-                      const newText = prompt("Correct text:", turn.currentText);
-                      if (newText) correctTurn(turn.id, newText);
-                    }}
-                    className="px-2 py-1 text-xs rounded bg-hud-surface border border-hud-border text-hud-text"
-                  >
-                    ✏ Edit
-                  </button>
+              {finalizedTurns.map((turn) => (
+                <div
+                  key={turn.id}
+                  className={`p-3 rounded-lg border ${
+                    turn.isSubstantive
+                      ? "border-hud-border bg-hud-surface"
+                      : "border-hud-border/50 bg-hud-surface/50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium px-2 py-0.5 rounded bg-hud-accent/20 text-hud-accent">
+                      {turn.isUnknownSpeaker
+                        ? "Unassigned"
+                        : getParticipantName(turn.providerSpeakerLabel)}
+                    </span>
+                    <span className="text-xs text-hud-muted">
+                      {turn.isSubstantive ? "substantive" : "backchannel"}
+                      {turn.isCalibration && " · calibration"}
+                      {turn.possibleOverlap && " · overlap"}
+                      {turn.isManuallyCorrected && " · corrected"}
+                      {turn.wasSpeakerRevised && " · revised"}
+                    </span>
+                  </div>
+                  <p className="text-sm">
+                    {turn.currentText || turn.originalText}
+                  </p>
+                  {turn.analysis?.category && (
+                    <span className="inline-block mt-1 text-xs px-1.5 py-0.5 rounded bg-hud-accent/10 text-hud-accent/70">
+                      {turn.analysis.category}
+                    </span>
+                  )}
+
+                  {/* Turn actions */}
+                  <details className="mt-1">
+                    <summary className="text-xs text-hud-muted cursor-pointer">
+                      Actions ▸
+                    </summary>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {["A", "B", "C", "D", "E", "F"].map((label) => (
+                        <button
+                          key={label}
+                          onClick={() =>
+                            mapSpeaker(turn.providerSpeakerLabel, label)
+                          }
+                          className="px-2 py-1 text-xs rounded bg-hud-surface border border-hud-border text-hud-text"
+                        >
+                          → {label}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => {
+                          const newText = prompt(
+                            "Correct text:",
+                            turn.currentText,
+                          );
+                          if (newText) correctTurn(turn.id, newText);
+                        }}
+                        className="px-2 py-1 text-xs rounded bg-hud-surface border border-hud-border text-hud-text"
+                      >
+                        ✏ Edit
+                      </button>
+                    </div>
+                  </details>
                 </div>
-              </details>
+              ))}
             </div>
-          ))}
+            {!followTranscript && unseenTurnCount > 0 && (
+              <button
+                type="button"
+                onClick={() => scrollTranscriptToLatest("smooth")}
+                className="absolute bottom-3 left-1/2 -translate-x-1/2 min-h-11 rounded-full border border-hud-accent/50 bg-hud-accent px-4 py-2 text-sm font-semibold text-white shadow-xl shadow-black/40 touch-manipulation"
+              >
+                {unseenTurnCount} new {unseenTurnCount === 1 ? "turn" : "turns"}{" "}
+                · Jump to latest
+              </button>
+            )}
+          </section>
+          <div className="hidden min-h-0 xl:flex">
+            <VisualEvidenceCapture
+              sessionId={sessionId}
+              capturedAtMs={finalizedTurns.at(-1)?.endMs ?? 0}
+              evidence={visualEvidence}
+              onCaptured={(captured) =>
+                setVisualEvidence((current) => [
+                  captured,
+                  ...current.filter((item) => item.id !== captured.id),
+                ])
+              }
+            />
+          </div>
         </div>
-        {!followTranscript && unseenTurnCount > 0 && (
-          <button
-            type="button"
-            onClick={() => scrollTranscriptToLatest("smooth")}
-            className="absolute bottom-3 left-1/2 -translate-x-1/2 min-h-11 rounded-full border border-hud-accent/50 bg-hud-accent px-4 py-2 text-sm font-semibold text-white shadow-xl shadow-black/40 touch-manipulation"
-          >
-            {unseenTurnCount} new {unseenTurnCount === 1 ? "turn" : "turns"} ·
-            Jump to latest
-          </button>
-        )}
-      </section>
+        <details className="shrink-0 border-t border-hud-border xl:hidden">
+          <summary className="min-h-11 cursor-pointer list-none px-4 py-3 text-xs font-semibold text-fuchsia-200 marker:hidden">
+            Visual evidence · {visualEvidence.length} captured +
+          </summary>
+          <div className="h-[52dvh] border-t border-hud-border">
+            <VisualEvidenceCapture
+              sessionId={sessionId}
+              capturedAtMs={finalizedTurns.at(-1)?.endMs ?? 0}
+              evidence={visualEvidence}
+              onCaptured={(captured) =>
+                setVisualEvidence((current) => [
+                  captured,
+                  ...current.filter((item) => item.id !== captured.id),
+                ])
+              }
+            />
+          </div>
+        </details>
+      </div>
 
       {/* Navigation */}
       <nav className="shrink-0 px-4 py-3 border-t border-hud-border flex gap-3">
@@ -858,4 +955,24 @@ export default function FacilitatorPage() {
       </nav>
     </main>
   );
+}
+
+function newestAnalysis(
+  current: LiveAnalysisSnapshot | null,
+  incoming: LiveAnalysisSnapshot | null,
+) {
+  if (!incoming) return current;
+  if (!current) return incoming;
+  return Date.parse(incoming.createdAt) >= Date.parse(current.createdAt)
+    ? incoming
+    : current;
+}
+
+function mergeVisualEvidence(
+  current: VisualEvidenceData[],
+  incoming: VisualEvidenceData[],
+) {
+  const byId = new Map(current.map((item) => [item.id, item]));
+  for (const item of incoming) byId.set(item.id, item);
+  return [...byId.values()].sort((a, b) => b.capturedAtMs - a.capturedAtMs);
 }

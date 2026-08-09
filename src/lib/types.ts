@@ -337,6 +337,8 @@ export interface SSEPatch {
     | "turn.updated"
     | "metrics"
     | "intelligence"
+    | "live.analysis"
+    | "visual.evidence"
     | "map.patch"
     | "prompt.show"
     | "prompt.clear"
@@ -382,6 +384,78 @@ export interface CritiqueIntelligenceSnapshot {
   decisions: CritiqueTrace[];
   actions: CritiqueTrace[];
   evidenceGaps: CritiqueTrace[];
+}
+
+export interface LiveAnalysisEvidence {
+  text: string;
+  supportingTurnIds: string[];
+}
+
+export interface LiveAnalysisFinding extends LiveAnalysisEvidence {
+  title: string;
+}
+
+export interface LiveCriterionAssessment extends LiveAnalysisEvidence {
+  criterion: string;
+  status: "unaddressed" | "discussed" | "evidenced";
+}
+
+export interface LiveAnalysisResult {
+  headline: string;
+  summary: string;
+  keyFindings: LiveAnalysisFinding[];
+  criteria: LiveCriterionAssessment[];
+  openQuestions: LiveAnalysisEvidence[];
+  decisions: LiveAnalysisEvidence[];
+  actions: LiveAnalysisEvidence[];
+  phaseAllocation: {
+    problemAndEvidence: number;
+    ideas: number;
+    evaluation: number;
+    decisionsAndActions: number;
+  };
+  agreementState: "consensus" | "majority" | "divided" | "emerging";
+  minorityPosition?: string;
+  engine: "model" | "deterministic-fallback";
+  warning?: string;
+}
+
+export interface LiveAnalysisSnapshot {
+  id: string;
+  sessionId: string;
+  objective: string;
+  phase: string;
+  criteria: string[];
+  transcriptTurnCount: number;
+  transcriptWordCount: number;
+  transcriptThroughMs: number;
+  firstTurnId: string;
+  lastTurnId: string;
+  visualEvidenceCount: number;
+  result: LiveAnalysisResult;
+  createdAt: string;
+}
+
+export interface VisualEvidenceAnalysis {
+  caption: string;
+  observations: string[];
+  relevance: string;
+  confidence: number;
+  engine: "model" | "deterministic-fallback";
+  warning?: string;
+}
+
+export interface VisualEvidenceData {
+  id: string;
+  sessionId: string;
+  capturedAtMs: number;
+  nearestTurnId?: string;
+  note?: string;
+  contentType: string;
+  byteSize: number;
+  imageUrl: string;
+  analysis: VisualEvidenceAnalysis;
+  createdAt: string;
 }
 
 export interface TopicSuggestion {

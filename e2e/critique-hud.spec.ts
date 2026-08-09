@@ -44,6 +44,35 @@ async function createTranscriptNavigationFixture(
   return session as { id: string };
 }
 
+async function ingestDiscussionTurns(
+  request: APIRequestContext,
+  sessionId: string,
+  startIndex: number,
+  texts: string[],
+) {
+  const turns: Array<{ id: string; currentText: string }> = [];
+  for (let offset = 0; offset < texts.length; offset++) {
+    const index = startIndex + offset;
+    const response = await request.post(`/api/sessions/${sessionId}/turns`, {
+      data: {
+        providerSessionId: `analysis-${sessionId}`,
+        providerTurnOrder: index,
+        segmentIndex: 0,
+        providerSpeakerLabel: String.fromCharCode(65 + (index % 3)),
+        startMs: index * 2_400,
+        endMs: index * 2_400 + 2_000,
+        receivedAtMs: index * 2_400 + 2_000,
+        currentText: texts[offset],
+        isFinal: true,
+      },
+    });
+    const turn = await response.json();
+    expect(response.ok(), JSON.stringify(turn)).toBeTruthy();
+    turns.push(turn);
+  }
+  return turns;
+}
+
 async function createRenderedFixture(request: APIRequestContext) {
   const speakers = [
     {
@@ -356,6 +385,140 @@ test.describe("Critique HUD — E2E", () => {
     expect(
       await viewport.evaluate((element) => element.scrollTop),
     ).toBeGreaterThan(0);
+  });
+
+  test("live HUD repeats intent analysis over the complete transcript and incorporates visual evidence", async ({
+    page,
+    request,
+  }) => {
+    test.skip(
+      test.info().project.name !== "chromium-desktop",
+      "The dense Live Critique HUD is exercised once in desktop Chromium.",
+    );
+    test.setTimeout(60_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const created = await request.post("/api/sessions", {
+      data: {
+        title: "Repeated live analysis fixture",
+        objective: "Assess whether the warning is understood",
+        phase: "evaluate",
+        criteria: ["Evidence quality", "Action ownership"],
+        speakerCount: 3,
+        runMode: "live",
+      },
+    });
+    const session = await created.json();
+    expect(created.ok(), JSON.stringify(session)).toBeTruthy();
+    await request.post(`/api/sessions/${session.id}/start`);
+    const firstTurns = await ingestDiscussionTurns(request, session.id, 0, [
+      "The opening field study showed that residents missed the warning label.",
+      "I want to distinguish a visibility problem from a comprehension problem.",
+      "Could we compare a persistent banner with the current transient notice?",
+      "The map legend already competes for attention on the narrow screen.",
+      "Our observation notes mention hesitation but do not explain the cause.",
+      "Then we should avoid claiming the icon itself caused the confusion.",
+      "A short comprehension prompt could test the warning without changing navigation.",
+      "I disagree that comprehension alone is enough because timing still matters.",
+      "We can preserve both concerns in a two-condition prototype.",
+      "The first condition keeps the warning visible beside the selected parcel.",
+      "The second condition asks the planner to restate the risk before continuing.",
+      "We still need an owner for recruiting planners with limited map experience.",
+    ]);
+
+    await page.goto(`/facilitator/${session.id}`);
+    const hud = page.getByTestId("live-analysis-hud");
+    await expect(hud).toBeVisible();
+    await hud
+      .getByPlaceholder("What should this analysis clarify?")
+      .fill("Assess warning comprehension across the discussion");
+    await hud.getByRole("button", { name: "Analyze all 12 turns" }).click();
+    await expect(
+      hud.getByText(
+        /Evaluate view · Assess warning comprehension across the discussion/,
+      ),
+    ).toBeVisible();
+    await expect(hud.getByText("12 turns · 132 words")).toBeVisible();
+
+    const firstHistoryResponse = await request.get(
+      `/api/sessions/${session.id}/analyses`,
+    );
+    const firstHistory = await firstHistoryResponse.json();
+    expect(firstHistoryResponse.ok()).toBeTruthy();
+    expect(firstHistory[0]).toMatchObject({
+      objective: "Assess warning comprehension across the discussion",
+      transcriptTurnCount: 12,
+      firstTurnId: firstTurns[0].id,
+      lastTurnId: firstTurns.at(-1)!.id,
+    });
+
+    const laterTurns = await ingestDiscussionTurns(request, session.id, 12, [
+      "I will recruit four planners and schedule the comparison for Thursday.",
+      "I will instrument whether they reopen the warning after dismissing it.",
+      "Let us record both comprehension accuracy and time to recover context.",
+      "The unresolved question is whether the extra prompt feels accusatory.",
+    ]);
+    // Reconcile through the same snapshot path used after an SSE reconnect.
+    // This deliberately proves that persisted analysis scope survives reloads.
+    await page.reload();
+    await expect(hud).toBeVisible();
+    await expect(
+      hud.getByText("4 new turns since this snapshot"),
+    ).toBeVisible();
+
+    const visualPanel = page.getByRole("complementary", {
+      name: "Visual evidence",
+    });
+    await visualPanel
+      .getByPlaceholder("Optional note: what should the analysis notice?")
+      .fill("Warning treatment beside the parcel legend");
+    await visualPanel.getByTestId("visual-evidence-file").setInputFiles({
+      name: "warning-treatment.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+        "base64",
+      ),
+    });
+    await expect(
+      visualPanel.getByText(
+        /Facilitator-captured visual evidence: Warning treatment beside the parcel legend/,
+      ),
+    ).toBeVisible();
+
+    await hud
+      .getByPlaceholder("What should this analysis clarify?")
+      .fill("Extract owned next actions and unresolved risks");
+    await hud
+      .getByRole("combobox", { name: "Critique phase" })
+      .selectOption("plan_experiment");
+    await hud.getByRole("button", { name: "Analyze all 16 turns" }).click();
+    await expect(
+      hud.getByText(
+        /Plan experiment view · Extract owned next actions and unresolved risks/,
+      ),
+    ).toBeVisible();
+    await expect(hud.getByText("16 turns · 175 words")).toBeVisible();
+    await expect(hud.getByText("1 visual")).toBeVisible();
+
+    const historyResponse = await request.get(
+      `/api/sessions/${session.id}/analyses`,
+    );
+    const history = await historyResponse.json();
+    expect(historyResponse.ok()).toBeTruthy();
+    expect(history).toHaveLength(2);
+    expect(history[0]).toMatchObject({
+      objective: "Extract owned next actions and unresolved risks",
+      phase: "plan_experiment",
+      transcriptTurnCount: 16,
+      firstTurnId: firstTurns[0].id,
+      lastTurnId: laterTurns.at(-1)!.id,
+      visualEvidenceCount: 1,
+    });
+    expect(history[1].transcriptTurnCount).toBe(12);
+    const currentSession = await (
+      await request.get(`/api/sessions/${session.id}`)
+    ).json();
+    expect(currentSession.status).toBe("active");
   });
 
   test("display page connects via SSE and shows HUD layout", async ({

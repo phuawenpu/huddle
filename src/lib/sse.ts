@@ -117,6 +117,14 @@ export function intelligencePatch(intelligence: unknown): SSEPatch {
   return { type: "intelligence", data: intelligence };
 }
 
+export function liveAnalysisPatch(analysis: unknown): SSEPatch {
+  return { type: "live.analysis", data: analysis };
+}
+
+export function visualEvidencePatch(evidence: unknown): SSEPatch {
+  return { type: "visual.evidence", data: evidence };
+}
+
 /**
  * Format a map.patch.
  */
