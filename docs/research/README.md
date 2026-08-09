@@ -1,7 +1,7 @@
 # Critique HUD research, product evolution, and system diagrams
 
-**Audit date:** 2026-08-07
-**Scope:** two source studies (whose PDFs are not retained in the repository), the current `main` codebase, and a targeted online prior-art review.
+**Audit date:** 2026-08-09
+**Scope:** two source studies (whose PDFs are not retained in the repository), the current `main` codebase, and targeted online reviews of product prior art, live meeting dynamics, visualization, and mixed reality.
 
 This folder separates four questions that should not be collapsed:
 
@@ -15,6 +15,8 @@ This folder separates four questions that should not be collapsed:
 | Artifact                                                                                         | Purpose                                                                                                                      |
 | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
 | [`06-product-and-investor-assessment.md`](06-product-and-investor-assessment.md)                 | Detailed demand evidence, competitive boundary, beachhead, moat, risks, pricing hypotheses, sources, and falsifiable gates   |
+| [`07-realistic-conversation-simulation.md`](07-realistic-conversation-simulation.md)             | Realistic multi-party STT simulation, WER/diarization scoring, fixtures, limitations, and repeatable evaluation procedure     |
+| [`08-meeting-dynamics-visualization.md`](08-meeting-dynamics-visualization.md)                   | Evidence-weighted design vocabulary for topic dynamics, response structure, participation, meeting tools, and AR             |
 | [`01-research-synthesis.md`](01-research-synthesis.md)                                           | Novel aspects of the two studies and the design requirements they establish                                                  |
 | [`02-codebase-audit.md`](02-codebase-audit.md)                                                   | Detailed architecture, data flow, implementation coverage, risks, and evidence                                               |
 | [`03-novelty-landscape.md`](03-novelty-landscape.md)                                             | Targeted comparison with current research and products; novelty boundary                                                     |
