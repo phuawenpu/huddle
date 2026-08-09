@@ -45,15 +45,15 @@ person scoring, and facilitator review—is the right foundation.
 
 ## A measurement vocabulary for live dynamics
 
-| Question | Observable measure | Suitable visual | Unsafe shortcut to avoid |
-| --- | --- | --- | --- |
-| Are recent turns about the same subject? | Topic concentration, active-topic share, topic-switch rate, and return-to-topic events over a rolling window | Colored topic bands in a time ribbon, with explicit branch and return markers | “Everyone is focused” |
-| Are people responding to one another? | Response-link coverage, unresolved questions, ignored proposals, and cross-speaker reference chains | Thin arcs or edge counts; select to reveal turn evidence | A global cohesion score |
-| Is the conversation exploring or settling? | Idea birth rate, branch count, comparison activity, decision/action emergence, and phase-relative trend | Phase-aware label such as “exploring: three active branches” | Treating all divergence as failure |
-| Are positions different? | Target-specific support, challenge, qualification, and uncertainty attached to a proposal or decision | Stance marks around the selected target | Participant sentiment or a meeting-wide agreement meter |
-| Is participation broadly distributed? | Recent speaking-time share, turn-entry opportunities, interruption/overlap estimates, and response received | Small multiples with an explicit time window | Ranking speakers or prescribing equal airtime |
-| Is evidence being connected to claims? | Source-grounded support/challenge relations and unresolved evidence needs | Evidence edges and open-loop markers | Binary “verified” badges for conversational claims |
-| Is the group attending to the same artifact? | Explicit references, selections, annotations, and—only with consent—shared gaze regions | Shared pointers or spatial landmarks | Inferring intent from gaze alone |
+| Question                                     | Observable measure                                                                                           | Suitable visual                                                               | Unsafe shortcut to avoid                                |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Are recent turns about the same subject?     | Topic concentration, active-topic share, topic-switch rate, and return-to-topic events over a rolling window | Colored topic bands in a time ribbon, with explicit branch and return markers | “Everyone is focused”                                   |
+| Are people responding to one another?        | Response-link coverage, unresolved questions, ignored proposals, and cross-speaker reference chains          | Thin arcs or edge counts; select to reveal turn evidence                      | A global cohesion score                                 |
+| Is the conversation exploring or settling?   | Idea birth rate, branch count, comparison activity, decision/action emergence, and phase-relative trend      | Phase-aware label such as “exploring: three active branches”                  | Treating all divergence as failure                      |
+| Are positions different?                     | Target-specific support, challenge, qualification, and uncertainty attached to a proposal or decision        | Stance marks around the selected target                                       | Participant sentiment or a meeting-wide agreement meter |
+| Is participation broadly distributed?        | Recent speaking-time share, turn-entry opportunities, interruption/overlap estimates, and response received  | Small multiples with an explicit time window                                  | Ranking speakers or prescribing equal airtime           |
+| Is evidence being connected to claims?       | Source-grounded support/challenge relations and unresolved evidence needs                                    | Evidence edges and open-loop markers                                          | Binary “verified” badges for conversational claims      |
+| Is the group attending to the same artifact? | Explicit references, selections, annotations, and—only with consent—shared gaze regions                      | Shared pointers or spatial landmarks                                          | Inferring intent from gaze alone                        |
 
 Every measure should expose its time window and confidence. “Last 90 seconds:
 two active topic branches” is interpretable; “alignment 63” is not.
@@ -334,23 +334,20 @@ Preprints are identified by their linked venue and should be treated as emerging
 evidence.
 
 - Bergstrom, T., and Karahalios, K. “Conversation Clock: Visualizing audio
-  patterns in co-located groups.” *HICSS*, 2007.
+  patterns in co-located groups.” _HICSS_, 2007.
 - Sturm, J. et al. “Influencing social dynamics in meetings through a peripheral
-  display.” *ICMI*, 2007.
+  display.” _ICMI_, 2007.
 - Kim, T. et al. “Meeting Mediator: Enhancing group collaboration using
-  sociometric feedback.” *CSCW*, 2008.
+  sociometric feedback.” _CSCW_, 2008.
 - Woolley, A. W. et al. “Evidence for a collective intelligence factor in the
-  performance of human groups.” *Science*, 2010.
+  performance of human groups.” _Science_, 2010.
 - Gonzales, A. L., Hancock, J. T., and Pennebaker, J. W. “Language style matching
-  as a predictor of social dynamics in small groups.” *Communication Research*,
-  2010.
+  as a predictor of social dynamics in small groups.” _Communication Research_, 2010.
 - Havre, S., Hetzler, B., and Nowell, L. “ThemeRiver: Visualizing theme changes
-  over time.” *IEEE InfoVis*, 2000.
+  over time.” _IEEE InfoVis_, 2000.
 - El-Assady, M. et al. “ConToVi: Multi-party conversation exploration using topic
-  space views.” *Computer Graphics Forum*, 2016.
+  space views.” _Computer Graphics Forum_, 2016.
 - Shi, Y. et al. “MeetingVis: Visual narratives to assist in recalling meeting
-  context and content.” *IEEE TVCG*, 2018.
-- Zhang, R. et al. “A structured model for multi-party conversation.” *EMNLP*,
-  2018.
+  context and content.” _IEEE TVCG_, 2018.
+- Zhang, R. et al. “A structured model for multi-party conversation.” _EMNLP_, 2018.
 - MeetMap. “Real-time collaborative dialogue mapping with LLMs.” arXiv, 2025.
-

@@ -26,6 +26,14 @@ This folder separates four questions that should not be collapsed:
 | [`generate_business_feasibility_one_pager.py`](generate_business_feasibility_one_pager.py)       | Reproducible ReportLab source for the business feasibility one-pager                                                         |
 | [`archive/diagrams-2026-08-07/`](archive/diagrams-2026-08-07/)                                   | Detailed 11-page atlas, earlier five-diagram exploration, and their generators                                               |
 
+## Current implementation goal
+
+The timestamped
+[`live-session realtime meeting-analysis goal`](../goals/2026-08-09T15-09-39Z-live-session-realtime-meeting-analysis.md)
+translates the meeting-dynamics research and the current UI/model-flow audit into
+a staged implementation plan with latency, grounding, safety, and evaluation
+criteria.
+
 ## Current synthesized brief
 
 The current brief generator deliberately produces three pages rather than an encyclopedic atlas:
