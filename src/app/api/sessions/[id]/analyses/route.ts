@@ -64,6 +64,7 @@ export async function POST(
           orderBy: [{ receivedAtMs: "asc" }, { providerTurnOrder: "asc" }],
         },
         visualEvidence: { orderBy: { capturedAtMs: "asc" } },
+        liveAnalyses: { orderBy: { createdAt: "desc" }, take: 1 },
       },
     });
     if (!session) {
@@ -115,6 +116,10 @@ export async function POST(
     const evidenceInScope = session.visualEvidence.filter(
       (evidence) => evidence.capturedAtMs <= transcriptThroughMs,
     );
+    const previousAnalysis = session.liveAnalyses[0];
+    const previousResult = previousAnalysis
+      ? safeParseJson(previousAnalysis.resultJson, {})
+      : {};
     const result = await analyzeFullTranscript(
       turns.map((turn) => ({
         id: turn.id,
@@ -122,6 +127,11 @@ export async function POST(
         text: turn.currentText,
         startMs: turn.startMs,
         endMs: turn.endMs,
+        isUnknownSpeaker: turn.isUnknownSpeaker,
+        possibleOverlap: turn.possibleOverlap,
+        wasSpeakerRevised: turn.wasSpeakerRevised,
+        isManuallyCorrected: turn.isManuallyCorrected,
+        transcriptConfidence: averageWordConfidence(turn.wordsJson),
       })),
       evidenceInScope.map((evidence) => {
         const analysis = safeParseJson(evidence.analysisJson, {});
@@ -133,7 +143,13 @@ export async function POST(
           observations: analysis.observations,
         };
       }),
-      { objective, phase, criteria },
+      {
+        objective,
+        phase,
+        criteria,
+        previousState: previousResult.meetingState,
+        previousSnapshotId: previousAnalysis?.id,
+      },
     );
 
     const record = await prisma.liveAnalysis.create({
@@ -205,4 +221,14 @@ function safeParseJson(value: string | null, fallback: any) {
   } catch {
     return fallback;
   }
+}
+
+function averageWordConfidence(value: string | null): number | undefined {
+  const words = safeParseJson(value, []);
+  if (!Array.isArray(words)) return undefined;
+  const values = words
+    .map((word) => Number(word?.confidence))
+    .filter((confidence) => Number.isFinite(confidence));
+  if (values.length === 0) return undefined;
+  return values.reduce((sum, confidence) => sum + confidence, 0) / values.length;
 }

@@ -389,6 +389,124 @@ export interface CritiqueIntelligenceSnapshot {
 export interface LiveAnalysisSourceQuote {
   turnId: string;
   quote: string;
+  speakerLabel?: string;
+  startMs?: number;
+  endMs?: number;
+  transcriptConfidence?: number;
+  uncertainty?: Array<
+    "unknown_speaker" | "possible_overlap" | "speaker_revised" | "text_corrected"
+  >;
+}
+
+export type MeetingNodeKind =
+  | "issue"
+  | "need"
+  | "proposal"
+  | "criterion"
+  | "evidence"
+  | "question"
+  | "decision"
+  | "action"
+  | "experiment";
+
+export type MeetingNodeStatus =
+  | "open"
+  | "exploring"
+  | "proposed"
+  | "accepted"
+  | "rejected"
+  | "committed"
+  | "done";
+
+export interface MeetingStateNode {
+  id: string;
+  kind: MeetingNodeKind;
+  title: string;
+  summary: string;
+  status: MeetingNodeStatus;
+  origin: "transcript" | "facilitator_intent" | "human_edit";
+  confidence: number;
+  owner?: string;
+  supportingTurnIds: string[];
+  sourceQuotes: LiveAnalysisSourceQuote[];
+}
+
+export interface MeetingStateRelation {
+  id: string;
+  fromNodeId: string;
+  toNodeId: string;
+  type:
+    | "supports"
+    | "challenges"
+    | "responds_to"
+    | "depends_on"
+    | "tests"
+    | "addresses"
+    | "results_in";
+  supportingTurnIds: string[];
+  sourceQuotes: LiveAnalysisSourceQuote[];
+}
+
+export interface MeetingStance {
+  id: string;
+  speakerLabel: string;
+  targetNodeId: string;
+  position: "supports" | "challenges" | "qualifies" | "unclear";
+  rationale: string;
+  confidence: number;
+  supportingTurnIds: string[];
+  sourceQuotes: LiveAnalysisSourceQuote[];
+}
+
+export interface TargetAgreement {
+  targetNodeId: string;
+  state: "consensus" | "majority" | "divided" | "contested" | "emerging";
+  summary: string;
+  supportingSpeakers: string[];
+  challengingSpeakers: string[];
+  supportingTurnIds: string[];
+  sourceQuotes: LiveAnalysisSourceQuote[];
+}
+
+export type FacilitatorActionType =
+  | "ask"
+  | "clarify"
+  | "compare"
+  | "surface_tension"
+  | "test"
+  | "decide"
+  | "confirm_owner"
+  | "summarize";
+
+export interface FacilitatorAction {
+  id: string;
+  type: FacilitatorActionType;
+  label: string;
+  prompt: string;
+  rationale: string;
+  urgency: "now" | "soon" | "watch";
+  priority: number;
+  targetNodeIds: string[];
+  supportingTurnIds: string[];
+  sourceQuotes: LiveAnalysisSourceQuote[];
+  requiresApproval: true;
+}
+
+export interface MeetingState {
+  schemaVersion: 1;
+  revision: number;
+  previousSnapshotId?: string;
+  nodes: MeetingStateNode[];
+  relations: MeetingStateRelation[];
+  stances: MeetingStance[];
+  agreements: TargetAgreement[];
+  facilitatorActions: FacilitatorAction[];
+  changes: {
+    addedNodeIds: string[];
+    retainedNodeIds: string[];
+    removedNodeIds: string[];
+    humanEditedNodeIds?: string[];
+  };
 }
 
 export interface LiveAnalysisEvidence {
@@ -428,6 +546,8 @@ export interface LiveAnalysisResult {
     rejectedSourceCount: number;
   };
   warning?: string;
+  /** Versioned, source-grounded state used by the facilitator and shared map. */
+  meetingState: MeetingState;
 }
 
 export interface LiveAnalysisSnapshot {
