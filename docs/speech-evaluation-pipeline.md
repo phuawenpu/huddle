@@ -64,7 +64,7 @@ RUN_PRODUCTION_LIVE=1 \
 BASE_URL=https://huddle-ti5ikw.fly.dev \
 PRODUCTION_LIVE_SCENARIO_ID=<approved-scenario-id> \
 PRODUCTION_LIVE_AUDIO_FILE=<absolute-path-to-16khz-mono-wav> \
-npx playwright test e2e/production-live.spec.ts --project=chromium
+npx playwright test e2e/production-live.spec.ts --project=chromium-desktop
 ```
 
 Default gates are:
@@ -72,13 +72,38 @@ Default gates are:
 | Metric                         | Maximum |
 | ------------------------------ | ------- |
 | Overall WER                    | `0.45`  |
+| Speaker-attributed WER         | `0.75`  |
 | DER excluding overlap          | `0.75`  |
 | Speaker-attributed overlap WER | `1.50`  |
 
-Override them with `MAX_SPEECH_WER`, `MAX_NON_OVERLAP_DER`, and
-`MAX_OVERLAP_SA_WER`. The test always requires three reference speakers, at
-least two stable hypothesis labels, a non-empty overlap interval, and at least
-two successful label-to-speaker mappings.
+Override them with `MAX_SPEECH_WER`, `MAX_SPEAKER_ATTRIBUTED_WER`,
+`MAX_NON_OVERLAP_DER`, and `MAX_OVERLAP_SA_WER`. The test always requires three
+reference speakers, at least two stable hypothesis labels, a non-empty overlap
+interval, and at least two successful label-to-speaker mappings.
+
+## Validated production baseline
+
+On 2026-08-09, Fly version 38 replayed the approved three-person Climate mix
+through the deployed recorded-audio path to the first authored overlap. The
+no-retry run finalized 19 transcript segments and produced two stable provider
+speaker labels:
+
+| Metric                         | Result    |
+| ------------------------------ | --------- |
+| Overall WER                    | `0.016`   |
+| Speaker-attributed WER         | `0.626`   |
+| Overlap WER                    | `1.000`   |
+| Speaker-attributed overlap WER | `0.333`   |
+| DER excluding overlap          | `0.326`   |
+| DER including overlap          | `0.327`   |
+| Missed speaker-time            | `3.213s`  |
+| False-alarm speaker-time       | `0.165s`  |
+| Confused speaker-time          | `30.991s` |
+
+The combined words were highly accurate, but the two-label hypothesis merged
+one of the three reference speakers. The resulting speaker confusion explains
+the much higher SA-WER and DER and establishes a concrete baseline for future
+diarization improvements.
 
 ## Score an existing session
 

@@ -11,6 +11,10 @@ const BASE_URL = process.env.BASE_URL || "";
 const SCENARIO_ID = process.env.PRODUCTION_LIVE_SCENARIO_ID || "";
 const FAKE_AUDIO_FILE = process.env.PRODUCTION_LIVE_AUDIO_FILE || "";
 const MAX_SPEECH_WER = numericEnv("MAX_SPEECH_WER", 0.45);
+const MAX_SPEAKER_ATTRIBUTED_WER = numericEnv(
+  "MAX_SPEAKER_ATTRIBUTED_WER",
+  0.75,
+);
 const MAX_NON_OVERLAP_DER = numericEnv("MAX_NON_OVERLAP_DER", 0.75);
 const MAX_OVERLAP_SA_WER = numericEnv("MAX_OVERLAP_SA_WER", 1.5);
 const ACTIVE_SESSION_IDS = new Set<string>();
@@ -147,6 +151,11 @@ test.describe("Production live audio verification", () => {
       "overall WER",
       evaluation.report.wordError.overall.rate,
       MAX_SPEECH_WER,
+    );
+    expectRateAtMost(
+      "speaker-attributed WER",
+      evaluation.report.wordError.speakerAttributed.rate,
+      MAX_SPEAKER_ATTRIBUTED_WER,
     );
     expectRateAtMost(
       "speaker-attributed overlap WER",

@@ -201,12 +201,13 @@ npm run test:e2e           # cross-browser UI suite plus Chromium mic/recording 
 RUN_PRODUCTION_LIVE=1 BASE_URL=https://huddle-ti5ikw.fly.dev \
   PRODUCTION_LIVE_SCENARIO_ID=<approved-scenario-id> \
   PRODUCTION_LIVE_AUDIO_FILE=<absolute-wav-path> \
-  npx playwright test e2e/production-live.spec.ts --project=chromium
+  npx playwright test e2e/production-live.spec.ts --project=chromium-desktop
 ```
 
-The production test now fails when overall WER exceeds `0.45`, non-overlap DER
-exceeds `0.75`, or overlap speaker-attributed WER exceeds `1.5`. Override those
-gates with `MAX_SPEECH_WER`, `MAX_NON_OVERLAP_DER`, and
+The production test now fails when overall WER exceeds `0.45`, speaker-attributed
+WER exceeds `0.75`, non-overlap DER exceeds `0.75`, or overlap
+speaker-attributed WER exceeds `1.5`. Override those gates with
+`MAX_SPEECH_WER`, `MAX_SPEAKER_ATTRIBUTED_WER`, `MAX_NON_OVERLAP_DER`, and
 `MAX_OVERLAP_SA_WER`. See the [speech evaluation pipeline](docs/speech-evaluation-pipeline.md)
 for metric definitions, the HTTP reporting interface, and interpretation limits.
 
