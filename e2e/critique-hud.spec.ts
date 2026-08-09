@@ -484,6 +484,16 @@ test.describe("Critique HUD — E2E", () => {
         /Facilitator-captured visual evidence: Warning treatment beside the parcel legend/,
       ),
     ).toBeVisible();
+    const evidenceResponse = await request.get(
+      `/api/sessions/${session.id}/visual-evidence`,
+    );
+    const capturedEvidence = await evidenceResponse.json();
+    expect(evidenceResponse.ok()).toBeTruthy();
+    expect(capturedEvidence).toHaveLength(1);
+    const imageResponse = await request.get(capturedEvidence[0].imageUrl);
+    expect(imageResponse.ok()).toBeTruthy();
+    expect(imageResponse.headers()["content-type"]).toBe("image/png");
+    expect(imageResponse.headers()["cache-control"]).toBe("private, no-store");
 
     await hud
       .getByPlaceholder("What should this analysis clarify?")
@@ -519,6 +529,102 @@ test.describe("Critique HUD — E2E", () => {
       await request.get(`/api/sessions/${session.id}`)
     ).json();
     expect(currentSession.status).toBe("active");
+
+    await page.goto(`/display/${session.id}`);
+    await expect(page.getByText("Intent synthesis")).toBeVisible();
+    await expect(
+      page.getByText(
+        "Plan experiment view · Extract owned next actions and unresolved risks",
+      ),
+    ).toBeVisible();
+    await expect(page.getByLabel("Discussion phase allocation")).toBeVisible();
+    await expect(page.getByText("1 visual context frame")).toBeVisible();
+  });
+
+  test("camera preview is consent-driven and captures one deliberate HUD evidence frame", async ({
+    request,
+  }) => {
+    test.skip(
+      test.info().project.name !== "chromium-desktop",
+      "Fake camera launch flags are Chromium-specific.",
+    );
+    test.setTimeout(45_000);
+    const created = await request.post("/api/sessions", {
+      data: {
+        title: "Visual evidence camera fixture",
+        objective: "Review the physical prototype state",
+        phase: "evaluate",
+        criteria: ["Visible state"],
+        speakerCount: 2,
+        runMode: "live",
+      },
+    });
+    const session = await created.json();
+    expect(created.ok(), JSON.stringify(session)).toBeTruthy();
+    const baseURL = process.env.BASE_URL || "http://127.0.0.1:3000";
+    const fakeBrowser = await chromium.launch({
+      headless: true,
+      args: [
+        "--use-fake-ui-for-media-stream",
+        "--use-fake-device-for-media-stream",
+        "--autoplay-policy=no-user-gesture-required",
+      ],
+    });
+    try {
+      const context = await fakeBrowser.newContext({
+        permissions: ["camera"],
+        viewport: { width: 1440, height: 900 },
+      });
+      const page = await context.newPage();
+      await page.goto(`${baseURL}/facilitator/${session.id}`);
+      const panel = page.getByRole("complementary", {
+        name: "Visual evidence",
+      });
+      await expect(
+        panel.getByText(
+          "Camera stays local until you deliberately capture one frame.",
+        ),
+      ).toBeVisible();
+      await panel.getByRole("button", { name: "Enable camera" }).click();
+      await expect(panel.getByText("Preview only")).toBeVisible();
+      await expect
+        .poll(() =>
+          panel
+            .getByLabel("Camera preview")
+            .evaluate(
+              (video: HTMLVideoElement) =>
+                video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+                video.videoWidth > 0,
+            ),
+        )
+        .toBe(true);
+      await panel
+        .getByPlaceholder("Optional note: what should the analysis notice?")
+        .fill("Physical prototype state at the critique table");
+      await panel.getByRole("button", { name: "Capture evidence" }).click();
+      await expect(
+        panel.getByText(
+          /Facilitator-captured visual evidence: Physical prototype state at the critique table/,
+        ),
+      ).toBeVisible({ timeout: 15_000 });
+
+      const evidence = await (
+        await request.get(`/api/sessions/${session.id}/visual-evidence`)
+      ).json();
+      expect(evidence).toHaveLength(1);
+      expect(evidence[0]).toMatchObject({
+        capturedAtMs: 0,
+        contentType: "image/jpeg",
+        note: "Physical prototype state at the critique table",
+      });
+      await panel.getByRole("button", { name: "Stop camera" }).click();
+      await expect(
+        panel.getByRole("button", { name: "Enable camera" }),
+      ).toBeVisible();
+      await context.close();
+    } finally {
+      await fakeBrowser.close();
+    }
   });
 
   test("display page connects via SSE and shows HUD layout", async ({

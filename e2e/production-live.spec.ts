@@ -20,10 +20,24 @@ const MAX_OVERLAP_SA_WER = numericEnv("MAX_OVERLAP_SA_WER", 1.5);
 const ACTIVE_SESSION_IDS = new Set<string>();
 
 type PersistedTurn = {
+  id: string;
   currentText: string;
   isFinal: boolean;
+  isSubstantive: boolean;
+  isCalibration: boolean;
   providerSpeakerLabel: string;
   possibleOverlap: boolean;
+};
+
+type LiveAnalysisSnapshot = {
+  objective: string;
+  phase: string;
+  transcriptTurnCount: number;
+  transcriptWordCount: number;
+  firstTurnId: string;
+  lastTurnId: string;
+  visualEvidenceCount: number;
+  result: { headline: string; engine: string; warning?: string };
 };
 
 type SpeechEvaluationResponse = {
@@ -83,7 +97,7 @@ test.describe("Production live audio verification", () => {
     page,
     request,
   }) => {
-    test.setTimeout(210_000);
+    test.setTimeout(280_000);
     const scenarioResponse = await request.get(`/api/scenarios/${SCENARIO_ID}`);
     expect(scenarioResponse.ok()).toBeTruthy();
     const scenario = (await scenarioResponse.json()) as {
@@ -131,6 +145,111 @@ test.describe("Production live audio verification", () => {
       0,
     );
 
+    const transcriptViewport = page.getByTestId("transcript-scroll");
+    await expect
+      .poll(() =>
+        transcriptViewport.evaluate(
+          (element) => element.scrollHeight > element.clientHeight,
+        ),
+      )
+      .toBe(true);
+    await transcriptViewport.evaluate((element) =>
+      element.scrollTo({ top: 0 }),
+    );
+    await expect(transcriptViewport).toHaveAttribute("data-following", "false");
+
+    const intentHud = page.getByTestId("live-analysis-hud");
+    await intentHud
+      .getByPlaceholder("What should this analysis clarify?")
+      .fill("Identify the strongest evidence and unresolved climate-map risks");
+    await intentHud
+      .getByRole("button", { name: /Analyze all \d+ turns?/ })
+      .click();
+    await expect(
+      intentHud.getByText(
+        "Intent · Identify the strongest evidence and unresolved climate-map risks",
+      ),
+    ).toBeVisible({ timeout: 45_000 });
+    const firstAnalysesResponse = await request.get(
+      `/api/sessions/${session.id}/analyses`,
+    );
+    const firstAnalyses =
+      (await firstAnalysesResponse.json()) as LiveAnalysisSnapshot[];
+    expect(firstAnalysesResponse.ok()).toBeTruthy();
+    expect(firstAnalyses).toHaveLength(1);
+    expect(firstAnalyses[0]).toMatchObject({
+      objective:
+        "Identify the strongest evidence and unresolved climate-map risks",
+      phase: "evaluate",
+      firstTurnId: expect.any(String),
+      lastTurnId: expect.any(String),
+    });
+    expect(firstAnalyses[0].transcriptTurnCount).toBeGreaterThanOrEqual(5);
+
+    const countAtFirstAnalysis = firstAnalyses[0].transcriptTurnCount;
+    const turnsAfterFirstAnalysis = await waitForTurns(
+      request,
+      session.id,
+      (current) =>
+        current.filter(
+          (turn) => turn.isFinal && turn.isSubstantive && !turn.isCalibration,
+        ).length > countAtFirstAnalysis,
+      45_000,
+    );
+    const laterSubstantiveTurns = turnsAfterFirstAnalysis.filter(
+      (turn) => turn.isFinal && turn.isSubstantive && !turn.isCalibration,
+    );
+    expect(laterSubstantiveTurns.length).toBeGreaterThan(countAtFirstAnalysis);
+    await expect(
+      page.getByRole("button", { name: /new turns? · Jump to latest/ }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: /new turns? · Jump to latest/ })
+      .click();
+    await expect
+      .poll(() =>
+        transcriptViewport.evaluate(
+          (element) =>
+            element.scrollHeight - element.scrollTop - element.clientHeight,
+        ),
+      )
+      .toBeLessThanOrEqual(2);
+
+    await intentHud
+      .getByPlaceholder("What should this analysis clarify?")
+      .fill("Extract owned next steps from the complete discussion so far");
+    await intentHud
+      .getByRole("combobox", { name: "Critique phase" })
+      .selectOption("plan_experiment");
+    await intentHud
+      .getByRole("button", { name: /Analyze all \d+ turns?/ })
+      .click();
+    await expect(
+      intentHud.getByText(
+        "Intent · Extract owned next steps from the complete discussion so far",
+      ),
+    ).toBeVisible({ timeout: 45_000 });
+    const repeatedAnalysesResponse = await request.get(
+      `/api/sessions/${session.id}/analyses`,
+    );
+    const repeatedAnalyses =
+      (await repeatedAnalysesResponse.json()) as LiveAnalysisSnapshot[];
+    expect(repeatedAnalysesResponse.ok()).toBeTruthy();
+    expect(repeatedAnalyses).toHaveLength(2);
+    expect(repeatedAnalyses[0].transcriptTurnCount).toBeGreaterThan(
+      repeatedAnalyses[1].transcriptTurnCount,
+    );
+    expect(repeatedAnalyses[0].firstTurnId).toBe(
+      repeatedAnalyses[1].firstTurnId,
+    );
+    expect(repeatedAnalyses[0].lastTurnId).not.toBe(
+      repeatedAnalyses[1].lastTurnId,
+    );
+    const activeSession = await (
+      await request.get(`/api/sessions/${session.id}`)
+    ).json();
+    expect(activeSession.status).toBe("active");
+
     await stopSession(page, request, session.id);
     const evaluation = await evaluateSpeechSession(
       request,
@@ -174,6 +293,15 @@ test.describe("Production live audio verification", () => {
         finalizedTurns: finalTurns.length,
         speakerLabels: [...speakerLabels],
         reachedFirstPlannedOverlap: true,
+        repeatedWholeTranscriptAnalyses: repeatedAnalyses.map((analysis) => ({
+          objective: analysis.objective,
+          transcriptTurnCount: analysis.transcriptTurnCount,
+          transcriptWordCount: analysis.transcriptWordCount,
+          firstTurnId: analysis.firstTurnId,
+          lastTurnId: analysis.lastTurnId,
+          engine: analysis.result.engine,
+          warning: analysis.result.warning,
+        })),
         lastFinalText: finalTurns.at(-1)?.currentText,
         speechEvaluation: {
           overallWer: evaluation.report.wordError.overall.rate,

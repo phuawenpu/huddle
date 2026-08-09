@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
-import type { CritiqueIntelligenceSnapshot } from "@/lib/types";
+import type {
+  CritiqueIntelligenceSnapshot,
+  LiveAnalysisSnapshot,
+  VisualEvidenceData,
+} from "@/lib/types";
 
 interface TranscriptTurn {
   id: string;
@@ -73,6 +77,12 @@ export default function DisplayPage() {
   const [metrics, setMetrics] = useState<SessionMetrics>({});
   const [intelligence, setIntelligence] =
     useState<CritiqueIntelligenceSnapshot | null>(null);
+  const [liveAnalysis, setLiveAnalysis] = useState<LiveAnalysisSnapshot | null>(
+    null,
+  );
+  const [visualEvidence, setVisualEvidence] = useState<VisualEvidenceData[]>(
+    [],
+  );
   const [prompt, setPrompt] = useState<PromptData | null>(null);
   const [connected, setConnected] = useState(false);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
@@ -101,6 +111,16 @@ export default function DisplayPage() {
           if (data.items) setItems(data.items);
           if (data.metrics) setMetrics(data.metrics);
           if (data.intelligence) setIntelligence(data.intelligence);
+          if (data.liveAnalysis !== undefined) {
+            setLiveAnalysis((current) =>
+              newestAnalysis(current, data.liveAnalysis),
+            );
+          }
+          if (data.visualEvidence) {
+            setVisualEvidence((current) =>
+              mergeVisualEvidence(current, data.visualEvidence),
+            );
+          }
         } catch {}
       });
 
@@ -153,6 +173,23 @@ export default function DisplayPage() {
       es.addEventListener("intelligence", (e) => {
         try {
           setIntelligence(JSON.parse(e.data));
+        } catch {}
+      });
+
+      es.addEventListener("live.analysis", (e) => {
+        try {
+          const analysis = JSON.parse(e.data) as LiveAnalysisSnapshot;
+          setLiveAnalysis((current) => newestAnalysis(current, analysis));
+        } catch {}
+      });
+
+      es.addEventListener("visual.evidence", (e) => {
+        try {
+          const evidence = JSON.parse(e.data) as VisualEvidenceData;
+          setVisualEvidence((current) => [
+            evidence,
+            ...current.filter((item) => item.id !== evidence.id),
+          ]);
         } catch {}
       });
 
@@ -209,7 +246,7 @@ export default function DisplayPage() {
   const isSimulation = session?.runMode !== "live";
 
   return (
-    <main className="min-h-dvh flex flex-col bg-hud-bg text-hud-text safe-top safe-bottom safe-left safe-right overscroll-none">
+    <main className="h-dvh max-h-dvh overflow-hidden flex flex-col bg-hud-bg text-hud-text safe-top safe-bottom safe-left safe-right overscroll-none">
       {/* Header */}
       <header className="px-6 py-4 border-b border-hud-border flex items-center justify-between">
         <div>
@@ -243,7 +280,7 @@ export default function DisplayPage() {
         </div>
       )}
 
-      <div className="flex-1 flex flex-col lg:flex-row gap-4 p-4 sm:p-6 overflow-hidden">
+      <div className="min-h-0 flex-1 flex flex-col lg:flex-row gap-4 p-4 sm:p-6 overflow-hidden">
         {/* Transcript panel (left, ~55%) */}
         <div className="flex-1 flex flex-col min-w-0">
           <h2 className="text-xs font-semibold text-hud-muted uppercase tracking-wider mb-2 px-1">
@@ -305,7 +342,65 @@ export default function DisplayPage() {
         </div>
 
         {/* Right panel: critique intelligence + discussion map + participation */}
-        <div className="lg:w-96 flex flex-col gap-4 min-w-0">
+        <div className="min-h-0 lg:w-96 flex flex-col gap-4 min-w-0 overflow-y-auto overscroll-contain pr-1">
+          {liveAnalysis && (
+            <section className="rounded-xl border border-cyan-300/30 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.12),transparent_55%),rgba(20,20,31,0.96)] p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-cyan-200">
+                    Intent synthesis
+                  </h3>
+                  <p className="mt-1 text-[10px] text-hud-muted">
+                    {liveAnalysis.transcriptTurnCount} turns · through{" "}
+                    {formatSessionTime(liveAnalysis.transcriptThroughMs)}
+                  </p>
+                </div>
+                <span className="rounded-full bg-cyan-400/10 px-2 py-1 text-[10px] text-cyan-200">
+                  {liveAnalysis.phase.replaceAll("_", " ")}
+                </span>
+              </div>
+              <h4 className="mt-3 text-sm font-semibold leading-snug text-white">
+                {liveAnalysis.result.headline}
+              </h4>
+              <p className="mt-1 line-clamp-3 text-[11px] leading-relaxed text-hud-text/70">
+                {liveAnalysis.result.summary}
+              </p>
+              <DisplayPhaseBand
+                allocation={liveAnalysis.result.phaseAllocation}
+              />
+              <div className="mt-3 grid grid-cols-3 gap-1.5 text-center">
+                <DisplayMetric
+                  label="Questions"
+                  value={liveAnalysis.result.openQuestions.length}
+                />
+                <DisplayMetric
+                  label="Decisions"
+                  value={liveAnalysis.result.decisions.length}
+                />
+                <DisplayMetric
+                  label="Actions"
+                  value={liveAnalysis.result.actions.length}
+                />
+              </div>
+              {visualEvidence.length > 0 && (
+                <div className="mt-3 flex items-center gap-2 border-t border-hud-border/60 pt-3">
+                  {visualEvidence.slice(0, 3).map((item) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={item.id}
+                      src={item.imageUrl}
+                      alt={item.analysis.caption}
+                      className="h-9 w-14 rounded border border-fuchsia-300/20 object-cover"
+                    />
+                  ))}
+                  <p className="min-w-0 text-[10px] text-hud-muted">
+                    {visualEvidence.length} visual context{" "}
+                    {visualEvidence.length === 1 ? "frame" : "frames"}
+                  </p>
+                </div>
+              )}
+            </section>
+          )}
           {/* Critique Radar */}
           <div className="bg-hud-surface border border-hud-accent/30 rounded-xl p-4">
             <div className="flex items-start justify-between gap-3 mb-3">
@@ -476,6 +571,67 @@ function RadarCount({
       </div>
     </div>
   );
+}
+
+function DisplayMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg bg-hud-bg/70 px-1.5 py-2">
+      <p className="text-base font-semibold tabular-nums text-cyan-100">
+        {value}
+      </p>
+      <p className="text-[8px] uppercase tracking-wide text-hud-muted">
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function DisplayPhaseBand({
+  allocation,
+}: {
+  allocation: LiveAnalysisSnapshot["result"]["phaseAllocation"];
+}) {
+  const phases = [
+    [allocation.problemAndEvidence, "bg-cyan-400"],
+    [allocation.ideas, "bg-violet-400"],
+    [allocation.evaluation, "bg-orange-400"],
+    [allocation.decisionsAndActions, "bg-emerald-400"],
+  ] as const;
+  return (
+    <div
+      className="mt-3 flex h-2 overflow-hidden rounded-full bg-white/5"
+      aria-label="Discussion phase allocation"
+    >
+      {phases.map(([value, color], index) => (
+        <span key={index} className={color} style={{ width: `${value}%` }} />
+      ))}
+    </div>
+  );
+}
+
+function formatSessionTime(milliseconds: number) {
+  const seconds = Math.max(0, Math.round(milliseconds / 1_000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+function newestAnalysis(
+  current: LiveAnalysisSnapshot | null,
+  incoming: LiveAnalysisSnapshot | null,
+) {
+  if (!incoming) return current;
+  if (!current) return incoming;
+  return Date.parse(incoming.createdAt) >= Date.parse(current.createdAt)
+    ? incoming
+    : current;
+}
+
+function mergeVisualEvidence(
+  current: VisualEvidenceData[],
+  incoming: VisualEvidenceData[],
+) {
+  const byId = new Map(current.map((item) => [item.id, item]));
+  for (const item of incoming) byId.set(item.id, item);
+  return [...byId.values()].sort((a, b) => b.capturedAtMs - a.capturedAtMs);
 }
 
 function categoryColor(cat: string): string {
