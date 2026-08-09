@@ -83,6 +83,10 @@ export default function FacilitatorPage() {
   const pcm16CountRef = useRef(0);
   const pendingPcmRef = useRef<ArrayBuffer[]>([]);
   const recordingEndedHandlerRef = useRef<() => void>(() => {});
+  const transcriptViewportRef = useRef<HTMLDivElement | null>(null);
+  const previousFinalTurnCountRef = useRef(0);
+  const [followTranscript, setFollowTranscript] = useState(true);
+  const [unseenTurnCount, setUnseenTurnCount] = useState(0);
 
   // Audio capture hook
   const {
@@ -521,6 +525,41 @@ export default function FacilitatorPage() {
   };
 
   const finalizedTurns = turns.filter((t) => t.isFinal);
+
+  const scrollTranscriptToLatest = useCallback((behavior: ScrollBehavior) => {
+    const viewport = transcriptViewportRef.current;
+    if (!viewport) return;
+    viewport.scrollTo({ top: viewport.scrollHeight, behavior });
+    setFollowTranscript(true);
+    setUnseenTurnCount(0);
+  }, []);
+
+  const handleTranscriptScroll = useCallback(() => {
+    const viewport = transcriptViewportRef.current;
+    if (!viewport) return;
+    const distanceFromBottom =
+      viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+    const isAtLatest = distanceFromBottom <= 48;
+    setFollowTranscript(isAtLatest);
+    if (isAtLatest) setUnseenTurnCount(0);
+  }, []);
+
+  useEffect(() => {
+    const previousCount = previousFinalTurnCountRef.current;
+    const addedCount = Math.max(0, finalizedTurns.length - previousCount);
+    previousFinalTurnCountRef.current = finalizedTurns.length;
+    if (addedCount === 0) return;
+
+    if (followTranscript) {
+      const frame = requestAnimationFrame(() =>
+        scrollTranscriptToLatest(previousCount === 0 ? "auto" : "smooth"),
+      );
+      return () => cancelAnimationFrame(frame);
+    }
+
+    setUnseenTurnCount((count) => count + addedCount);
+  }, [finalizedTurns.length, followTranscript, scrollTranscriptToLatest]);
+
   const getParticipantName = (label: string) => {
     const mapping = mappings.find((m) => m.speakerLabel === label);
     if (mapping?.participantId) {
@@ -549,9 +588,9 @@ export default function FacilitatorPage() {
   }
 
   return (
-    <main className="min-h-dvh flex flex-col bg-hud-bg text-hud-text safe-top safe-bottom safe-left safe-right">
+    <main className="h-dvh max-h-dvh overflow-hidden flex flex-col bg-hud-bg text-hud-text safe-top safe-bottom safe-left safe-right">
       {/* Header */}
-      <header className="px-4 py-3 border-b border-hud-border flex items-center justify-between">
+      <header className="shrink-0 px-4 py-3 border-b border-hud-border flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold">
             {session?.title || "Loading..."}
@@ -582,7 +621,7 @@ export default function FacilitatorPage() {
       </header>
 
       {/* Controls */}
-      <div className="px-4 py-3 border-b border-hud-border flex gap-3 items-center">
+      <div className="shrink-0 px-4 py-3 border-b border-hud-border flex gap-3 items-center">
         {/* Meter */}
         <div className="flex-1 h-3 bg-hud-surface rounded-full overflow-hidden">
           <div
@@ -630,7 +669,7 @@ export default function FacilitatorPage() {
       )}
 
       {/* Session intent editor */}
-      <details className="px-4 py-2 border-b border-hud-border">
+      <details className="shrink-0 max-h-[40dvh] overflow-y-auto px-4 py-2 border-b border-hud-border">
         <summary className="text-sm text-hud-muted cursor-pointer font-medium">
           Session Intent ▸
         </summary>
@@ -695,82 +734,102 @@ export default function FacilitatorPage() {
       )}
 
       {/* Transcript */}
-      <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2 overscroll-contain">
-        {finalizedTurns.length === 0 && !isActive && (
-          <p className="text-hud-muted text-sm py-8 text-center">
-            {session?.status === "terminated"
-              ? "Session ended. No turns recorded."
-              : "Start capture to begin transcription."}
-          </p>
-        )}
-        {finalizedTurns.length === 0 && isActive && (
-          <p className="text-hud-muted text-sm py-8 text-center">
-            Listening… speak to begin.
-          </p>
-        )}
+      <section className="relative flex-1 min-h-0" aria-label="Live transcript">
+        <div
+          ref={transcriptViewportRef}
+          data-testid="transcript-scroll"
+          data-following={followTranscript ? "true" : "false"}
+          onScroll={handleTranscriptScroll}
+          className="h-full overflow-y-scroll px-4 py-2 space-y-2 overscroll-contain touch-pan-y [scrollbar-gutter:stable]"
+        >
+          {finalizedTurns.length === 0 && !isActive && (
+            <p className="text-hud-muted text-sm py-8 text-center">
+              {session?.status === "terminated"
+                ? "Session ended. No turns recorded."
+                : "Start capture to begin transcription."}
+            </p>
+          )}
+          {finalizedTurns.length === 0 && isActive && (
+            <p className="text-hud-muted text-sm py-8 text-center">
+              Listening… speak to begin.
+            </p>
+          )}
 
-        {finalizedTurns.map((turn) => (
-          <div
-            key={turn.id}
-            className={`p-3 rounded-lg border ${
-              turn.isSubstantive
-                ? "border-hud-border bg-hud-surface"
-                : "border-hud-border/50 bg-hud-surface/50"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-medium px-2 py-0.5 rounded bg-hud-accent/20 text-hud-accent">
-                {turn.isUnknownSpeaker
-                  ? "Unassigned"
-                  : getParticipantName(turn.providerSpeakerLabel)}
-              </span>
-              <span className="text-xs text-hud-muted">
-                {turn.isSubstantive ? "substantive" : "backchannel"}
-                {turn.isCalibration && " · calibration"}
-                {turn.possibleOverlap && " · overlap"}
-                {turn.isManuallyCorrected && " · corrected"}
-                {turn.wasSpeakerRevised && " · revised"}
-              </span>
-            </div>
-            <p className="text-sm">{turn.currentText || turn.originalText}</p>
-            {turn.analysis?.category && (
-              <span className="inline-block mt-1 text-xs px-1.5 py-0.5 rounded bg-hud-accent/10 text-hud-accent/70">
-                {turn.analysis.category}
-              </span>
-            )}
+          {finalizedTurns.map((turn) => (
+            <div
+              key={turn.id}
+              className={`p-3 rounded-lg border ${
+                turn.isSubstantive
+                  ? "border-hud-border bg-hud-surface"
+                  : "border-hud-border/50 bg-hud-surface/50"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-medium px-2 py-0.5 rounded bg-hud-accent/20 text-hud-accent">
+                  {turn.isUnknownSpeaker
+                    ? "Unassigned"
+                    : getParticipantName(turn.providerSpeakerLabel)}
+                </span>
+                <span className="text-xs text-hud-muted">
+                  {turn.isSubstantive ? "substantive" : "backchannel"}
+                  {turn.isCalibration && " · calibration"}
+                  {turn.possibleOverlap && " · overlap"}
+                  {turn.isManuallyCorrected && " · corrected"}
+                  {turn.wasSpeakerRevised && " · revised"}
+                </span>
+              </div>
+              <p className="text-sm">{turn.currentText || turn.originalText}</p>
+              {turn.analysis?.category && (
+                <span className="inline-block mt-1 text-xs px-1.5 py-0.5 rounded bg-hud-accent/10 text-hud-accent/70">
+                  {turn.analysis.category}
+                </span>
+              )}
 
-            {/* Turn actions */}
-            <details className="mt-1">
-              <summary className="text-xs text-hud-muted cursor-pointer">
-                Actions ▸
-              </summary>
-              <div className="mt-1 flex flex-wrap gap-1">
-                {["A", "B", "C", "D", "E", "F"].map((label) => (
+              {/* Turn actions */}
+              <details className="mt-1">
+                <summary className="text-xs text-hud-muted cursor-pointer">
+                  Actions ▸
+                </summary>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {["A", "B", "C", "D", "E", "F"].map((label) => (
+                    <button
+                      key={label}
+                      onClick={() =>
+                        mapSpeaker(turn.providerSpeakerLabel, label)
+                      }
+                      className="px-2 py-1 text-xs rounded bg-hud-surface border border-hud-border text-hud-text"
+                    >
+                      → {label}
+                    </button>
+                  ))}
                   <button
-                    key={label}
-                    onClick={() => mapSpeaker(turn.providerSpeakerLabel, label)}
+                    onClick={() => {
+                      const newText = prompt("Correct text:", turn.currentText);
+                      if (newText) correctTurn(turn.id, newText);
+                    }}
                     className="px-2 py-1 text-xs rounded bg-hud-surface border border-hud-border text-hud-text"
                   >
-                    → {label}
+                    ✏ Edit
                   </button>
-                ))}
-                <button
-                  onClick={() => {
-                    const newText = prompt("Correct text:", turn.currentText);
-                    if (newText) correctTurn(turn.id, newText);
-                  }}
-                  className="px-2 py-1 text-xs rounded bg-hud-surface border border-hud-border text-hud-text"
-                >
-                  ✏ Edit
-                </button>
-              </div>
-            </details>
-          </div>
-        ))}
-      </div>
+                </div>
+              </details>
+            </div>
+          ))}
+        </div>
+        {!followTranscript && unseenTurnCount > 0 && (
+          <button
+            type="button"
+            onClick={() => scrollTranscriptToLatest("smooth")}
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 min-h-11 rounded-full border border-hud-accent/50 bg-hud-accent px-4 py-2 text-sm font-semibold text-white shadow-xl shadow-black/40 touch-manipulation"
+          >
+            {unseenTurnCount} new {unseenTurnCount === 1 ? "turn" : "turns"} ·
+            Jump to latest
+          </button>
+        )}
+      </section>
 
       {/* Navigation */}
-      <nav className="px-4 py-3 border-t border-hud-border flex gap-3">
+      <nav className="shrink-0 px-4 py-3 border-t border-hud-border flex gap-3">
         <a
           href={`/display/${sessionId}`}
           target="_blank"

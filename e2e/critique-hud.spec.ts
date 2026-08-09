@@ -7,6 +7,43 @@ import {
 
 const SESSION_TIMEOUT = 45000;
 
+async function createTranscriptNavigationFixture(
+  request: APIRequestContext,
+  turnCount = 32,
+) {
+  const created = await request.post("/api/sessions", {
+    data: {
+      title: "Long transcript navigation fixture",
+      objective: "Verify every live transcript turn remains reachable",
+      phase: "evaluate",
+      criteria: ["Transcript access"],
+      speakerCount: 3,
+      runMode: "live",
+    },
+  });
+  const session = await created.json();
+  expect(created.ok(), JSON.stringify(session)).toBeTruthy();
+
+  for (let index = 0; index < turnCount; index++) {
+    const ingested = await request.post(`/api/sessions/${session.id}/turns`, {
+      data: {
+        providerSessionId: `navigation-${session.id}`,
+        providerTurnOrder: index,
+        segmentIndex: 0,
+        providerSpeakerLabel: String.fromCharCode(65 + (index % 3)),
+        startMs: index * 700,
+        endMs: index * 700 + 500,
+        receivedAtMs: index * 700 + 500,
+        currentText: `Transcript marker ${String(index + 1).padStart(2, "0")}`,
+        isFinal: true,
+      },
+    });
+    expect(ingested.ok()).toBeTruthy();
+  }
+
+  return session as { id: string };
+}
+
 async function createRenderedFixture(request: APIRequestContext) {
   const speakers = [
     {
@@ -240,6 +277,85 @@ test.describe("Critique HUD — E2E", () => {
       // Meter bar should be present
       expect(true).toBeTruthy();
     }
+  });
+
+  test("long live transcript scrolls both ways and only auto-follows at the latest turn", async ({
+    page,
+    request,
+  }) => {
+    test.skip(
+      test.info().project.name !== "chromium-desktop",
+      "Transcript scroll mechanics are exercised once in desktop Chromium.",
+    );
+    await page.setViewportSize({ width: 1180, height: 720 });
+    const session = await createTranscriptNavigationFixture(request);
+
+    await page.goto(`/facilitator/${session.id}`);
+    const viewport = page.getByTestId("transcript-scroll");
+    await expect(viewport).toBeVisible();
+    await expect
+      .poll(() =>
+        viewport.evaluate(
+          (element) => element.scrollHeight > element.clientHeight,
+        ),
+      )
+      .toBe(true);
+    await expect
+      .poll(() =>
+        viewport.evaluate(
+          (element) =>
+            element.scrollHeight - element.scrollTop - element.clientHeight,
+        ),
+      )
+      .toBeLessThanOrEqual(2);
+
+    await viewport.evaluate((element) => element.scrollTo({ top: 0 }));
+    await expect(viewport).toHaveAttribute("data-following", "false");
+    await expect(page.getByText("Transcript marker 01")).toBeInViewport();
+    await expect(page.getByText("Transcript marker 32")).not.toBeInViewport();
+
+    const newest = await request.post(`/api/sessions/${session.id}/turns`, {
+      data: {
+        providerSessionId: `navigation-${session.id}`,
+        providerTurnOrder: 32,
+        segmentIndex: 0,
+        providerSpeakerLabel: "C",
+        startMs: 22_400,
+        endMs: 22_900,
+        receivedAtMs: 22_900,
+        currentText: "Transcript marker 33",
+        isFinal: true,
+      },
+    });
+    expect(newest.ok()).toBeTruthy();
+
+    const jumpButton = page.getByRole("button", {
+      name: /1 new turn · Jump to latest/,
+    });
+    await expect(jumpButton).toBeVisible();
+    expect(
+      await viewport.evaluate((element) => element.scrollTop),
+    ).toBeLessThan(50);
+
+    await jumpButton.click();
+    await expect(page.getByText("Transcript marker 33")).toBeInViewport();
+    await expect
+      .poll(() =>
+        viewport.evaluate(
+          (element) =>
+            element.scrollHeight - element.scrollTop - element.clientHeight,
+        ),
+      )
+      .toBeLessThanOrEqual(2);
+
+    await viewport.evaluate((element) => element.scrollBy({ top: -300 }));
+    expect(
+      await viewport.evaluate((element) => element.scrollTop),
+    ).toBeGreaterThan(0);
+    await viewport.evaluate((element) => element.scrollBy({ top: 180 }));
+    expect(
+      await viewport.evaluate((element) => element.scrollTop),
+    ).toBeGreaterThan(0);
   });
 
   test("display page connects via SSE and shows HUD layout", async ({
