@@ -226,6 +226,15 @@ Key runtime guarantees:
 
 ### Build Stage Progress
 
+#### Active live-session upgrade — 2026-08-09T15:43:18Z
+
+- Replaced the earlier live-session plan with the timestamped portrait-first
+  speaker-waveform goal and began implementation against the current single-cyan,
+  40-pixel audio visualizer.
+- Next verification slice: accessible stable speaker colors, substantial live and
+  recent-history waveform presentation, portrait layout, and component/unit tests
+  before rolling-analysis UI integration.
+
 | Stage                         | Status         | Summary                                                                                                                                                                                                                                   |
 | ----------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **1 — Speech proof**          | ✅ Implemented | AudioWorklet PCM16 resampler, `useAudioCapture` hook (getUserMedia + analyser meter + settings readback), ASR WebSocket client (AssemblyAI v3 protocol), wake lock, sendBeacon termination                                                |
@@ -250,7 +259,7 @@ The source studies, current implementation, and adjacent 2023–2026 systems hav
 - [Product and investor assessment](docs/research/06-product-and-investor-assessment.md)
 - [Realistic multi-party conversation simulation](docs/research/07-realistic-conversation-simulation.md)
 - [Meeting-dynamics visualization research](docs/research/08-meeting-dynamics-visualization.md)
-- [Timestamped live-session realtime analysis goal](docs/goals/2026-08-09T15-09-39Z-live-session-realtime-meeting-analysis.md)
+- [Timestamped portrait live-session and speaker-waveform goal](docs/goals/2026-08-09T15-25-58Z-portrait-live-session-speaker-waveforms.md)
 - [System brief generator](docs/research/generate_critique_intelligence_system.py)
 - [Business one-pager generator](docs/research/generate_business_feasibility_one_pager.py)
 - [Archived conceptual diagram set](docs/research/archive/diagrams-2026-08-07/)

@@ -29,10 +29,10 @@ This folder separates four questions that should not be collapsed:
 ## Current implementation goal
 
 The timestamped
-[`live-session realtime meeting-analysis goal`](../goals/2026-08-09T15-09-39Z-live-session-realtime-meeting-analysis.md)
+[`portrait live-session and speaker-waveform goal`](../goals/2026-08-09T15-25-58Z-portrait-live-session-speaker-waveforms.md)
 translates the meeting-dynamics research and the current UI/model-flow audit into
-a staged implementation plan with latency, grounding, safety, and evaluation
-criteria.
+a staged implementation plan with prominent speaker-colored audio, mobile
+attention hierarchy, latency, grounding, safety, and evaluation criteria.
 
 ## Current synthesized brief
 
