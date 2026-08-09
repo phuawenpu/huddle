@@ -10,7 +10,6 @@ import { analyzeTurnBatch, analyzeWindow, generatePrompt } from "./analysis";
 import { publish } from "./pubsub";
 import {
   turnUpdatedPatch,
-  mapPatch,
   promptShowPatch,
   metricsPatch,
   intelligencePatch,
@@ -186,17 +185,13 @@ async function flushBatch(sessionId: string): Promise<void> {
               sessionId,
               category: candidate.category,
               text: candidate.text,
-              status: "open",
+              // AI-derived map items remain private drafts. Only an explicit
+              // facilitator publication is sent to the shared display.
+              status: "draft",
               turnIds,
             },
           });
-          publish(
-            sessionId,
-            mapPatch({
-              ...item,
-              turnIds: candidate.turnIds,
-            }),
-          );
+          void item;
         }
       }
 

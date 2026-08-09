@@ -11,7 +11,6 @@ import {
 import { useWakeLock } from "@/lib/client/wake-lock";
 import { AudioVisualizer } from "@/lib/client/audio-visualizer";
 import type {
-  CritiqueIntelligenceSnapshot,
   LiveAnalysisSnapshot,
   VisualEvidenceData,
 } from "@/lib/types";
@@ -80,8 +79,6 @@ export default function FacilitatorPage() {
   const [livePartial, setLivePartial] = useState<string>("");
   const [starting, setStarting] = useState(false);
   const [pcmReady, setPcmReady] = useState(false);
-  const [intelligence, setIntelligence] =
-    useState<CritiqueIntelligenceSnapshot | null>(null);
   const [liveAnalysis, setLiveAnalysis] = useState<LiveAnalysisSnapshot | null>(
     null,
   );
@@ -89,6 +86,8 @@ export default function FacilitatorPage() {
     [],
   );
   const [analyzing, setAnalyzing] = useState(false);
+  const [busyNodeId, setBusyNodeId] = useState<string | null>(null);
+  const [publishedNodeIds, setPublishedNodeIds] = useState<string[]>([]);
 
   const [intentObjective, setIntentObjective] = useState("");
   const [intentPhase, setIntentPhase] = useState("");
@@ -188,7 +187,9 @@ export default function FacilitatorPage() {
 
   // SSE event listener for live patches
   useEffect(() => {
-    const es = new EventSource(`/api/sessions/${sessionId}/events`);
+    const es = new EventSource(
+      `/api/sessions/${sessionId}/events?audience=facilitator`,
+    );
     let lastId = "";
 
     es.addEventListener("snapshot", (e) => {
@@ -217,7 +218,6 @@ export default function FacilitatorPage() {
         }
         if (data.speakerMappings) setMappings(data.speakerMappings);
         if (data.participants) setParticipants(data.participants);
-        if (data.intelligence) setIntelligence(data.intelligence);
         if (data.liveAnalysis !== undefined) {
           setLiveAnalysis((current) =>
             newestAnalysis(current, data.liveAnalysis),
@@ -271,12 +271,6 @@ export default function FacilitatorPage() {
         if (data.streamingMinutesUsed !== undefined) {
           setStreamingMins(data.streamingMinutesUsed);
         }
-      } catch {}
-    });
-
-    es.addEventListener("intelligence", (e) => {
-      try {
-        setIntelligence(JSON.parse(e.data));
       } catch {}
     });
 
@@ -564,6 +558,77 @@ export default function FacilitatorPage() {
     }
   };
 
+  const handleEditMeetingNode = async (
+    nodeId: string,
+    edit: {
+      title: string;
+      summary: string;
+      status:
+        | "open"
+        | "exploring"
+        | "proposed"
+        | "accepted"
+        | "rejected"
+        | "committed"
+        | "done";
+      owner?: string;
+    },
+  ) => {
+    if (!liveAnalysis || busyNodeId) return;
+    setBusyNodeId(nodeId);
+    setError("");
+    try {
+      const response = await fetch(
+        `/api/sessions/${sessionId}/analyses/${liveAnalysis.id}/nodes/${encodeURIComponent(nodeId)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(edit),
+        },
+      );
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to save the map revision");
+      }
+      setLiveAnalysis(result);
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Failed to save the map revision",
+      );
+    } finally {
+      setBusyNodeId(null);
+    }
+  };
+
+  const handlePublishMeetingNode = async (nodeId: string, text: string) => {
+    if (!liveAnalysis || busyNodeId) return;
+    setBusyNodeId(nodeId);
+    setError("");
+    try {
+      const response = await fetch(
+        `/api/sessions/${sessionId}/analyses/${liveAnalysis.id}/nodes/${encodeURIComponent(nodeId)}/publish`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        },
+      );
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to publish the map card");
+      }
+      setPublishedNodeIds((current) =>
+        current.includes(nodeId) ? current : [...current, nodeId],
+      );
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Failed to publish the map card",
+      );
+    } finally {
+      setBusyNodeId(null);
+    }
+  };
+
   // Map speaker label
   const mapSpeaker = async (label: string, participantId: string) => {
     try {
@@ -758,17 +823,20 @@ export default function FacilitatorPage() {
 
       <LiveAnalysisHud
         analysis={liveAnalysis}
-        intelligence={intelligence}
         turns={finalizedTurns}
         objective={intentObjective}
         phase={intentPhase}
         criteriaText={intentCriteria}
         analyzing={analyzing}
         ready={Boolean(session)}
+        busyNodeId={busyNodeId}
+        publishedNodeIds={publishedNodeIds}
         onObjectiveChange={setIntentObjective}
         onPhaseChange={setIntentPhase}
         onCriteriaChange={setIntentCriteria}
         onAnalyze={handleRunAnalysis}
+        onEditNode={handleEditMeetingNode}
+        onPublishNode={handlePublishMeetingNode}
       />
 
       {/* Error display */}

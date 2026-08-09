@@ -4,7 +4,6 @@ import { createSSEResponse, snapshotPatch } from "@/lib/sse";
 import { subscribe } from "@/lib/pubsub";
 import {
   buildCritiqueIntelligence,
-  isSourceLinkedDiscussionItem,
   normalizeCriteria,
   normalizeTurnAnalysis,
 } from "@/lib/critique-intelligence";
@@ -19,6 +18,8 @@ export async function GET(
   context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
+  const facilitatorView =
+    request.nextUrl.searchParams.get("audience") === "facilitator";
 
   let sequenceId = 0;
 
@@ -62,16 +63,26 @@ export async function GET(
             participants: session.participants,
             speakerMappings: session.speakerMappings,
             turns: serializedTurns,
-            items: serializedItems.filter((item) =>
-              isSourceLinkedDiscussionItem(item, serializedTurns),
-            ),
+            items: facilitatorView
+              ? serializedItems
+              : serializedItems.filter(
+                  (item) =>
+                    item.status === "published" &&
+                    item.turnIds.every((turnId: string) =>
+                      serializedTurns.some((turn) => turn.id === turnId),
+                    ),
+                ),
             intent: session.intentRevisions[0] || null,
-            liveAnalysis: session.liveAnalyses[0]
+            liveAnalysis: facilitatorView && session.liveAnalyses[0]
               ? serializeLiveAnalysis(session.liveAnalyses[0])
               : null,
-            visualEvidence: session.visualEvidence.map(serializeVisualEvidence),
+            visualEvidence: facilitatorView
+              ? session.visualEvidence.map(serializeVisualEvidence)
+              : [],
             metrics: calculateMetrics(serializedTurns),
-            intelligence: buildCritiqueIntelligence(serializedTurns, criteria),
+            intelligence: facilitatorView
+              ? buildCritiqueIntelligence(serializedTurns, criteria)
+              : null,
           }),
           String(++sequenceId),
         );
@@ -81,7 +92,24 @@ export async function GET(
     })();
 
     // Subscribe to live patches via pub/sub
-    const unsub = subscribe(id, { send, close });
+    const unsub = subscribe(id, {
+      send: (patch, eventId) => {
+        if (
+          !facilitatorView &&
+          [
+            "intelligence",
+            "live.analysis",
+            "visual.evidence",
+            "prompt.show",
+            "prompt.clear",
+          ].includes(patch.type)
+        ) {
+          return;
+        }
+        send(patch, eventId);
+      },
+      close,
+    });
 
     return () => {
       unsub();
