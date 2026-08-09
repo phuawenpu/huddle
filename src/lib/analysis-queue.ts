@@ -14,6 +14,7 @@ import {
   metricsPatch,
   intelligencePatch,
   promptClearPatch,
+  windowAnalysisPatch,
 } from "./sse";
 import { checkPromptGuard } from "./guard";
 import { calculateMetrics } from "./metrics";
@@ -24,8 +25,8 @@ import {
 } from "./critique-intelligence";
 
 const BATCH_WINDOW_MS = 1500;
-const WINDOW_INTERVAL_MS = 20000;
-const WINDOW_TURN_THRESHOLD = 5;
+const WINDOW_INTERVAL_MS = 10000;
+const WINDOW_TURN_THRESHOLD = 3;
 const MAX_CONCURRENCY = 2;
 
 interface PendingTurn {
@@ -48,6 +49,7 @@ const sessionQueues = new Map<
     activeAnalyses: number;
     lastPromptId: string | null;
     promptTimer: ReturnType<typeof setTimeout> | null;
+    windowAnalysisInFlight: boolean;
   }
 >();
 
@@ -61,6 +63,7 @@ function getSessionQueue(sessionId: string) {
       activeAnalyses: 0,
       lastPromptId: null,
       promptTimer: null,
+      windowAnalysisInFlight: false,
     });
   }
   return sessionQueues.get(sessionId)!;
@@ -247,7 +250,8 @@ async function flushBatch(sessionId: string): Promise<void> {
 
 async function runWindowAnalysis(sessionId: string): Promise<void> {
   const q = sessionQueues.get(sessionId);
-  if (!q) return;
+  if (!q || q.windowAnalysisInFlight) return;
+  q.windowAnalysisInFlight = true;
 
   try {
     const session = await prisma.session.findUnique({
@@ -278,8 +282,9 @@ async function runWindowAnalysis(sessionId: string): Promise<void> {
       runMode: session.runMode,
     };
 
+    const chronologicalTurns = [...recentTurns].reverse();
     const windowAnalysis = await analyzeWindow(
-      recentTurns.map((t) => ({
+      chronologicalTurns.map((t) => ({
         id: t.id,
         speakerLabel: t.providerSpeakerLabel,
         text: t.currentText,
@@ -288,6 +293,18 @@ async function runWindowAnalysis(sessionId: string): Promise<void> {
       })),
       [],
       config,
+    );
+
+    const throughTurn = chronologicalTurns.at(-1)!;
+    publish(
+      sessionId,
+      windowAnalysisPatch({
+        ...windowAnalysis,
+        throughTurnId: throughTurn.id,
+        throughMs: throughTurn.endMs,
+        analyzedTurnCount: chronologicalTurns.length,
+        generatedAt: new Date().toISOString(),
+      }),
     );
 
     // Generate facilitation prompt
@@ -329,6 +346,7 @@ async function runWindowAnalysis(sessionId: string): Promise<void> {
             id: promptRecord.id,
             text: prompt.text,
             confidence: prompt.confidence,
+            supportingTurnIds: prompt.supportingTurnIds,
           }),
         );
 
@@ -362,6 +380,8 @@ async function runWindowAnalysis(sessionId: string): Promise<void> {
     q.analyzedSinceWindow = 0;
   } catch (err) {
     console.error("Window analysis failed:", err);
+  } finally {
+    q.windowAnalysisInFlight = false;
   }
 }
 

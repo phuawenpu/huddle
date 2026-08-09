@@ -276,7 +276,7 @@ export async function analyzeWindow(
               role: "system",
               content: `Analyze this window of a Design Thinking critique discussion.
 Session: ${config.sessionObjective} (${config.sessionPhase})
-Recent turns: ${JSON.stringify(recentTurns.map((t) => ({ speaker: t.speakerLabel, text: t.text, category: t.category })))}
+Recent turns: ${JSON.stringify(recentTurns.map((t) => ({ id: t.id, speaker: t.speakerLabel, text: t.text, category: t.category })))}
 
 Return JSON with:
 - theme: overarching theme of this window
@@ -287,7 +287,8 @@ Return JSON with:
 - decisions: array of decisions made
 - actions: array of action items
 - agreementState: "consensus" | "majority" | "divided" | "emerging"
-- minorityPosition: a minority view that should be preserved, or null`,
+- minorityPosition: a minority view that should be preserved, or null
+- supportingTurnIds: up to 3 supplied turn IDs that most directly support the current state/open question. Never invent an ID.`,
             },
           ],
           response_format: { type: "json_object" },
@@ -373,6 +374,11 @@ function normalizeWindowAnalysis(
       typeof raw.minorityPosition === "string"
         ? boundedString(raw.minorityPosition, "")
         : undefined,
+    supportingTurnIds: normalizeSupportingTurnIds(
+      raw.supportingTurnIds,
+      turns,
+      fallback.supportingTurnIds,
+    ),
   };
 }
 
@@ -404,6 +410,7 @@ function stubWindowAnalysis(
     decisions: [],
     actions: [],
     agreementState: "emerging",
+    supportingTurnIds: turns.slice(-3).map((turn) => turn.id),
   };
 }
 
@@ -483,10 +490,27 @@ export function generatePrompt(
   if (windowAnalysis.openQuestions.length > 0) {
     return {
       text: windowAnalysis.openQuestions[0],
-      supportingTurnIds: [],
+      supportingTurnIds: windowAnalysis.supportingTurnIds,
       confidence: 0.8,
       category: "questions",
     };
   }
   return null;
+}
+
+function normalizeSupportingTurnIds(
+  value: unknown,
+  turns: TurnContext[],
+  fallback: string[],
+) {
+  if (!Array.isArray(value)) return fallback;
+  const suppliedIds = new Set(turns.map((turn) => turn.id));
+  return [
+    ...new Set(
+      value.filter(
+        (candidate): candidate is string =>
+          typeof candidate === "string" && suppliedIds.has(candidate),
+      ),
+    ),
+  ].slice(0, 3);
 }

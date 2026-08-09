@@ -9,10 +9,13 @@ import {
   type IngestTurnData,
 } from "@/lib/client/asr-client";
 import { useWakeLock } from "@/lib/client/wake-lock";
-import { AudioVisualizer } from "@/lib/client/audio-visualizer";
+import { SpeakerWaveformStage } from "@/lib/client/speaker-waveform-stage";
+import { speakerVisualStyle } from "@/lib/client/speaker-visuals";
 import type {
+  CritiqueIntelligenceSnapshot,
   LiveAnalysisSnapshot,
   VisualEvidenceData,
+  WindowAnalysisSnapshot,
 } from "@/lib/types";
 import { LiveAnalysisHud } from "./live-analysis-hud";
 import { VisualEvidenceCapture } from "./visual-evidence-capture";
@@ -63,6 +66,13 @@ interface Participant {
   displayName: string;
 }
 
+interface LivePrompt {
+  id: string;
+  text: string;
+  confidence: number;
+  supportingTurnIds: string[];
+}
+
 export default function FacilitatorPage() {
   const params = useParams<{ sessionId: string }>();
   const router = useRouter();
@@ -88,6 +98,11 @@ export default function FacilitatorPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [busyNodeId, setBusyNodeId] = useState<string | null>(null);
   const [publishedNodeIds, setPublishedNodeIds] = useState<string[]>([]);
+  const [intelligence, setIntelligence] =
+    useState<CritiqueIntelligenceSnapshot | null>(null);
+  const [windowAnalysis, setWindowAnalysis] =
+    useState<WindowAnalysisSnapshot | null>(null);
+  const [livePrompt, setLivePrompt] = useState<LivePrompt | null>(null);
 
   const [intentObjective, setIntentObjective] = useState("");
   const [intentPhase, setIntentPhase] = useState("");
@@ -228,6 +243,9 @@ export default function FacilitatorPage() {
             mergeVisualEvidence(current, data.visualEvidence),
           );
         }
+        if (data.intelligence !== undefined) {
+          setIntelligence(data.intelligence);
+        }
       } catch {}
     });
 
@@ -273,6 +291,26 @@ export default function FacilitatorPage() {
         }
       } catch {}
     });
+
+    es.addEventListener("intelligence", (e) => {
+      try {
+        setIntelligence(JSON.parse(e.data));
+      } catch {}
+    });
+
+    es.addEventListener("window.analysis", (e) => {
+      try {
+        setWindowAnalysis(JSON.parse(e.data) as WindowAnalysisSnapshot);
+      } catch {}
+    });
+
+    es.addEventListener("prompt.show", (e) => {
+      try {
+        setLivePrompt(JSON.parse(e.data) as LivePrompt);
+      } catch {}
+    });
+
+    es.addEventListener("prompt.clear", () => setLivePrompt(null));
 
     es.addEventListener("live.analysis", (e) => {
       try {
@@ -593,7 +631,9 @@ export default function FacilitatorPage() {
       setLiveAnalysis(result);
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : "Failed to save the map revision",
+        cause instanceof Error
+          ? cause.message
+          : "Failed to save the map revision",
       );
     } finally {
       setBusyNodeId(null);
@@ -622,7 +662,9 @@ export default function FacilitatorPage() {
       );
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : "Failed to publish the map card",
+        cause instanceof Error
+          ? cause.message
+          : "Failed to publish the map card",
       );
     } finally {
       setBusyNodeId(null);
@@ -669,6 +711,13 @@ export default function FacilitatorPage() {
   };
 
   const finalizedTurns = turns.filter((t) => t.isFinal);
+  const speakerLabels = [
+    ...new Set(
+      turns
+        .map((turn) => turn.providerSpeakerLabel)
+        .filter((label) => Boolean(label)),
+    ),
+  ];
 
   const scrollTranscriptToLatest = useCallback((behavior: ScrollBehavior) => {
     const viewport = transcriptViewportRef.current;
@@ -765,24 +814,26 @@ export default function FacilitatorPage() {
       </header>
 
       {/* Controls */}
-      <div className="shrink-0 flex items-center gap-3 border-b border-hud-border bg-hud-surface/50 px-4 py-2">
-        <div className="relative h-10 min-w-0 flex-1 overflow-hidden rounded-lg border border-cyan-300/10 bg-black/30">
-          <AudioVisualizer
-            analyser={analyserNode}
-            bars={56}
-            height={40}
-            active={isActive}
-            color="#22d3ee"
-            className="opacity-80"
-          />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-white/5">
-            <div
-              className="h-full bg-cyan-300 transition-[width] duration-100"
-              style={{ width: `${Math.min(100, meter * 100)}%` }}
-            />
-          </div>
+      <div className="shrink-0 flex items-center justify-between gap-3 border-b border-hud-border bg-hud-surface/50 px-4 py-2">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-hud-muted">
+            Capture
+          </p>
+          <p className="truncate text-xs text-hud-text/80">
+            {isActive
+              ? activeSpeaker
+                ? `${
+                    speakerVisualStyle(
+                      activeSpeaker,
+                      turns.map((turn) => turn.providerSpeakerLabel),
+                    ).marker
+                  } ${getParticipantName(activeSpeaker)} speaking`
+                : "Listening · speaker pending"
+              : session?.runMode === "live"
+                ? "Microphone ready"
+                : "Recorded demo ready"}
+          </p>
         </div>
-
         {isActive ? (
           <button
             onClick={handleStop}
@@ -811,18 +862,24 @@ export default function FacilitatorPage() {
         )}
       </div>
 
-      {/* Live partial */}
-      {isActive && livePartial && (
-        <div className="px-4 py-2 bg-hud-surface border-b border-hud-border">
-          <span className="text-xs text-hud-muted">
-            {activeSpeaker ? getParticipantName(activeSpeaker) : "Speaker"}
-          </span>
-          <p className="text-sm italic text-hud-muted">{livePartial}</p>
-        </div>
-      )}
+      <SpeakerWaveformStage
+        analyser={analyserNode}
+        meter={meter}
+        active={isActive}
+        activeSpeakerLabel={activeSpeaker}
+        activeSpeakerName={
+          activeSpeaker ? getParticipantName(activeSpeaker) : "Speaker pending"
+        }
+        liveText={livePartial}
+        turns={finalizedTurns}
+        getSpeakerName={getParticipantName}
+      />
 
       <LiveAnalysisHud
         analysis={liveAnalysis}
+        intelligence={intelligence}
+        windowAnalysis={windowAnalysis}
+        livePrompt={livePrompt}
         turns={finalizedTurns}
         objective={intentObjective}
         phase={intentPhase}
@@ -882,71 +939,85 @@ export default function FacilitatorPage() {
                 </p>
               )}
 
-              {finalizedTurns.map((turn) => (
-                <div
-                  key={turn.id}
-                  className={`p-3 rounded-lg border ${
-                    turn.isSubstantive
-                      ? "border-hud-border bg-hud-surface"
-                      : "border-hud-border/50 bg-hud-surface/50"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium px-2 py-0.5 rounded bg-hud-accent/20 text-hud-accent">
-                      {turn.isUnknownSpeaker
-                        ? "Unassigned"
-                        : getParticipantName(turn.providerSpeakerLabel)}
-                    </span>
-                    <span className="text-xs text-hud-muted">
-                      {turn.isSubstantive ? "substantive" : "backchannel"}
-                      {turn.isCalibration && " · calibration"}
-                      {turn.possibleOverlap && " · overlap"}
-                      {turn.isManuallyCorrected && " · corrected"}
-                      {turn.wasSpeakerRevised && " · revised"}
-                    </span>
-                  </div>
-                  <p className="text-sm">
-                    {turn.currentText || turn.originalText}
-                  </p>
-                  {turn.analysis?.category && (
-                    <span className="inline-block mt-1 text-xs px-1.5 py-0.5 rounded bg-hud-accent/10 text-hud-accent/70">
-                      {turn.analysis.category}
-                    </span>
-                  )}
+              {finalizedTurns.map((turn) => {
+                const speakerStyle = speakerVisualStyle(
+                  turn.isUnknownSpeaker ? null : turn.providerSpeakerLabel,
+                  speakerLabels,
+                );
+                return (
+                  <div
+                    key={turn.id}
+                    className={`rounded-lg border border-l-4 p-3 ${
+                      turn.isSubstantive
+                        ? "border-hud-border bg-hud-surface"
+                        : "border-hud-border/50 bg-hud-surface/50"
+                    }`}
+                    style={{ borderLeftColor: speakerStyle.color }}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span
+                        className="rounded px-2 py-0.5 text-xs font-medium"
+                        style={{
+                          background: speakerStyle.softColor,
+                          color: speakerStyle.color,
+                        }}
+                      >
+                        {speakerStyle.marker}{" "}
+                        {turn.isUnknownSpeaker
+                          ? "Unassigned"
+                          : getParticipantName(turn.providerSpeakerLabel)}
+                      </span>
+                      <span className="text-xs text-hud-muted">
+                        {turn.isSubstantive ? "substantive" : "backchannel"}
+                        {turn.isCalibration && " · calibration"}
+                        {turn.possibleOverlap && " · overlap"}
+                        {turn.isManuallyCorrected && " · corrected"}
+                        {turn.wasSpeakerRevised && " · revised"}
+                      </span>
+                    </div>
+                    <p className="text-sm">
+                      {turn.currentText || turn.originalText}
+                    </p>
+                    {turn.analysis?.category && (
+                      <span className="inline-block mt-1 text-xs px-1.5 py-0.5 rounded bg-hud-accent/10 text-hud-accent/70">
+                        {turn.analysis.category}
+                      </span>
+                    )}
 
-                  {/* Turn actions */}
-                  <details className="mt-1">
-                    <summary className="text-xs text-hud-muted cursor-pointer">
-                      Actions ▸
-                    </summary>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {["A", "B", "C", "D", "E", "F"].map((label) => (
+                    {/* Turn actions */}
+                    <details className="mt-1">
+                      <summary className="text-xs text-hud-muted cursor-pointer">
+                        Actions ▸
+                      </summary>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {["A", "B", "C", "D", "E", "F"].map((label) => (
+                          <button
+                            key={label}
+                            onClick={() =>
+                              mapSpeaker(turn.providerSpeakerLabel, label)
+                            }
+                            className="px-2 py-1 text-xs rounded bg-hud-surface border border-hud-border text-hud-text"
+                          >
+                            → {label}
+                          </button>
+                        ))}
                         <button
-                          key={label}
-                          onClick={() =>
-                            mapSpeaker(turn.providerSpeakerLabel, label)
-                          }
+                          onClick={() => {
+                            const newText = prompt(
+                              "Correct text:",
+                              turn.currentText,
+                            );
+                            if (newText) correctTurn(turn.id, newText);
+                          }}
                           className="px-2 py-1 text-xs rounded bg-hud-surface border border-hud-border text-hud-text"
                         >
-                          → {label}
+                          ✏ Edit
                         </button>
-                      ))}
-                      <button
-                        onClick={() => {
-                          const newText = prompt(
-                            "Correct text:",
-                            turn.currentText,
-                          );
-                          if (newText) correctTurn(turn.id, newText);
-                        }}
-                        className="px-2 py-1 text-xs rounded bg-hud-surface border border-hud-border text-hud-text"
-                      >
-                        ✏ Edit
-                      </button>
-                    </div>
-                  </details>
-                </div>
-              ))}
+                      </div>
+                    </details>
+                  </div>
+                );
+              })}
             </div>
             {!followTranscript && unseenTurnCount > 0 && (
               <button

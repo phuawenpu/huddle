@@ -117,6 +117,10 @@ export function intelligencePatch(intelligence: unknown): SSEPatch {
   return { type: "intelligence", data: intelligence };
 }
 
+export function windowAnalysisPatch(analysis: unknown): SSEPatch {
+  return { type: "window.analysis", data: analysis };
+}
+
 export function liveAnalysisPatch(analysis: unknown): SSEPatch {
   return { type: "live.analysis", data: analysis };
 }

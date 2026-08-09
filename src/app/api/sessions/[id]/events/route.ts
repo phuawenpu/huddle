@@ -73,9 +73,10 @@ export async function GET(
                     ),
                 ),
             intent: session.intentRevisions[0] || null,
-            liveAnalysis: facilitatorView && session.liveAnalyses[0]
-              ? serializeLiveAnalysis(session.liveAnalyses[0])
-              : null,
+            liveAnalysis:
+              facilitatorView && session.liveAnalyses[0]
+                ? serializeLiveAnalysis(session.liveAnalyses[0])
+                : null,
             visualEvidence: facilitatorView
               ? session.visualEvidence.map(serializeVisualEvidence)
               : [],
@@ -98,6 +99,7 @@ export async function GET(
           !facilitatorView &&
           [
             "intelligence",
+            "window.analysis",
             "live.analysis",
             "visual.evidence",
             "prompt.show",

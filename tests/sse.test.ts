@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createSSEResponse, intelligencePatch } from "../src/lib/sse";
+import {
+  createSSEResponse,
+  intelligencePatch,
+  windowAnalysisPatch,
+} from "../src/lib/sse";
 
 describe("SSE framing", () => {
   it("terminates an event with a blank line so browsers dispatch immediately", async () => {
@@ -16,6 +20,13 @@ describe("SSE framing", () => {
     expect(intelligencePatch({ analyzedTurnCount: 3 })).toEqual({
       type: "intelligence",
       data: { analyzedTurnCount: 3 },
+    });
+  });
+
+  it("creates a dedicated rolling-window analysis event", () => {
+    expect(windowAnalysisPatch({ throughTurnId: "turn-3" })).toEqual({
+      type: "window.analysis",
+      data: { throughTurnId: "turn-3" },
     });
   });
 });

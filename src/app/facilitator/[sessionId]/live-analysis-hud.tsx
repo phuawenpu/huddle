@@ -2,17 +2,24 @@
 
 import { useEffect, useState } from "react";
 import type {
+  CritiqueIntelligenceSnapshot,
   FacilitatorAction,
   LiveAnalysisSnapshot,
   MeetingNodeKind,
   MeetingNodeStatus,
   MeetingStateNode,
+  WindowAnalysisSnapshot,
 } from "@/lib/types";
 
 interface HudTurn {
   id: string;
   isSubstantive: boolean;
   isCalibration: boolean;
+  endMs?: number;
+  analysis?: {
+    category?: string;
+    theme?: string;
+  };
 }
 
 interface NodeEdit {
@@ -24,6 +31,14 @@ interface NodeEdit {
 
 interface LiveAnalysisHudProps {
   analysis: LiveAnalysisSnapshot | null;
+  intelligence: CritiqueIntelligenceSnapshot | null;
+  windowAnalysis: WindowAnalysisSnapshot | null;
+  livePrompt: {
+    id: string;
+    text: string;
+    confidence: number;
+    supportingTurnIds: string[];
+  } | null;
   turns: HudTurn[];
   objective: string;
   phase: string;
@@ -102,6 +117,9 @@ const ACTION_TONES: Record<FacilitatorAction["type"], string> = {
 
 export function LiveAnalysisHud({
   analysis,
+  intelligence,
+  windowAnalysis,
+  livePrompt,
   turns,
   objective,
   phase,
@@ -139,199 +157,316 @@ export function LiveAnalysisHud({
   return (
     <section
       data-testid="live-analysis-hud"
-      className="max-h-[60dvh] shrink-0 overflow-y-auto border-b border-cyan-400/20 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%),linear-gradient(115deg,rgba(20,20,31,0.99),rgba(8,10,16,0.99))] px-3 py-3 sm:px-4"
+      className="shrink-0 border-b border-cyan-400/20 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%),linear-gradient(115deg,rgba(20,20,31,0.99),rgba(8,10,16,0.99))]"
       aria-label="Live meeting intelligence"
     >
-      <div className="grid gap-3 2xl:grid-cols-[minmax(0,1fr)_21rem]">
-        <div className="min-w-0 space-y-3">
-          <header className="rounded-2xl border border-cyan-300/20 bg-black/20 p-3">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="relative flex h-2.5 w-2.5" aria-hidden="true">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-300 opacity-50" />
-                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-cyan-300" />
-                  </span>
-                  <h2 className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-200">
-                    Meeting state
-                  </h2>
-                  {state && (
-                    <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-hud-muted">
-                      revision {state.revision}
-                    </span>
+      <details className="group" data-testid="meeting-intelligence-details">
+        <summary className="min-h-20 cursor-pointer list-none px-3 py-2 marker:hidden sm:px-4">
+          <NowLens
+            analysis={analysis}
+            intelligence={intelligence}
+            windowAnalysis={windowAnalysis}
+            livePrompt={livePrompt}
+            turns={turns}
+            analyzing={analyzing}
+          />
+        </summary>
+        <div className="max-h-[52dvh] overflow-y-auto border-t border-cyan-300/15 px-3 py-3 sm:px-4">
+          <div className="grid gap-3 2xl:grid-cols-[minmax(0,1fr)_21rem]">
+            <div className="min-w-0 space-y-3">
+              <header className="rounded-2xl border border-cyan-300/20 bg-black/20 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="relative flex h-2.5 w-2.5"
+                        aria-hidden="true"
+                      >
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-300 opacity-50" />
+                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-cyan-300" />
+                      </span>
+                      <h2 className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-200">
+                        Meeting state
+                      </h2>
+                      {state && (
+                        <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-hud-muted">
+                          revision {state.revision}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-[10px] uppercase tracking-wider text-hud-muted">
+                      {analysis
+                        ? `Intent · ${analysis.objective}`
+                        : "Private facilitator workspace"}
+                    </p>
+                    <h3 className="mt-1 text-base font-semibold leading-snug text-white sm:text-lg">
+                      {analyzing
+                        ? "Refreshing issues, options, commitments, and tensions…"
+                        : analysis?.result.headline ||
+                          "Build a shared understanding as the discussion develops."}
+                    </h3>
+                    <p className="mt-1 max-w-4xl text-xs leading-relaxed text-hud-text/75 sm:text-sm">
+                      {analysis?.result.summary ||
+                        "Run synthesis when there is enough context. The AI proposes a private meaning map and next facilitation moves; nothing is published automatically."}
+                    </p>
+                  </div>
+                  {analysis && (
+                    <div className="flex flex-wrap justify-end gap-1.5 text-[10px]">
+                      <span className="rounded-full border border-hud-border bg-hud-bg/70 px-2 py-1 text-hud-muted">
+                        through{" "}
+                        {formatSessionTime(analysis.transcriptThroughMs)}
+                      </span>
+                      <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-emerald-200">
+                        {analysis.result.grounding?.validatedSourceCount || 0}{" "}
+                        verified anchors
+                      </span>
+                      {state && state.changes.addedNodeIds.length > 0 && (
+                        <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2 py-1 text-cyan-200">
+                          {state.changes.addedNodeIds.length} new concepts
+                        </span>
+                      )}
+                      {analysis.result.engine !== "model" && (
+                        <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-2 py-1 text-amber-200">
+                          deterministic view
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
-                <p className="mt-1 text-[10px] uppercase tracking-wider text-hud-muted">
-                  {analysis ? `Intent · ${analysis.objective}` : "Private facilitator workspace"}
-                </p>
-                <h3 className="mt-1 text-base font-semibold leading-snug text-white sm:text-lg">
-                  {analyzing
-                    ? "Refreshing issues, options, commitments, and tensions…"
-                    : analysis?.result.headline ||
-                      "Build a shared understanding as the discussion develops."}
-                </h3>
-                <p className="mt-1 max-w-4xl text-xs leading-relaxed text-hud-text/75 sm:text-sm">
-                  {analysis?.result.summary ||
-                    "Run synthesis when there is enough context. The AI proposes a private meaning map and next facilitation moves; nothing is published automatically."}
-                </p>
-              </div>
-              {analysis && (
-                <div className="flex flex-wrap justify-end gap-1.5 text-[10px]">
-                  <span className="rounded-full border border-hud-border bg-hud-bg/70 px-2 py-1 text-hud-muted">
-                    through {formatSessionTime(analysis.transcriptThroughMs)}
-                  </span>
-                  <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-emerald-200">
-                    {analysis.result.grounding?.validatedSourceCount || 0} verified anchors
-                  </span>
-                  {state && state.changes.addedNodeIds.length > 0 && (
-                    <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2 py-1 text-cyan-200">
-                      {state.changes.addedNodeIds.length} new concepts
-                    </span>
-                  )}
-                  {analysis.result.engine !== "model" && (
-                    <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-2 py-1 text-amber-200">
-                      deterministic view
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-            {analysis?.result.warning && (
-              <p className="mt-2 rounded-lg border border-amber-400/20 bg-amber-400/10 px-2 py-1.5 text-[11px] text-amber-200">
-                {analysis.result.warning}
-              </p>
-            )}
-            {analysis && newSinceSnapshot > 0 && (
-              <p className="mt-2 inline-flex rounded-full bg-cyan-400/10 px-2 py-1 text-[11px] font-medium text-cyan-200">
-                The discussion has moved on · refresh to include {newSinceSnapshot} new {newSinceSnapshot === 1 ? "turn" : "turns"}
-              </p>
-            )}
-          </header>
-
-          <section
-            className="rounded-2xl border border-hud-border bg-hud-surface/55 p-3"
-            aria-labelledby="action-dock-title"
-          >
-            <div className="flex flex-wrap items-end justify-between gap-2">
-              <div>
-                <h3
-                  id="action-dock-title"
-                  className="text-[11px] font-bold uppercase tracking-[0.18em] text-white"
-                >
-                  Facilitator action dock
-                </h3>
-                <p className="mt-0.5 text-[10px] text-hud-muted">
-                  Private, ranked suggestions. You choose if and how to use them.
-                </p>
-              </div>
-              {selectedAction && (
-                <button
-                  type="button"
-                  onClick={() => void copyAction(selectedAction)}
-                  className="min-h-9 rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-3 py-1.5 text-[11px] font-semibold text-cyan-100"
-                >
-                  {copiedActionId === selectedAction.id ? "Copied" : "Copy prompt"}
-                </button>
-              )}
-            </div>
-            {(state?.facilitatorActions.length || 0) > 0 ? (
-              <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                {state?.facilitatorActions.map((action) => (
-                  <button
-                    key={action.id}
-                    type="button"
-                    aria-pressed={selectedActionId === action.id}
-                    onClick={() =>
-                      setSelectedActionId((current) =>
-                        current === action.id ? null : action.id,
-                      )
-                    }
-                    className={`min-h-11 rounded-xl border p-2 text-left transition hover:-translate-y-0.5 hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-cyan-300/40 ${ACTION_TONES[action.type]} ${
-                      selectedActionId === action.id ? "ring-2 ring-cyan-300/50" : ""
-                    }`}
-                  >
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-semibold text-white">
-                        {action.label}
-                      </span>
-                      <span className="text-[9px] uppercase tracking-wide text-hud-muted">
-                        {action.urgency}
-                      </span>
-                    </span>
-                    <span className="mt-1 block line-clamp-2 text-[10px] leading-relaxed text-hud-text/75">
-                      {action.prompt}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-3 text-xs text-hud-muted">
-                Suggestions appear when the map contains a grounded open question, tension, unsupported proposal, or unowned action.
-              </p>
-            )}
-            {selectedAction && (
-              <div className="mt-2 rounded-xl border border-cyan-300/20 bg-black/25 p-3" aria-live="polite">
-                <p className="text-sm font-medium leading-relaxed text-cyan-50">
-                  “{selectedAction.prompt}”
-                </p>
-                <p className="mt-1 text-[10px] text-hud-muted">
-                  Why now: {selectedAction.rationale}
-                </p>
-                <SourceTrail sources={selectedAction.sourceQuotes} />
-              </div>
-            )}
-          </section>
-
-          {state && (
-            <section aria-labelledby="meaning-map-title">
-              <div className="mb-2 flex flex-wrap items-end justify-between gap-2 px-1">
-                <div>
-                  <h3
-                    id="meaning-map-title"
-                    className="text-[11px] font-bold uppercase tracking-[0.18em] text-white"
-                  >
-                    Meaning map
-                  </h3>
-                  <p className="mt-0.5 text-[10px] text-hud-muted">
-                    Edit private AI interpretations, then publish only the cards useful to the room.
+                {analysis?.result.warning && (
+                  <p className="mt-2 rounded-lg border border-amber-400/20 bg-amber-400/10 px-2 py-1.5 text-[11px] text-amber-200">
+                    {analysis.result.warning}
                   </p>
-                </div>
-                <span className="text-[10px] text-hud-muted">
-                  AI private → facilitator review → shared display
-                </span>
-              </div>
-              <div className="grid gap-2 lg:grid-cols-3">
-                {LANES.map((lane) => (
-                  <MeetingLane
-                    key={lane.label}
-                    lane={lane}
-                    nodes={state.nodes.filter((node) => lane.kinds.includes(node.kind))}
-                    analysis={analysis}
-                    busyNodeId={busyNodeId}
-                    publishedNodeIds={publishedNodeIds}
-                    onEditNode={onEditNode}
-                    onPublishNode={onPublishNode}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-        </div>
+                )}
+                {analysis && newSinceSnapshot > 0 && (
+                  <p className="mt-2 inline-flex rounded-full bg-cyan-400/10 px-2 py-1 text-[11px] font-medium text-cyan-200">
+                    The discussion has moved on · refresh to include{" "}
+                    {newSinceSnapshot} new{" "}
+                    {newSinceSnapshot === 1 ? "turn" : "turns"}
+                  </p>
+                )}
+              </header>
 
-        <AnalysisIntentForm
-          objective={objective}
-          phase={phase}
-          criteriaText={criteriaText}
-          ready={ready}
-          analyzing={analyzing}
-          hasTranscript={substantiveTurns.length > 0}
-          onObjectiveChange={onObjectiveChange}
-          onPhaseChange={onPhaseChange}
-          onCriteriaChange={onCriteriaChange}
-          onAnalyze={onAnalyze}
-        />
-      </div>
+              <section
+                className="rounded-2xl border border-hud-border bg-hud-surface/55 p-3"
+                aria-labelledby="action-dock-title"
+              >
+                <div className="flex flex-wrap items-end justify-between gap-2">
+                  <div>
+                    <h3
+                      id="action-dock-title"
+                      className="text-[11px] font-bold uppercase tracking-[0.18em] text-white"
+                    >
+                      Facilitator action dock
+                    </h3>
+                    <p className="mt-0.5 text-[10px] text-hud-muted">
+                      Private, ranked suggestions. You choose if and how to use
+                      them.
+                    </p>
+                  </div>
+                  {selectedAction && (
+                    <button
+                      type="button"
+                      onClick={() => void copyAction(selectedAction)}
+                      className="min-h-9 rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-3 py-1.5 text-[11px] font-semibold text-cyan-100"
+                    >
+                      {copiedActionId === selectedAction.id
+                        ? "Copied"
+                        : "Copy prompt"}
+                    </button>
+                  )}
+                </div>
+                {(state?.facilitatorActions.length || 0) > 0 ? (
+                  <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                    {state?.facilitatorActions.map((action) => (
+                      <button
+                        key={action.id}
+                        type="button"
+                        aria-pressed={selectedActionId === action.id}
+                        onClick={() =>
+                          setSelectedActionId((current) =>
+                            current === action.id ? null : action.id,
+                          )
+                        }
+                        className={`min-h-11 rounded-xl border p-2 text-left transition hover:-translate-y-0.5 hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-cyan-300/40 ${ACTION_TONES[action.type]} ${
+                          selectedActionId === action.id
+                            ? "ring-2 ring-cyan-300/50"
+                            : ""
+                        }`}
+                      >
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-semibold text-white">
+                            {action.label}
+                          </span>
+                          <span className="text-[9px] uppercase tracking-wide text-hud-muted">
+                            {action.urgency}
+                          </span>
+                        </span>
+                        <span className="mt-1 block line-clamp-2 text-[10px] leading-relaxed text-hud-text/75">
+                          {action.prompt}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs text-hud-muted">
+                    Suggestions appear when the map contains a grounded open
+                    question, tension, unsupported proposal, or unowned action.
+                  </p>
+                )}
+                {selectedAction && (
+                  <div
+                    className="mt-2 rounded-xl border border-cyan-300/20 bg-black/25 p-3"
+                    aria-live="polite"
+                  >
+                    <p className="text-sm font-medium leading-relaxed text-cyan-50">
+                      “{selectedAction.prompt}”
+                    </p>
+                    <p className="mt-1 text-[10px] text-hud-muted">
+                      Why now: {selectedAction.rationale}
+                    </p>
+                    <SourceTrail sources={selectedAction.sourceQuotes} />
+                  </div>
+                )}
+              </section>
+
+              {state && (
+                <section aria-labelledby="meaning-map-title">
+                  <div className="mb-2 flex flex-wrap items-end justify-between gap-2 px-1">
+                    <div>
+                      <h3
+                        id="meaning-map-title"
+                        className="text-[11px] font-bold uppercase tracking-[0.18em] text-white"
+                      >
+                        Meaning map
+                      </h3>
+                      <p className="mt-0.5 text-[10px] text-hud-muted">
+                        Edit private AI interpretations, then publish only the
+                        cards useful to the room.
+                      </p>
+                    </div>
+                    <span className="text-[10px] text-hud-muted">
+                      AI private → facilitator review → shared display
+                    </span>
+                  </div>
+                  <div className="grid gap-2 lg:grid-cols-3">
+                    {LANES.map((lane) => (
+                      <MeetingLane
+                        key={lane.label}
+                        lane={lane}
+                        nodes={state.nodes.filter((node) =>
+                          lane.kinds.includes(node.kind),
+                        )}
+                        analysis={analysis}
+                        busyNodeId={busyNodeId}
+                        publishedNodeIds={publishedNodeIds}
+                        onEditNode={onEditNode}
+                        onPublishNode={onPublishNode}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
+
+            <AnalysisIntentForm
+              objective={objective}
+              phase={phase}
+              criteriaText={criteriaText}
+              ready={ready}
+              analyzing={analyzing}
+              hasTranscript={substantiveTurns.length > 0}
+              onObjectiveChange={onObjectiveChange}
+              onPhaseChange={onPhaseChange}
+              onCriteriaChange={onCriteriaChange}
+              onAnalyze={onAnalyze}
+            />
+          </div>
+        </div>
+      </details>
     </section>
+  );
+}
+
+function NowLens({
+  analysis,
+  intelligence,
+  windowAnalysis,
+  livePrompt,
+  turns,
+  analyzing,
+}: Pick<
+  LiveAnalysisHudProps,
+  | "analysis"
+  | "intelligence"
+  | "windowAnalysis"
+  | "livePrompt"
+  | "turns"
+  | "analyzing"
+>) {
+  const latestAnalyzedTurn = [...turns]
+    .reverse()
+    .find((turn) => turn.analysis?.theme || turn.analysis?.category);
+  const latestCapturedTurn = turns.at(-1);
+  const topic =
+    windowAnalysis?.theme ||
+    latestAnalyzedTurn?.analysis?.theme ||
+    analysis?.result.headline ||
+    "Listening for the current topic";
+  const state =
+    windowAnalysis?.discussionState ||
+    humanizeKind(
+      latestAnalyzedTurn?.analysis?.category || "collecting context",
+    );
+  const openLoopCount = intelligence?.openLoops.length || 0;
+  const capturedThrough = latestCapturedTurn?.endMs || 0;
+  const analyzedThrough =
+    windowAnalysis?.throughMs ||
+    latestAnalyzedTurn?.endMs ||
+    analysis?.transcriptThroughMs ||
+    0;
+
+  return (
+    <div className="grid gap-1.5" aria-label="Current meeting state">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            className="relative flex h-2.5 w-2.5 shrink-0"
+            aria-hidden="true"
+          >
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-300 opacity-40" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-cyan-300" />
+          </span>
+          <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-cyan-200">
+            Now lens
+          </span>
+          <span className="rounded-full bg-white/5 px-2 py-0.5 text-[9px] uppercase tracking-wide text-hud-muted">
+            {analyzing ? "reconciling" : state}
+          </span>
+        </div>
+        <span className="shrink-0 text-[9px] text-hud-muted">
+          <span className="group-open:hidden">Inspect map +</span>
+          <span className="hidden group-open:inline">Close map −</span>
+        </span>
+      </div>
+      <p className="line-clamp-1 text-sm font-semibold text-white">{topic}</p>
+      <div className="flex flex-wrap items-center gap-1.5 text-[9px]">
+        <span className="rounded-full border border-hud-border bg-black/20 px-2 py-0.5 text-hud-muted">
+          captured {formatSessionTime(capturedThrough)}
+        </span>
+        <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2 py-0.5 text-cyan-100">
+          analyzed {formatSessionTime(analyzedThrough)}
+        </span>
+        <span className="rounded-full border border-violet-300/20 bg-violet-300/10 px-2 py-0.5 text-violet-100">
+          {openLoopCount} open {openLoopCount === 1 ? "loop" : "loops"}
+        </span>
+      </div>
+      {livePrompt && (
+        <p className="line-clamp-1 rounded-lg border border-amber-300/20 bg-amber-300/10 px-2 py-1 text-[10px] text-amber-100">
+          Private cue · {livePrompt.text}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -423,16 +558,22 @@ function MeetingNodeCard({
   return (
     <article className="rounded-xl border border-white/10 bg-hud-bg/75 p-2.5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-1.5">
-        <span className={`rounded-full border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${KIND_TONES[node.kind]}`}>
+        <span
+          className={`rounded-full border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${KIND_TONES[node.kind]}`}
+        >
           {node.kind}
         </span>
         <div className="flex items-center gap-1 text-[9px] text-hud-muted">
           <span>{node.status}</span>
           {node.origin === "human_edit" && (
-            <span className="rounded-full bg-white/5 px-1.5 py-0.5">edited</span>
+            <span className="rounded-full bg-white/5 px-1.5 py-0.5">
+              edited
+            </span>
           )}
           {published && (
-            <span className="rounded-full bg-emerald-400/10 px-1.5 py-0.5 text-emerald-200">shared</span>
+            <span className="rounded-full bg-emerald-400/10 px-1.5 py-0.5 text-emerald-200">
+              shared
+            </span>
           )}
         </div>
       </div>
@@ -443,7 +584,12 @@ function MeetingNodeCard({
             <span className="sr-only">Node title</span>
             <input
               value={draft.title}
-              onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  title: event.target.value,
+                }))
+              }
               className="min-h-10 w-full rounded-lg border border-hud-border bg-black/25 px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-300/60"
             />
           </label>
@@ -451,7 +597,12 @@ function MeetingNodeCard({
             <span className="sr-only">Node summary</span>
             <textarea
               value={draft.summary}
-              onChange={(event) => setDraft((current) => ({ ...current, summary: event.target.value }))}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  summary: event.target.value,
+                }))
+              }
               rows={3}
               className="w-full rounded-lg border border-hud-border bg-black/25 px-2 py-1.5 text-[11px] text-white outline-none focus:border-cyan-300/60"
             />
@@ -461,11 +612,26 @@ function MeetingNodeCard({
               <span className="sr-only">Node status</span>
               <select
                 value={draft.status}
-                onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value as MeetingNodeStatus }))}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    status: event.target.value as MeetingNodeStatus,
+                  }))
+                }
                 className="min-h-10 w-full rounded-lg border border-hud-border bg-hud-bg px-2 text-[10px] text-white"
               >
-                {["open", "exploring", "proposed", "accepted", "rejected", "committed", "done"].map((status) => (
-                  <option key={status} value={status}>{status}</option>
+                {[
+                  "open",
+                  "exploring",
+                  "proposed",
+                  "accepted",
+                  "rejected",
+                  "committed",
+                  "done",
+                ].map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
                 ))}
               </select>
             </label>
@@ -474,7 +640,12 @@ function MeetingNodeCard({
               <input
                 value={draft.owner || ""}
                 placeholder="Owner (optional)"
-                onChange={(event) => setDraft((current) => ({ ...current, owner: event.target.value }))}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    owner: event.target.value,
+                  }))
+                }
                 className="min-h-10 w-full rounded-lg border border-hud-border bg-black/25 px-2 text-[10px] text-white"
               />
             </label>
@@ -500,20 +671,30 @@ function MeetingNodeCard({
         </div>
       ) : (
         <>
-          <h5 className="mt-1.5 text-xs font-semibold leading-snug text-white">{node.title}</h5>
-          <p className="mt-1 text-[10px] leading-relaxed text-hud-text/70">{node.summary}</p>
+          <h5 className="mt-1.5 text-xs font-semibold leading-snug text-white">
+            {node.title}
+          </h5>
+          <p className="mt-1 text-[10px] leading-relaxed text-hud-text/70">
+            {node.summary}
+          </p>
           {node.owner && (
-            <p className="mt-1 text-[9px] text-amber-100">Owner · {node.owner}</p>
+            <p className="mt-1 text-[9px] text-amber-100">
+              Owner · {node.owner}
+            </p>
           )}
           {agreement && (
-            <div className={`mt-2 rounded-lg px-2 py-1.5 text-[9px] ${
-              agreement.state === "divided" || agreement.state === "contested"
-                ? "bg-rose-400/10 text-rose-100"
-                : agreement.state === "emerging"
-                  ? "bg-amber-400/10 text-amber-100"
-                  : "bg-emerald-400/10 text-emerald-100"
-            }`}>
-              <strong className="uppercase tracking-wide">{agreement.state}</strong>
+            <div
+              className={`mt-2 rounded-lg px-2 py-1.5 text-[9px] ${
+                agreement.state === "divided" || agreement.state === "contested"
+                  ? "bg-rose-400/10 text-rose-100"
+                  : agreement.state === "emerging"
+                    ? "bg-amber-400/10 text-amber-100"
+                    : "bg-emerald-400/10 text-emerald-100"
+              }`}
+            >
+              <strong className="uppercase tracking-wide">
+                {agreement.state}
+              </strong>
               <span className="ml-1">{agreement.summary}</span>
             </div>
           )}
@@ -548,21 +729,33 @@ function SourceTrail({
   sources: FacilitatorAction["sourceQuotes"];
 }) {
   if (sources.length === 0) {
-    return <p className="mt-2 text-[9px] text-hud-muted">Facilitator-defined context</p>;
+    return (
+      <p className="mt-2 text-[9px] text-hud-muted">
+        Facilitator-defined context
+      </p>
+    );
   }
   return (
     <details className="group mt-2">
       <summary className="cursor-pointer list-none text-[9px] font-medium text-cyan-200 marker:hidden">
-        <span className="group-open:hidden">{sources.length} source {sources.length === 1 ? "anchor" : "anchors"} +</span>
+        <span className="group-open:hidden">
+          {sources.length} source {sources.length === 1 ? "anchor" : "anchors"}{" "}
+          +
+        </span>
         <span className="hidden group-open:inline">Hide sources −</span>
       </summary>
       <div className="mt-1 space-y-1">
         {sources.slice(0, 3).map((source) => (
-          <blockquote key={`${source.turnId}-${source.quote}`} className="border-l border-cyan-300/30 pl-2 text-[9px] italic leading-relaxed text-hud-muted/90">
+          <blockquote
+            key={`${source.turnId}-${source.quote}`}
+            className="border-l border-cyan-300/30 pl-2 text-[9px] italic leading-relaxed text-hud-muted/90"
+          >
             “{source.quote}”
             <footer className="mt-0.5 not-italic text-cyan-200/65">
-              {source.speakerLabel || "Unassigned"} · {formatSessionTime(source.startMs || 0)}
-              {(source.uncertainty?.length || 0) > 0 && ` · ${source.uncertainty?.map((value) => value.replaceAll("_", " ")).join(", ")}`}
+              {source.speakerLabel || "Unassigned"} ·{" "}
+              {formatSessionTime(source.startMs || 0)}
+              {(source.uncertainty?.length || 0) > 0 &&
+                ` · ${source.uncertainty?.map((value) => value.replaceAll("_", " ")).join(", ")}`}
             </footer>
           </blockquote>
         ))}
@@ -604,10 +797,16 @@ function AnalysisIntentForm({
     >
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-hud-muted">Facilitator lens</h3>
-          <p className="mt-0.5 text-[10px] text-hud-muted/80">Changes create a new, traceable state revision.</p>
+          <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-hud-muted">
+            Facilitator lens
+          </h3>
+          <p className="mt-0.5 text-[10px] text-hud-muted/80">
+            Changes create a new, traceable state revision.
+          </p>
         </div>
-        <span className="rounded-full bg-hud-bg px-2 py-1 text-[10px] text-hud-muted">{PHASE_LABELS[phase] || phase}</span>
+        <span className="rounded-full bg-hud-bg px-2 py-1 text-[10px] text-hud-muted">
+          {PHASE_LABELS[phase] || phase}
+        </span>
       </div>
       <label className="mt-2 block">
         <span className="sr-only">Analysis objective</span>
@@ -628,7 +827,9 @@ function AnalysisIntentForm({
           className="min-h-11 w-full rounded-lg border border-hud-border bg-hud-bg/80 px-2 py-2 text-xs text-hud-text outline-none focus:border-cyan-300/60"
         >
           {Object.entries(PHASE_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
+            <option key={value} value={value}>
+              {label}
+            </option>
           ))}
         </select>
       </label>
@@ -648,13 +849,16 @@ function AnalysisIntentForm({
       </details>
       <button
         type="submit"
-        disabled={!ready || analyzing || !hasTranscript || !objective.trim() || !phase}
+        disabled={
+          !ready || analyzing || !hasTranscript || !objective.trim() || !phase
+        }
         className="mt-2 min-h-11 w-full rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 px-3 py-2 text-xs font-bold text-white shadow-lg shadow-cyan-950/30 transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
       >
         {analyzing ? "Refreshing meeting state…" : "Refresh meeting state"}
       </button>
       <p className="mt-2 text-[9px] leading-relaxed text-hud-muted">
-        Covers the complete transcript through now. Audio capture and transcription continue while synthesis runs.
+        Covers the complete transcript through now. Audio capture and
+        transcription continue while synthesis runs.
       </p>
     </form>
   );
@@ -663,4 +867,10 @@ function AnalysisIntentForm({
 function formatSessionTime(milliseconds: number) {
   const seconds = Math.max(0, Math.round(milliseconds / 1_000));
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+function humanizeKind(value: string) {
+  return value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

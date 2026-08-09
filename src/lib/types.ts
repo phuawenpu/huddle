@@ -337,6 +337,7 @@ export interface SSEPatch {
     | "turn.updated"
     | "metrics"
     | "intelligence"
+    | "window.analysis"
     | "live.analysis"
     | "visual.evidence"
     | "map.patch"
@@ -394,7 +395,10 @@ export interface LiveAnalysisSourceQuote {
   endMs?: number;
   transcriptConfidence?: number;
   uncertainty?: Array<
-    "unknown_speaker" | "possible_overlap" | "speaker_revised" | "text_corrected"
+    | "unknown_speaker"
+    | "possible_overlap"
+    | "speaker_revised"
+    | "text_corrected"
   >;
 }
 
@@ -628,6 +632,15 @@ export interface WindowAnalysis {
   actions: string[];
   agreementState: "consensus" | "majority" | "divided" | "emerging";
   minorityPosition?: string;
+  /** Validated recent turn IDs grounding the window state and private prompt. */
+  supportingTurnIds: string[];
+}
+
+export interface WindowAnalysisSnapshot extends WindowAnalysis {
+  throughTurnId: string;
+  throughMs: number;
+  analyzedTurnCount: number;
+  generatedAt: string;
 }
 
 export interface PromptData {

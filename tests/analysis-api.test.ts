@@ -105,6 +105,7 @@ describe("OpenAI analysis request compatibility", () => {
                   ],
                   actions: [{ text: "This object must be discarded" }],
                   agreementState: "unsupported-state",
+                  supportingTurnIds: ["invented-turn"],
                 }),
               },
             },
@@ -128,6 +129,7 @@ describe("OpenAI analysis request compatibility", () => {
     expect(result.decisions).toEqual(["We agreed to test the neutral state."]);
     expect(result.actions).toEqual([]);
     expect(result.agreementState).toBe("emerging");
+    expect(result.supportingTurnIds).toEqual([]);
   });
 
   it("falls back to bounded local analysis when the provider misses its deadline", async () => {
