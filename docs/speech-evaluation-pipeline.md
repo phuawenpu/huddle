@@ -56,8 +56,9 @@ aligned research annotations.
 
 The test creates a production session, injects the approved Climate mix through
 the exact browser AudioWorklet → PCM16 → streaming ASR path, waits through the
-first authored overlap, terminates cleanly, requests a score, and applies
-quality gates.
+first authored overlap, runs two persisted whole-transcript intent snapshots
+while capture remains active, audits their exact source-quote anchors,
+terminates cleanly, requests a score, and applies quality gates.
 
 ```bash
 RUN_PRODUCTION_LIVE=1 \
@@ -83,7 +84,7 @@ interval, and at least two successful label-to-speaker mappings.
 
 ## Validated production baseline
 
-On 2026-08-09, Fly version 38 replayed the approved three-person Climate mix
+On 2026-08-09, Fly version 41 replayed the approved three-person Climate mix
 through the deployed recorded-audio path to the first authored overlap. The
 no-retry run finalized 19 transcript segments and produced two stable provider
 speaker labels:
@@ -104,6 +105,12 @@ The combined words were highly accurate, but the two-label hypothesis merged
 one of the three reference speakers. The resulting speaker confusion explains
 the much higher SA-WER and DER and establishes a concrete baseline for future
 diarization improvements.
+
+The same run created live-analysis snapshots at 18 turns/337 words and 19
+turns/362 words without stopping capture. Both used model synthesis and passed
+an exact-substring source audit. See
+[Live Critique verification](live-critique-verification.md) for the interaction
+and grounding procedure and its interpretation limits.
 
 ## Score an existing session
 

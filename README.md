@@ -15,16 +15,16 @@ Both modes drive the same pipeline: audio → worklet → PCM16 → ASR → tran
 
 ## Current Status
 
-**Active development — live capture, overlap-aware scenario authoring, natural-audio simulation, injected end-to-end demos, and source-linked critique extraction are implemented. Human disposition, artifact revision linkage, broader real-device evaluation, and production governance remain next.**
+**Active development — live capture, overlap-aware scenario authoring, natural-audio simulation, repeatable whole-transcript intent analysis, deliberate visual evidence capture, and source-linked critique extraction are implemented. Human disposition, artifact revision linkage, broader real-device evaluation, access control, and production governance remain next.**
 
 | Metric            | Value                                            |
 | ----------------- | ------------------------------------------------ |
 | TypeScript        | 0 errors                                         |
-| Unit tests        | 110/110 passing                                  |
+| Unit tests        | 116/116 passing                                  |
 | Live audio E2E    | Mic + recorded pipelines pass locally and on Fly |
-| API routes        | 40 endpoints operational                         |
+| API routes        | 44 endpoints operational                         |
 | Frontend pages    | 9 routes functional                              |
-| DB schema         | 11 models, SQLite via Prisma                     |
+| DB schema         | 13 models, SQLite via Prisma                     |
 | Production data   | 12/12 scenarios at quality score 100             |
 | Scenario audit    | 0 errors, warnings, or exact duplicate lines     |
 | Fly.io deployment | 1/1 health checks passing                        |
@@ -38,10 +38,10 @@ Both modes drive the same pipeline: audio → worklet → PCM16 → ASR → tran
 | **1 — Speech proof**          | ✅ Implemented | AudioWorklet PCM16 resampler, `useAudioCapture` hook (getUserMedia + analyser meter + settings readback), ASR WebSocket client (AssemblyAI v3 protocol), wake lock, sendBeacon termination                                                |
 | **2 — Diarization**           | 🟡 Partial     | Idempotent turn ingest, word-level provider speaker runs, UNKNOWN/PENDING normalization, overlap hints, and mappings work; late SpeakerRevision persistence/correction is incomplete.                                                     |
 | **3 — Scenarios + stubs**     | ✅ Implemented | Versioned rich transcripts, one-to-three-pass LLM revision, quality gates, ASR/LLM/TTS stubs, realistic overlap fixtures, and recorded-audio injection through the live Worklet/ASR path work.                                            |
-| **4 — HUD**                   | 🟡 Partial     | In-memory SSE, talk share, flat discussion items, simulation badge, and reconnect work; event replay/`Last-Event-ID` resume is not implemented.                                                                                           |
+| **4 — HUD**                   | 🟡 Partial     | Bounded two-way transcript navigation, controlled auto-follow, live waveform, compact synthesis graphs, whole-transcript intent snapshots, deliberate visual context, SSE, simulation badge, and reconnect work; durable event replay is not implemented.          |
 | **5 — TTS + mixing**          | ✅ Implemented | Cached per-turn OpenAI TTS, explicit tone fixtures in stub mode, ffmpeg overlap scheduling/mixing, WAV + MP3 output, manifests, and independent ASR validation.                                                                           |
-| **6 — Critique intelligence** | 🟡 Partial     | Batched turn/window analysis, bounded source-quote validation, Critique Radar, criterion coverage, open loops, commitments, and deduplicated source-linked items work; cross-turn relation persistence and human disposition remain next. |
-| **7 — Facilitation**          | 🟡 Partial     | Single-prompt restraint and a lexical guard exist; correction audit, intent revision history, participant-aware guards, and SSE propagation are incomplete.                                                                               |
+| **6 — Critique intelligence** | 🟡 Partial     | Batched turn/window analysis, exhaustive whole-transcript synthesis, exact source-quote validation, Critique Radar, criterion coverage, open loops, commitments, and source-linked items work; semantic verification and human disposition remain next.              |
+| **7 — Facilitation**          | 🟡 Partial     | Facilitators can revise intent and rerun persisted analysis while audio continues; single-prompt restraint and a lexical guard exist. Correction audit and participant-aware guards remain incomplete.                                      |
 | **8 — Evaluation**            | 🟡 Partial     | Playwright covers six device profiles; mic and recorded pipelines have passed local and deployed E2E checks with real ASR. Some reported metrics remain proxies, and a broader physical-device/acoustic matrix is still pending.          |
 
 ## Research and system-design study
@@ -65,6 +65,8 @@ The source studies, current implementation, and adjacent 2023–2026 systems hav
 ```
 POST /api/sessions/[id]/turns          — Idempotent turn ingest with SSE broadcast
 GET  /api/sessions/[id]/events          — SSE with pub/sub integration
+GET/POST /api/sessions/[id]/analyses    — Persisted intent snapshots over the complete finalized transcript
+GET/POST /api/sessions/[id]/visual-evidence — Deliberate frame capture and timeline linkage
 POST /api/sessions/terminate-beacon     — sendBeacon termination endpoint
 POST /api/scenarios/[id]/synthesize     — Generate WAV audio from scenario turns
 POST /api/scenarios/[id]/revise         — Run 1–3 sequential structured transcript revisions
@@ -79,8 +81,8 @@ POST /api/uploads                        — Upload audio files (WAV, MP3, M4A, 
 | Page                       | Features                                                                                                                                                                                                        |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/sessions/new`            | Three audio source modes: Live Mic, Upload File, Past Recording. Browse and select from synthesized scenarios.                                                                                                  |
-| `/facilitator/[sessionId]` | Full capture pipeline: mic → AudioWorklet → ASR WebSocket. Live partial transcripts, speaker mapping (A-F labels), intent editor, corrections.                                                                  |
-| `/display/[sessionId]`     | Live SSE-driven HUD: last 5 turns, Critique Radar (criterion coverage, open loops, options, decisions, actions, evidence gaps), talk-share bars, source-linked discussion map, prompt banner, SIMULATION badge. |
+| `/facilitator/[sessionId]` | Mic/recorded AudioWorklet capture, bounded transcript with pauseable auto-follow, waveform, compact signal HUD, repeatable full-transcript intent analysis, speaker mapping, corrections, and consent-driven visual evidence. |
+| `/display/[sessionId]`     | SSE-driven shared HUD with recent turns, Critique Radar, talk share, source-linked discussion map, latest intent synthesis/phase graph, visual context, prompt banner, and SIMULATION badge.                              |
 | `/simulator/[runId]`       | Playback controller with speed control (0.5×–2.0×), progress bar, current speaker/turn display, WAV download.                                                                                                   |
 | `/scenarios`               | Quality-scored library with duplicate, delete, and launch-to-simulator actions.                                                                                                                                 |
 | `/scenarios/[scenarioId]`  | Timed transcript, quality diagnostics, 1–3-pass LLM workshop, synthesis, preflight, approval, and launch controls.                                                                                              |
@@ -110,6 +112,7 @@ as production-secure.
 - HTML5 audio playback and visual turn tracking for manual sim C tests
 - Browser decoding of an approved mix into the same AudioWorklet → PCM16 → ASR path used by a microphone
 - Local and deployed Playwright checks for recorded and fake-microphone sources, including persistence and clean session termination
+- Repeated intent snapshots while capture remains active, with exact transcript-quote anchors audited after persistence
 
 ❌ **What needs fixing:**
 
@@ -132,7 +135,7 @@ as production-secure.
 
 - Human evaluation of real generated conversations and overlap naturalness
 - Acoustic validation across rooms, devices, distances, and background conditions
-- Separate overlap WER and diarization-error measurements
+- Better overlap speech recovery and three-person diarization (the current production baseline resolves only two stable labels)
 
 ## Scenario transcript lifecycle
 
@@ -192,7 +195,7 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Testing
 
 ```bash
-npm test                    # 105 unit tests (including transcript/ASR/audio gates)
+npm test                    # unit and integration tests, including transcript/ASR/audio gates
 npx tsc --noEmit           # TypeScript check
 npm run build              # production Next.js build
 npm run test:e2e           # cross-browser UI suite plus Chromium mic/recording pipeline cases
@@ -210,11 +213,14 @@ speaker-attributed WER exceeds `1.5`. Override those gates with
 `MAX_SPEECH_WER`, `MAX_SPEAKER_ATTRIBUTED_WER`, `MAX_NON_OVERLAP_DER`, and
 `MAX_OVERLAP_SA_WER`. See the [speech evaluation pipeline](docs/speech-evaluation-pipeline.md)
 for metric definitions, the HTTP reporting interface, and interpretation limits.
+See [Live Critique verification](docs/live-critique-verification.md) for the
+transcript-navigation, repeated-analysis, grounding, mobile, and deliberate
+visual-evidence acceptance procedure.
 
 ## Architecture
 
 - **One process:** Next.js 15.5 serves UI, API routes, SSE, and background work
-- **SQLite via Prisma** (11 models, WAL mode)
+- **SQLite via Prisma** (13 models, WAL mode)
 - **Local filesystem** for audio assets (`/data/audio/`)
 - **SSE** with `src/lib/pubsub.ts` in-memory pub/sub, 15s heartbeat, `Last-Event-ID` reconnect
 - **Two external providers:** AssemblyAI (ASR) and OpenAI (LLM + TTS)

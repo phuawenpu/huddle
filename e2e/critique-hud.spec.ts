@@ -434,11 +434,8 @@ test.describe("Critique HUD — E2E", () => {
       .fill("Assess warning comprehension across the discussion");
     await hud.getByRole("button", { name: "Analyze all 12 turns" }).click();
     await expect(
-      hud.getByText(
-        /Evaluate view · Assess warning comprehension across the discussion/,
-      ),
-    ).toBeVisible();
-    await expect(hud.getByText("12 turns · 132 words")).toBeVisible();
+      hud.getByRole("button", { name: "Analyze all 12 turns" }),
+    ).toBeEnabled({ timeout: 30_000 });
 
     const firstHistoryResponse = await request.get(
       `/api/sessions/${session.id}/analyses`,
@@ -451,6 +448,14 @@ test.describe("Critique HUD — E2E", () => {
       firstTurnId: firstTurns[0].id,
       lastTurnId: firstTurns.at(-1)!.id,
     });
+    await expect(
+      hud.getByRole("heading", {
+        name: firstHistory[0].result.headline,
+        exact: true,
+        level: 3,
+      }),
+    ).toBeVisible();
+    await expect(hud.getByText("12 turns · 132 words")).toBeVisible();
 
     const laterTurns = await ingestDiscussionTurns(request, session.id, 12, [
       "I will recruit four planners and schedule the comparison for Thursday.",
@@ -480,17 +485,19 @@ test.describe("Critique HUD — E2E", () => {
         "base64",
       ),
     });
-    await expect(
-      visualPanel.getByText(
-        /Facilitator-captured visual evidence: Warning treatment beside the parcel legend/,
-      ),
-    ).toBeVisible();
+    await expect(visualPanel.getByText("1 captured")).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(visualPanel.locator("article")).toHaveCount(1);
     const evidenceResponse = await request.get(
       `/api/sessions/${session.id}/visual-evidence`,
     );
     const capturedEvidence = await evidenceResponse.json();
     expect(evidenceResponse.ok()).toBeTruthy();
     expect(capturedEvidence).toHaveLength(1);
+    expect(capturedEvidence[0].note).toBe(
+      "Warning treatment beside the parcel legend",
+    );
     const imageResponse = await request.get(capturedEvidence[0].imageUrl);
     expect(imageResponse.ok()).toBeTruthy();
     expect(imageResponse.headers()["content-type"]).toBe("image/png");
@@ -504,12 +511,8 @@ test.describe("Critique HUD — E2E", () => {
       .selectOption("plan_experiment");
     await hud.getByRole("button", { name: "Analyze all 16 turns" }).click();
     await expect(
-      hud.getByText(
-        /Plan experiment view · Extract owned next actions and unresolved risks/,
-      ),
-    ).toBeVisible();
-    await expect(hud.getByText("16 turns · 175 words")).toBeVisible();
-    await expect(hud.getByText("1 visual")).toBeVisible();
+      hud.getByRole("button", { name: "Analyze all 16 turns" }),
+    ).toBeEnabled({ timeout: 30_000 });
 
     const historyResponse = await request.get(
       `/api/sessions/${session.id}/analyses`,
@@ -526,6 +529,15 @@ test.describe("Critique HUD — E2E", () => {
       visualEvidenceCount: 1,
     });
     expect(history[1].transcriptTurnCount).toBe(12);
+    await expect(
+      hud.getByRole("heading", {
+        name: history[0].result.headline,
+        exact: true,
+        level: 3,
+      }),
+    ).toBeVisible();
+    await expect(hud.getByText("16 turns · 175 words")).toBeVisible();
+    await expect(hud.getByText("1 visual")).toBeVisible();
     const currentSession = await (
       await request.get(`/api/sessions/${session.id}`)
     ).json();
@@ -534,9 +546,7 @@ test.describe("Critique HUD — E2E", () => {
     await page.goto(`/display/${session.id}`);
     await expect(page.getByText("Intent synthesis")).toBeVisible();
     await expect(
-      page.getByText(
-        "Plan experiment view · Extract owned next actions and unresolved risks",
-      ),
+      page.getByText(history[0].result.headline, { exact: true }),
     ).toBeVisible();
     await expect(page.getByLabel("Discussion phase allocation")).toBeVisible();
     await expect(page.getByText("1 visual context frame")).toBeVisible();
@@ -603,11 +613,10 @@ test.describe("Critique HUD — E2E", () => {
         .getByPlaceholder("Optional note: what should the analysis notice?")
         .fill("Physical prototype state at the critique table");
       await panel.getByRole("button", { name: "Capture evidence" }).click();
-      await expect(
-        panel.getByText(
-          /Facilitator-captured visual evidence: Physical prototype state at the critique table/,
-        ),
-      ).toBeVisible({ timeout: 15_000 });
+      await expect(panel.getByText("1 captured")).toBeVisible({
+        timeout: 30_000,
+      });
+      await expect(panel.locator("article")).toHaveCount(1);
 
       const evidence = await (
         await request.get(`/api/sessions/${session.id}/visual-evidence`)
