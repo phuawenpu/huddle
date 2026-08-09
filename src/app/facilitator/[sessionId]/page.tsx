@@ -947,6 +947,9 @@ export default function FacilitatorPage() {
                 return (
                   <div
                     key={turn.id}
+                    data-testid="transcript-turn"
+                    data-speaker-label={turn.providerSpeakerLabel}
+                    data-speaker-color={speakerStyle.color}
                     className={`rounded-lg border border-l-4 p-3 ${
                       turn.isSubstantive
                         ? "border-hud-border bg-hud-surface"

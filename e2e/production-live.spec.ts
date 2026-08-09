@@ -186,6 +186,10 @@ test.describe("Production live audio verification", () => {
 
     const intentHud = page.getByTestId("live-analysis-hud");
     await intentHud
+      .getByTestId("meeting-intelligence-details")
+      .locator(":scope > summary")
+      .click();
+    await intentHud
       .getByPlaceholder("What should this analysis clarify?")
       .fill("Identify the strongest evidence and unresolved climate-map risks");
     await intentHud

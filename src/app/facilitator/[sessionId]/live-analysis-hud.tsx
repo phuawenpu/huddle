@@ -375,7 +375,7 @@ export function LiveAnalysisHud({
               criteriaText={criteriaText}
               ready={ready}
               analyzing={analyzing}
-              hasTranscript={substantiveTurns.length > 0}
+              turnCount={substantiveTurns.length}
               onObjectiveChange={onObjectiveChange}
               onPhaseChange={onPhaseChange}
               onCriteriaChange={onCriteriaChange}
@@ -770,7 +770,7 @@ function AnalysisIntentForm({
   criteriaText,
   ready,
   analyzing,
-  hasTranscript,
+  turnCount,
   onObjectiveChange,
   onPhaseChange,
   onCriteriaChange,
@@ -786,7 +786,7 @@ function AnalysisIntentForm({
   | "onPhaseChange"
   | "onCriteriaChange"
   | "onAnalyze"
-> & { hasTranscript: boolean }) {
+> & { turnCount: number }) {
   return (
     <form
       className="h-fit rounded-2xl border border-hud-border bg-hud-surface/75 p-3 2xl:sticky 2xl:top-0"
@@ -850,11 +850,13 @@ function AnalysisIntentForm({
       <button
         type="submit"
         disabled={
-          !ready || analyzing || !hasTranscript || !objective.trim() || !phase
+          !ready || analyzing || turnCount === 0 || !objective.trim() || !phase
         }
         className="mt-2 min-h-11 w-full rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 px-3 py-2 text-xs font-bold text-white shadow-lg shadow-cyan-950/30 transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
       >
-        {analyzing ? "Refreshing meeting state…" : "Refresh meeting state"}
+        {analyzing
+          ? "Refreshing meeting state…"
+          : `Analyze all ${turnCount} ${turnCount === 1 ? "turn" : "turns"}`}
       </button>
       <p className="mt-2 text-[9px] leading-relaxed text-hud-muted">
         Covers the complete transcript through now. Audio capture and

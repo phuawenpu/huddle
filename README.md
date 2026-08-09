@@ -235,6 +235,19 @@ Key runtime guarantees:
   recent-history waveform presentation, portrait layout, and component/unit tests
   before rolling-analysis UI integration.
 
+#### Implementation checkpoint — 2026-08-09T15:58:23Z
+
+- Added a portrait-first live-audio stage that preserves a substantial waveform,
+  adds a 30-second history rail, and reconciles its accessible color/marker system
+  to finalized speaker turns without implying source-separated audio.
+- Reduced the always-on meeting analysis to a compact **Now Lens** while keeping the
+  full inspection map reachable on demand; rolling analysis now runs every 10
+  seconds or three new turns and streams its analysis window and evidence IDs.
+- Unit/type verification is passing. Mobile browser QA confirms all 24 fixture
+  turns, three distinct speaker colors, the waveform/history, compact lens, and
+  expanded inspector remain reachable without horizontal overflow. Full-suite and
+  deployed-app verification are next.
+
 | Stage                         | Status         | Summary                                                                                                                                                                                                                                   |
 | ----------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **1 — Speech proof**          | ✅ Implemented | AudioWorklet PCM16 resampler, `useAudioCapture` hook (getUserMedia + analyser meter + settings readback), ASR WebSocket client (AssemblyAI v3 protocol), wake lock, sendBeacon termination                                                |

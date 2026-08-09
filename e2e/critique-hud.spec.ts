@@ -430,6 +430,10 @@ test.describe("Critique HUD — E2E", () => {
     const hud = page.getByTestId("live-analysis-hud");
     await expect(hud).toBeVisible();
     await hud
+      .getByTestId("meeting-intelligence-details")
+      .locator(":scope > summary")
+      .click();
+    await hud
       .getByPlaceholder("What should this analysis clarify?")
       .fill("Assess warning comprehension across the discussion");
     await hud.getByRole("button", { name: "Analyze all 12 turns" }).click();
@@ -816,7 +820,7 @@ test.describe("Mobile-specific assertions", () => {
     expect(count).toBeGreaterThan(0);
   });
 
-  test("iPhone Live Critique keeps HUD, transcript, and visual controls independently reachable", async ({
+  test("iPhone Live Critique keeps speaker waveforms, Now lens, transcript, and inspection reachable", async ({
     page,
     request,
   }) => {
@@ -826,10 +830,22 @@ test.describe("Mobile-specific assertions", () => {
     );
     const session = await createTranscriptNavigationFixture(request, 24);
     await page.goto(`/facilitator/${session.id}`);
+    await expect(
+      page.getByRole("heading", { name: "Long transcript navigation fixture" }),
+    ).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByTestId("transcript-turn")).toHaveCount(24, {
+      timeout: 20_000,
+    });
 
     const main = page.locator("main");
+    const waveform = page.getByTestId("speaker-waveform-stage");
     const hud = page.getByTestId("live-analysis-hud");
     const transcript = page.getByTestId("transcript-scroll");
+    await expect(waveform).toBeVisible();
+    await expect(page.getByTestId("speaker-waveform-history")).toBeVisible();
+    await expect(hud.getByText("Now lens")).toBeVisible();
     await expect(hud).toBeVisible();
     await expect(transcript).toBeVisible();
     await expect(
@@ -844,13 +860,26 @@ test.describe("Mobile-specific assertions", () => {
     }));
     expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
     expect(layout.scrollHeight).toBeLessThanOrEqual(layout.clientHeight + 1);
+    const waveformBox = await waveform.boundingBox();
     const hudBox = await hud.boundingBox();
     const transcriptBox = await transcript.boundingBox();
-    expect(hudBox?.height || 0).toBeGreaterThan(100);
+    expect(waveformBox?.height || 0).toBeGreaterThanOrEqual(140);
+    expect(waveformBox?.height || Infinity).toBeLessThanOrEqual(220);
+    expect(hudBox?.height || 0).toBeGreaterThanOrEqual(70);
     expect(hudBox?.height || Infinity).toBeLessThanOrEqual(
-      (page.viewportSize()?.height || 0) * 0.47,
+      (page.viewportSize()?.height || 0) * 0.2,
     );
-    expect(transcriptBox?.height || 0).toBeGreaterThan(100);
+    expect(transcriptBox?.height || 0).toBeGreaterThan(80);
+
+    const speakerColors = await page
+      .getByTestId("transcript-turn")
+      .evaluateAll((elements) =>
+        elements.slice(0, 3).map((element) => ({
+          label: element.getAttribute("data-speaker-label"),
+          color: element.getAttribute("data-speaker-color"),
+        })),
+      );
+    expect(new Set(speakerColors.map((entry) => entry.color)).size).toBe(3);
     await expect
       .poll(() =>
         transcript.evaluate(
@@ -875,11 +904,14 @@ test.describe("Mobile-specific assertions", () => {
     await expect(transcript).toHaveAttribute("data-following", "true");
     await expect(page.getByText("Transcript marker 24")).toBeInViewport();
 
-    await hud.evaluate((element) =>
-      element.scrollTo({ top: element.scrollHeight }),
+    await hud
+      .getByTestId("meeting-intelligence-details")
+      .locator(":scope > summary")
+      .click();
+    const analysisIntent = hud.getByPlaceholder(
+      "What should this analysis clarify?",
     );
-    await expect(
-      hud.getByPlaceholder("What should this analysis clarify?"),
-    ).toBeInViewport();
+    await analysisIntent.scrollIntoViewIfNeeded();
+    await expect(analysisIntent).toBeInViewport();
   });
 });
