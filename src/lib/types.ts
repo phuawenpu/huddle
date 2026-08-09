@@ -386,9 +386,15 @@ export interface CritiqueIntelligenceSnapshot {
   evidenceGaps: CritiqueTrace[];
 }
 
+export interface LiveAnalysisSourceQuote {
+  turnId: string;
+  quote: string;
+}
+
 export interface LiveAnalysisEvidence {
   text: string;
   supportingTurnIds: string[];
+  sourceQuotes?: LiveAnalysisSourceQuote[];
 }
 
 export interface LiveAnalysisFinding extends LiveAnalysisEvidence {
@@ -417,6 +423,10 @@ export interface LiveAnalysisResult {
   agreementState: "consensus" | "majority" | "divided" | "emerging";
   minorityPosition?: string;
   engine: "model" | "deterministic-fallback";
+  grounding?: {
+    validatedSourceCount: number;
+    rejectedSourceCount: number;
+  };
   warning?: string;
 }
 

@@ -73,6 +73,19 @@ describe("whole-transcript live analysis", () => {
     ]);
   });
 
+  it("truncates long HUD headlines on a word boundary", async () => {
+    vi.stubEnv("LLM_STUB", "1");
+    const result = await analyzeFullTranscript(turns, [], {
+      objective: `Assess ${"carefully articulated evidence ".repeat(12)}`,
+      phase: "evaluate",
+      criteria: [],
+    });
+
+    expect(result.headline.length).toBeLessThanOrEqual(160);
+    expect(result.headline).toMatch(/…$/);
+    expect(result.headline.at(-2)).not.toBe(" ");
+  });
+
   it("partitions long discussions without dropping or duplicating turns", () => {
     const longTurns = Array.from({ length: 75 }, (_, index) => ({
       id: `turn-${index}`,
@@ -106,12 +119,26 @@ describe("whole-transcript live analysis", () => {
                     {
                       title: "Observed problem",
                       text: "Residents missed the warning.",
-                      supportingTurnIds: ["turn-first", "invented-turn"],
+                      sourceQuotes: [
+                        {
+                          turnId: "turn-first",
+                          quote: "residents missed the warning",
+                        },
+                        {
+                          turnId: "invented-turn",
+                          quote: "invented evidence",
+                        },
+                      ],
                     },
                     {
                       title: "Owned action",
                       text: "A prototype is assigned.",
-                      supportingTurnIds: ["turn-last"],
+                      sourceQuotes: [
+                        {
+                          turnId: "turn-last",
+                          quote: "I will prototype both warning treatments",
+                        },
+                      ],
                     },
                   ],
                   criteria: [
@@ -119,7 +146,23 @@ describe("whole-transcript live analysis", () => {
                       criterion: "Warnings are understood",
                       status: "evidenced",
                       text: "The field study supplies evidence.",
-                      supportingTurnIds: ["turn-first"],
+                      sourceQuotes: [
+                        {
+                          turnId: "turn-first",
+                          quote: "The opening field study showed",
+                        },
+                      ],
+                    },
+                    {
+                      criterion: "Action ownership",
+                      status: "evidenced",
+                      text: "An owner was assigned.",
+                      sourceQuotes: [
+                        {
+                          turnId: "turn-middle",
+                          quote: "This quote is not in the transcript",
+                        },
+                      ],
                     },
                   ],
                   openQuestions: [],
@@ -127,7 +170,12 @@ describe("whole-transcript live analysis", () => {
                   actions: [
                     {
                       text: "Prototype both treatments.",
-                      supportingTurnIds: ["turn-last"],
+                      sourceQuotes: [
+                        {
+                          turnId: "turn-last",
+                          quote: "prototype both warning treatments",
+                        },
+                      ],
                     },
                   ],
                   phaseAllocation: {
@@ -149,7 +197,7 @@ describe("whole-transcript live analysis", () => {
     const result = await analyzeFullTranscript(turns, [], {
       objective: "Assess warning comprehension",
       phase: "evaluate",
-      criteria: ["Warnings are understood"],
+      criteria: ["Warnings are understood", "Action ownership"],
     });
     const requestBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
     const payload = JSON.parse(requestBody.messages[1].content);
@@ -165,6 +213,15 @@ describe("whole-transcript live analysis", () => {
       "turn-last",
     ]);
     expect(result.keyFindings[0].supportingTurnIds).toEqual(["turn-first"]);
+    expect(result.grounding).toEqual({
+      validatedSourceCount: 4,
+      rejectedSourceCount: 2,
+    });
+    expect(result.criteria[1]).toMatchObject({
+      criterion: "Action ownership",
+      status: "unaddressed",
+      supportingTurnIds: [],
+    });
     expect(result.engine).toBe("model");
   });
 });

@@ -120,6 +120,12 @@ export function LiveAnalysisHud({
                   {analysis.transcriptTurnCount} turns ·{" "}
                   {analysis.transcriptWordCount} words
                 </span>
+                {analysis.result.grounding && (
+                  <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-emerald-200">
+                    {analysis.result.grounding.validatedSourceCount} exact quote
+                    anchors
+                  </span>
+                )}
                 <span className="rounded-full border border-hud-border bg-hud-bg/70 px-2 py-1 text-hud-muted">
                   through {formatSessionTime(analysis.transcriptThroughMs)}
                 </span>
@@ -224,6 +230,14 @@ export function LiveAnalysisHud({
                           ? "turn"
                           : "turns"}
                       </p>
+                      {finding.sourceQuotes?.slice(0, 2).map((source) => (
+                        <blockquote
+                          key={`${source.turnId}-${source.quote}`}
+                          className="mt-1 border-l border-cyan-300/30 pl-2 text-[10px] italic text-hud-muted/80"
+                        >
+                          “{source.quote}”
+                        </blockquote>
+                      ))}
                     </article>
                   ))}
                 </div>

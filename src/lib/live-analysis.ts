@@ -147,14 +147,14 @@ async function requestAnalysis(payload: Record<string, unknown>) {
 Return one JSON object with:
 - headline: one concise intent-specific conclusion
 - summary: a compact synthesis of the discussion
-- keyFindings: up to 6 {title, text, supportingTurnIds}
-- criteria: one {criterion, status, text, supportingTurnIds} for every supplied criterion; status is unaddressed, discussed, or evidenced
-- openQuestions, decisions, actions: arrays of {text, supportingTurnIds}
+- keyFindings: up to 6 {title, text, sourceQuotes}
+- criteria: one {criterion, status, text, sourceQuotes} for every supplied criterion; status is unaddressed, discussed, or evidenced
+- openQuestions, decisions, actions: arrays of {text, sourceQuotes}
 - phaseAllocation: {problemAndEvidence, ideas, evaluation, decisionsAndActions}, totaling 100
 - agreementState: consensus, majority, divided, or emerging
 - minorityPosition: optional string
 
-Only cite turn IDs supplied in the payload. Keep disagreements and uncertainty visible. A visual-evidence caption is context, not proof of a participant's claim.`,
+Each sourceQuotes value is an array of {turnId, quote}; quote must be an exact verbatim substring of that turn's text. Never promote an intent criterion into a finding, decision, or action unless a transcript quote supports it. An unaddressed criterion must have no source quotes. Only cite turn IDs supplied in the payload. Keep disagreements and uncertainty visible. A visual-evidence caption is context, not proof of a participant's claim.`,
           },
           { role: "user", content: JSON.stringify(payload) },
         ],
@@ -183,8 +183,16 @@ function normalizeAnalysis(
 ): LiveAnalysisResult {
   const fallback = fallbackAnalysis(turns, [], config);
   if (!isRecord(raw)) return fallback;
-  const turnIds = new Set(turns.map((turn) => turn.id));
-  const keyFindings = normalizeFindings(raw.keyFindings, turnIds);
+  const turnById = new Map(turns.map((turn) => [turn.id, turn]));
+  const grounding = { validatedSourceCount: 0, rejectedSourceCount: 0 };
+  const keyFindings = normalizeFindings(raw.keyFindings, turnById, grounding);
+  if (keyFindings.length === 0) {
+    return {
+      ...fallback,
+      warning:
+        "The model returned no findings with exact transcript quotes; showing deterministic source coverage instead.",
+    };
+  }
   const criteriaValues = Array.isArray(raw.criteria) ? raw.criteria : [];
   const agreementStates: LiveAnalysisResult["agreementState"][] = [
     "consensus",
@@ -192,11 +200,18 @@ function normalizeAnalysis(
     "divided",
     "emerging",
   ];
+  const groundedSummary = keyFindings
+    .slice(0, 3)
+    .map((finding) => finding.text)
+    .join(" ");
 
   return {
-    headline: boundedString(raw.headline, fallback.headline, 160),
-    summary: boundedString(raw.summary, fallback.summary, 900),
-    keyFindings: keyFindings.length > 0 ? keyFindings : fallback.keyFindings,
+    // The prominent HUD copy is composed only from findings that survived
+    // exact-quote validation. Raw model headline/summary text is intentionally
+    // not displayed because it has no independent source anchors.
+    headline: boundedString(keyFindings[0].title, fallback.headline, 160),
+    summary: boundedString(groundedSummary, fallback.summary, 900),
+    keyFindings,
     criteria: config.criteria.map((criterion) => {
       const candidate = criteriaValues.find(
         (value) =>
@@ -210,23 +225,41 @@ function normalizeAnalysis(
           status: "unaddressed" as const,
           text: "No source-linked coverage was returned for this criterion.",
           supportingTurnIds: [],
+          sourceQuotes: [],
         };
       }
-      const status = ["unaddressed", "discussed", "evidenced"].includes(
-        String(candidate.status),
-      )
+      const requestedStatus = [
+        "unaddressed",
+        "discussed",
+        "evidenced",
+      ].includes(String(candidate.status))
         ? (candidate.status as "unaddressed" | "discussed" | "evidenced")
         : "unaddressed";
+      const sourceQuotes =
+        requestedStatus === "unaddressed"
+          ? []
+          : normalizeSourceQuotes(candidate.sourceQuotes, turnById, grounding);
+      const status =
+        requestedStatus === "unaddressed" || sourceQuotes.length === 0
+          ? "unaddressed"
+          : requestedStatus;
       return {
         criterion,
         status,
-        text: boundedString(candidate.text, "", 360),
-        supportingTurnIds: validTurnIds(candidate.supportingTurnIds, turnIds),
+        text:
+          status === "unaddressed" && requestedStatus !== "unaddressed"
+            ? "The model supplied no exact transcript quote for this assessment."
+            : boundedString(candidate.text, "", 360),
+        supportingTurnIds:
+          status === "unaddressed"
+            ? []
+            : unique(sourceQuotes.map((source) => source.turnId)),
+        sourceQuotes: status === "unaddressed" ? [] : sourceQuotes,
       };
     }),
-    openQuestions: normalizeEvidence(raw.openQuestions, turnIds),
-    decisions: normalizeEvidence(raw.decisions, turnIds),
-    actions: normalizeEvidence(raw.actions, turnIds),
+    openQuestions: normalizeEvidence(raw.openQuestions, turnById, grounding),
+    decisions: normalizeEvidence(raw.decisions, turnById, grounding),
+    actions: normalizeEvidence(raw.actions, turnById, grounding),
     phaseAllocation: normalizePhaseAllocation(raw.phaseAllocation),
     agreementState:
       typeof raw.agreementState === "string" &&
@@ -240,6 +273,7 @@ function normalizeAnalysis(
         ? boundedString(raw.minorityPosition, "", 360)
         : undefined,
     engine,
+    grounding,
   };
 }
 
@@ -263,10 +297,55 @@ function fallbackAnalysis(
       /\b(i will|i'll|we will|we'll|action|next step)\b/i.test(turn.text),
     )
     .slice(-4);
+  const keyFindings = uniqueTurns([
+    first,
+    turns[Math.floor(turns.length / 2)],
+    last,
+  ]).map((turn, index) => ({
+    title:
+      index === 0
+        ? "Opening context"
+        : index === 1
+          ? "Midpoint signal"
+          : "Latest state",
+    text: boundedString(turn.text, "", 320),
+    supportingTurnIds: [turn.id],
+    sourceQuotes: [sourceQuoteForTurn(turn)],
+  }));
+  const criterionAssessments = config.criteria.map((criterion) => {
+    const words = criterion.toLowerCase().match(/[a-z0-9]{4,}/g) || [];
+    const matches = turns
+      .filter((turn) =>
+        words.some((word) => turn.text.toLowerCase().includes(word)),
+      )
+      .slice(-3);
+    return {
+      criterion,
+      status:
+        matches.length > 0 ? ("discussed" as const) : ("unaddressed" as const),
+      text:
+        matches.length > 0
+          ? "Related language appears in the source turns."
+          : "No direct keyword coverage found in the transcript.",
+      supportingTurnIds: matches.map((turn) => turn.id),
+      sourceQuotes: matches.map(sourceQuoteForTurn),
+    };
+  });
+  const openQuestions = questionTurns.map(toEvidence);
+  const decisions = decisionTurns.map(toEvidence);
+  const actions = actionTurns.map(toEvidence);
+  const validatedSourceCount = [
+    ...keyFindings,
+    ...criterionAssessments,
+    ...openQuestions,
+    ...decisions,
+    ...actions,
+  ].reduce((count, item) => count + (item.sourceQuotes?.length || 0), 0);
 
   return {
-    headline: `${humanizePhase(config.phase)} view · ${config.objective}`.slice(
-      0,
+    headline: boundedString(
+      `${humanizePhase(config.phase)} view · ${config.objective}`,
+      "Live critique synthesis",
       160,
     ),
     summary: `Analyzed all ${turns.length} substantive turns from ${first.speakerLabel} through ${last.speakerLabel}${
@@ -274,43 +353,11 @@ function fallbackAnalysis(
         ? `, together with ${visualEvidence.length} captured visual evidence ${visualEvidence.length === 1 ? "item" : "items"}`
         : ""
     }. This deterministic view preserves coverage while model synthesis is unavailable.`,
-    keyFindings: uniqueTurns([
-      first,
-      turns[Math.floor(turns.length / 2)],
-      last,
-    ]).map((turn, index) => ({
-      title:
-        index === 0
-          ? "Opening context"
-          : index === 1
-            ? "Midpoint signal"
-            : "Latest state",
-      text: turn.text.slice(0, 320),
-      supportingTurnIds: [turn.id],
-    })),
-    criteria: config.criteria.map((criterion) => {
-      const words = criterion.toLowerCase().match(/[a-z0-9]{4,}/g) || [];
-      const matches = turns
-        .filter((turn) =>
-          words.some((word) => turn.text.toLowerCase().includes(word)),
-        )
-        .slice(-3);
-      return {
-        criterion,
-        status:
-          matches.length > 0
-            ? ("discussed" as const)
-            : ("unaddressed" as const),
-        text:
-          matches.length > 0
-            ? "Related language appears in the source turns."
-            : "No direct keyword coverage found in the transcript.",
-        supportingTurnIds: matches.map((turn) => turn.id),
-      };
-    }),
-    openQuestions: questionTurns.map(toEvidence),
-    decisions: decisionTurns.map(toEvidence),
-    actions: actionTurns.map(toEvidence),
+    keyFindings,
+    criteria: criterionAssessments,
+    openQuestions,
+    decisions,
+    actions,
     phaseAllocation: {
       problemAndEvidence: 30,
       ideas: 25,
@@ -319,6 +366,7 @@ function fallbackAnalysis(
     },
     agreementState: "emerging",
     engine: "deterministic-fallback",
+    grounding: { validatedSourceCount, rejectedSourceCount: 0 },
   };
 }
 
@@ -334,44 +382,84 @@ function serializeTurn(turn: LiveAnalysisTurn) {
 
 function normalizeFindings(
   value: unknown,
-  allowedIds: Set<string>,
+  turnById: Map<string, LiveAnalysisTurn>,
+  grounding: { validatedSourceCount: number; rejectedSourceCount: number },
 ): LiveAnalysisFinding[] {
   if (!Array.isArray(value)) return [];
   return value
     .filter(isRecord)
-    .map((item) => ({
-      title: boundedString(item.title, "Finding", 100),
-      text: boundedString(item.text, "", 420),
-      supportingTurnIds: validTurnIds(item.supportingTurnIds, allowedIds),
-    }))
+    .map((item) => {
+      const sourceQuotes = normalizeSourceQuotes(
+        item.sourceQuotes,
+        turnById,
+        grounding,
+      );
+      return {
+        title: boundedString(item.title, "Finding", 100),
+        text: boundedString(item.text, "", 420),
+        supportingTurnIds: unique(sourceQuotes.map((source) => source.turnId)),
+        sourceQuotes,
+      };
+    })
     .filter((item) => item.text.length > 0 && item.supportingTurnIds.length > 0)
     .slice(0, 6);
 }
 
 function normalizeEvidence(
   value: unknown,
-  allowedIds: Set<string>,
+  turnById: Map<string, LiveAnalysisTurn>,
+  grounding: { validatedSourceCount: number; rejectedSourceCount: number },
 ): LiveAnalysisEvidence[] {
   if (!Array.isArray(value)) return [];
   return value
     .filter(isRecord)
-    .map((item) => ({
-      text: boundedString(item.text, "", 360),
-      supportingTurnIds: validTurnIds(item.supportingTurnIds, allowedIds),
-    }))
-    .filter((item) => item.text.length > 0)
+    .map((item) => {
+      const sourceQuotes = normalizeSourceQuotes(
+        item.sourceQuotes,
+        turnById,
+        grounding,
+      );
+      return {
+        text: boundedString(item.text, "", 360),
+        supportingTurnIds: unique(sourceQuotes.map((source) => source.turnId)),
+        sourceQuotes,
+      };
+    })
+    .filter((item) => item.text.length > 0 && item.sourceQuotes.length > 0)
     .slice(0, 8);
 }
 
-function validTurnIds(value: unknown, allowedIds: Set<string>): string[] {
+function normalizeSourceQuotes(
+  value: unknown,
+  turnById: Map<string, LiveAnalysisTurn>,
+  grounding: { validatedSourceCount: number; rejectedSourceCount: number },
+) {
   if (!Array.isArray(value)) return [];
-  return [
-    ...new Set(
-      value.filter(
-        (id): id is string => typeof id === "string" && allowedIds.has(id),
-      ),
-    ),
-  ].slice(0, 12);
+  const sourceQuotes: Array<{ turnId: string; quote: string }> = [];
+  for (const source of value.slice(0, 16)) {
+    if (!isRecord(source)) {
+      grounding.rejectedSourceCount++;
+      continue;
+    }
+    const turnId = typeof source.turnId === "string" ? source.turnId : "";
+    const quote = typeof source.quote === "string" ? source.quote.trim() : "";
+    const turn = turnById.get(turnId);
+    if (!turn || !quote || !turn.text.includes(quote)) {
+      grounding.rejectedSourceCount++;
+      continue;
+    }
+    const key = `${turnId}\u0000${quote}`;
+    if (
+      sourceQuotes.some(
+        (existing) => `${existing.turnId}\u0000${existing.quote}` === key,
+      )
+    ) {
+      continue;
+    }
+    sourceQuotes.push({ turnId, quote: quote.slice(0, 320) });
+    grounding.validatedSourceCount++;
+  }
+  return sourceQuotes.slice(0, 12);
 }
 
 function normalizePhaseAllocation(value: unknown) {
@@ -398,9 +486,14 @@ function boundedString(
   fallback: string,
   maxLength: number,
 ): string {
-  return typeof value === "string" && value.trim()
-    ? value.trim().slice(0, maxLength)
-    : fallback;
+  if (typeof value !== "string" || !value.trim()) return fallback;
+  const text = value.trim();
+  if (text.length <= maxLength) return text;
+  const candidate = text.slice(0, Math.max(1, maxLength - 1));
+  const breakAt = candidate.lastIndexOf(" ");
+  const end =
+    breakAt >= Math.floor(maxLength * 0.65) ? breakAt : candidate.length;
+  return `${candidate.slice(0, end).replace(/[\s,;:—-]+$/, "")}…`;
 }
 
 function boundedNumber(value: unknown, fallback: number): number {
@@ -422,7 +515,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function toEvidence(turn: LiveAnalysisTurn): LiveAnalysisEvidence {
-  return { text: turn.text.slice(0, 360), supportingTurnIds: [turn.id] };
+  return {
+    text: boundedString(turn.text, "", 360),
+    supportingTurnIds: [turn.id],
+    sourceQuotes: [sourceQuoteForTurn(turn)],
+  };
+}
+
+function sourceQuoteForTurn(turn: LiveAnalysisTurn) {
+  return { turnId: turn.id, quote: turn.text.slice(0, 320) };
+}
+
+function unique(values: string[]) {
+  return [...new Set(values)];
 }
 
 function uniqueTurns(turns: LiveAnalysisTurn[]): LiveAnalysisTurn[] {

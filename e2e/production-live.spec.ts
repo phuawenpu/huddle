@@ -37,7 +37,33 @@ type LiveAnalysisSnapshot = {
   firstTurnId: string;
   lastTurnId: string;
   visualEvidenceCount: number;
-  result: { headline: string; engine: string; warning?: string };
+  result: {
+    headline: string;
+    engine: string;
+    warning?: string;
+    grounding?: {
+      validatedSourceCount: number;
+      rejectedSourceCount: number;
+    };
+    keyFindings: Array<{
+      text: string;
+      supportingTurnIds: string[];
+      sourceQuotes?: Array<{ turnId: string; quote: string }>;
+    }>;
+    criteria: Array<{
+      status: string;
+      supportingTurnIds: string[];
+      sourceQuotes?: Array<{ turnId: string; quote: string }>;
+    }>;
+    openQuestions: GroundedAnalysisItem[];
+    decisions: GroundedAnalysisItem[];
+    actions: GroundedAnalysisItem[];
+  };
+};
+
+type GroundedAnalysisItem = {
+  supportingTurnIds: string[];
+  sourceQuotes?: Array<{ turnId: string; quote: string }>;
 };
 
 type SpeechEvaluationResponse = {
@@ -245,6 +271,9 @@ test.describe("Production live audio verification", () => {
     expect(repeatedAnalyses[0].lastTurnId).not.toBe(
       repeatedAnalyses[1].lastTurnId,
     );
+    const groundedTurns = await fetchTurns(request, session.id);
+    assertGroundedAnalysis(repeatedAnalyses[0], groundedTurns);
+    assertGroundedAnalysis(repeatedAnalyses[1], groundedTurns);
     const activeSession = await (
       await request.get(`/api/sessions/${session.id}`)
     ).json();
@@ -300,6 +329,7 @@ test.describe("Production live audio verification", () => {
           firstTurnId: analysis.firstTurnId,
           lastTurnId: analysis.lastTurnId,
           engine: analysis.result.engine,
+          grounding: analysis.result.grounding,
           warning: analysis.result.warning,
         })),
         lastFinalText: finalTurns.at(-1)?.currentText,
@@ -468,6 +498,59 @@ async function waitForTurns(
   throw new Error(
     `Timed out waiting for production transcript; latest=${JSON.stringify(latest)}`,
   );
+}
+
+async function fetchTurns(
+  request: APIRequestContext,
+  sessionId: string,
+): Promise<PersistedTurn[]> {
+  const response = await request.get(`/api/sessions/${sessionId}/turns`);
+  const turns = (await response.json()) as PersistedTurn[];
+  expect(response.ok(), JSON.stringify(turns)).toBeTruthy();
+  return turns;
+}
+
+function assertGroundedAnalysis(
+  analysis: LiveAnalysisSnapshot,
+  turns: PersistedTurn[],
+) {
+  const textByTurnId = new Map(
+    turns.map((turn) => [turn.id, turn.currentText]),
+  );
+  expect(analysis.result.grounding?.validatedSourceCount).toBeGreaterThan(0);
+  expect(analysis.result.keyFindings.length).toBeGreaterThan(0);
+  const requiredItems: GroundedAnalysisItem[] = [
+    ...analysis.result.keyFindings,
+    ...analysis.result.criteria.filter(
+      (criterion) => criterion.status !== "unaddressed",
+    ),
+    ...analysis.result.openQuestions,
+    ...analysis.result.decisions,
+    ...analysis.result.actions,
+  ];
+  for (const item of requiredItems) {
+    expect(item.sourceQuotes?.length || 0).toBeGreaterThan(0);
+    const quoteTurnIds = new Set<string>();
+    for (const source of item.sourceQuotes || []) {
+      const transcript = textByTurnId.get(source.turnId);
+      expect(
+        transcript,
+        `Unknown analysis source turn ${source.turnId}`,
+      ).toBeTruthy();
+      expect(
+        transcript!.includes(source.quote),
+        `Non-verbatim source quote for turn ${source.turnId}: ${source.quote}`,
+      ).toBeTruthy();
+      quoteTurnIds.add(source.turnId);
+    }
+    expect(new Set(item.supportingTurnIds)).toEqual(quoteTurnIds);
+  }
+  for (const criterion of analysis.result.criteria.filter(
+    (item) => item.status === "unaddressed",
+  )) {
+    expect(criterion.supportingTurnIds).toEqual([]);
+    expect(criterion.sourceQuotes || []).toEqual([]);
+  }
 }
 
 async function stopSession(

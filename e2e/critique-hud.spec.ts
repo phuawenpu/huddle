@@ -38,7 +38,8 @@ async function createTranscriptNavigationFixture(
         isFinal: true,
       },
     });
-    expect(ingested.ok()).toBeTruthy();
+    const ingestResult = await ingested.json();
+    expect(ingested.ok(), JSON.stringify(ingestResult)).toBeTruthy();
   }
 
   return session as { id: string };
@@ -806,5 +807,72 @@ test.describe("Mobile-specific assertions", () => {
     const buttons = page.locator("button, a[href]");
     const count = await buttons.count();
     expect(count).toBeGreaterThan(0);
+  });
+
+  test("iPhone Live Critique keeps HUD, transcript, and visual controls independently reachable", async ({
+    page,
+    request,
+  }) => {
+    test.skip(
+      test.info().project.name !== "iphone",
+      "This responsive viewport contract is exercised on the iPhone project.",
+    );
+    const session = await createTranscriptNavigationFixture(request, 24);
+    await page.goto(`/facilitator/${session.id}`);
+
+    const main = page.locator("main");
+    const hud = page.getByTestId("live-analysis-hud");
+    const transcript = page.getByTestId("transcript-scroll");
+    await expect(hud).toBeVisible();
+    await expect(transcript).toBeVisible();
+    await expect(
+      page.getByText("Visual evidence · 0 captured +"),
+    ).toBeVisible();
+
+    const layout = await main.evaluate((element) => ({
+      scrollWidth: element.scrollWidth,
+      clientWidth: element.clientWidth,
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+    }));
+    expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
+    expect(layout.scrollHeight).toBeLessThanOrEqual(layout.clientHeight + 1);
+    const hudBox = await hud.boundingBox();
+    const transcriptBox = await transcript.boundingBox();
+    expect(hudBox?.height || 0).toBeGreaterThan(100);
+    expect(hudBox?.height || Infinity).toBeLessThanOrEqual(
+      (page.viewportSize()?.height || 0) * 0.47,
+    );
+    expect(transcriptBox?.height || 0).toBeGreaterThan(100);
+    await expect
+      .poll(() =>
+        transcript.evaluate(
+          (element) => element.scrollHeight > element.clientHeight,
+        ),
+      )
+      .toBe(true);
+
+    await transcript.evaluate((element) => {
+      element.scrollTop = 0;
+      element.dispatchEvent(new Event("scroll"));
+    });
+    await expect(transcript).toHaveAttribute("data-following", "false");
+    await expect
+      .poll(() => transcript.evaluate((element) => element.scrollTop))
+      .toBe(0);
+    await expect(page.getByText("Transcript marker 01")).toBeInViewport();
+    await transcript.evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+      element.dispatchEvent(new Event("scroll"));
+    });
+    await expect(transcript).toHaveAttribute("data-following", "true");
+    await expect(page.getByText("Transcript marker 24")).toBeInViewport();
+
+    await hud.evaluate((element) =>
+      element.scrollTo({ top: element.scrollHeight }),
+    );
+    await expect(
+      hud.getByPlaceholder("What should this analysis clarify?"),
+    ).toBeInViewport();
   });
 });

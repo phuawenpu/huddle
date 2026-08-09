@@ -353,6 +353,9 @@ export default function DisplayPage() {
                   <p className="mt-1 text-[10px] text-hud-muted">
                     {liveAnalysis.transcriptTurnCount} turns · through{" "}
                     {formatSessionTime(liveAnalysis.transcriptThroughMs)}
+                    {liveAnalysis.result.grounding
+                      ? ` · ${liveAnalysis.result.grounding.validatedSourceCount} exact quote anchors`
+                      : ""}
                   </p>
                 </div>
                 <span className="rounded-full bg-cyan-400/10 px-2 py-1 text-[10px] text-cyan-200">
