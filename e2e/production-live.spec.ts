@@ -10,6 +10,9 @@ const RUN_PRODUCTION_LIVE = process.env.RUN_PRODUCTION_LIVE === "1";
 const BASE_URL = process.env.BASE_URL || "";
 const SCENARIO_ID = process.env.PRODUCTION_LIVE_SCENARIO_ID || "";
 const FAKE_AUDIO_FILE = process.env.PRODUCTION_LIVE_AUDIO_FILE || "";
+const MAX_SPEECH_WER = numericEnv("MAX_SPEECH_WER", 0.45);
+const MAX_NON_OVERLAP_DER = numericEnv("MAX_NON_OVERLAP_DER", 0.75);
+const MAX_OVERLAP_SA_WER = numericEnv("MAX_OVERLAP_SA_WER", 1.5);
 const ACTIVE_SESSION_IDS = new Set<string>();
 
 type PersistedTurn = {
@@ -17,6 +20,40 @@ type PersistedTurn = {
   isFinal: boolean;
   providerSpeakerLabel: string;
   possibleOverlap: boolean;
+};
+
+type SpeechEvaluationResponse = {
+  report: {
+    reference: {
+      speakerCount: number;
+      overlapIntervals: Array<{ startMs: number; endMs: number }>;
+      overlapSpeakerMs: number;
+    };
+    hypothesis: {
+      turnCount: number;
+      speakerLabelCount: number;
+      unknownWordCount: number;
+    };
+    speakerMapping: Array<{
+      hypothesisLabel: string;
+      referenceSpeakerName: string;
+    }>;
+    wordError: {
+      overall: { rate: number | null };
+      speakerAttributed: { rate: number | null };
+      overlap: { rate: number | null };
+      overlapSpeakerAttributed: { rate: number | null };
+    };
+    diarization: {
+      excludingOverlap: {
+        errorRate: number | null;
+        missedSpeechMs: number;
+        falseAlarmMs: number;
+        speakerConfusionMs: number;
+      };
+      includingOverlap: { errorRate: number | null };
+    };
+  };
 };
 
 test.describe("Production live audio verification", () => {
@@ -43,6 +80,15 @@ test.describe("Production live audio verification", () => {
     request,
   }) => {
     test.setTimeout(210_000);
+    const scenarioResponse = await request.get(`/api/scenarios/${SCENARIO_ID}`);
+    expect(scenarioResponse.ok()).toBeTruthy();
+    const scenario = (await scenarioResponse.json()) as {
+      turns: Array<{ text: string; endMs?: number }>;
+    };
+    const firstOverlapTarget = scenario.turns.find((turn) =>
+      turn.text.toLowerCase().includes("uncertainty label"),
+    );
+    expect(firstOverlapTarget?.endMs).toBeGreaterThan(0);
     const session = await createSession(request, {
       title: "Production Climate recorded-pipeline verification",
       runMode: "sim_injected",
@@ -82,6 +128,36 @@ test.describe("Production live audio verification", () => {
     );
 
     await stopSession(page, request, session.id);
+    const evaluation = await evaluateSpeechSession(
+      request,
+      session.id,
+      firstOverlapTarget!.endMs!,
+    );
+    expect(evaluation.report.reference.speakerCount).toBe(3);
+    expect(evaluation.report.reference.overlapIntervals.length).toBeGreaterThan(
+      0,
+    );
+    expect(evaluation.report.reference.overlapSpeakerMs).toBeGreaterThan(0);
+    expect(evaluation.report.hypothesis.turnCount).toBeGreaterThanOrEqual(8);
+    expect(
+      evaluation.report.hypothesis.speakerLabelCount,
+    ).toBeGreaterThanOrEqual(2);
+    expect(evaluation.report.speakerMapping.length).toBeGreaterThanOrEqual(2);
+    expectRateAtMost(
+      "overall WER",
+      evaluation.report.wordError.overall.rate,
+      MAX_SPEECH_WER,
+    );
+    expectRateAtMost(
+      "speaker-attributed overlap WER",
+      evaluation.report.wordError.overlapSpeakerAttributed.rate,
+      MAX_OVERLAP_SA_WER,
+    );
+    expectRateAtMost(
+      "non-overlap DER",
+      evaluation.report.diarization.excludingOverlap.errorRate,
+      MAX_NON_OVERLAP_DER,
+    );
     console.log(
       JSON.stringify({
         source: "recorded_demo",
@@ -90,6 +166,20 @@ test.describe("Production live audio verification", () => {
         speakerLabels: [...speakerLabels],
         reachedFirstPlannedOverlap: true,
         lastFinalText: finalTurns.at(-1)?.currentText,
+        speechEvaluation: {
+          overallWer: evaluation.report.wordError.overall.rate,
+          speakerAttributedWer:
+            evaluation.report.wordError.speakerAttributed.rate,
+          overlapWer: evaluation.report.wordError.overlap.rate,
+          overlapSpeakerAttributedWer:
+            evaluation.report.wordError.overlapSpeakerAttributed.rate,
+          derExcludingOverlap:
+            evaluation.report.diarization.excludingOverlap.errorRate,
+          derIncludingOverlap:
+            evaluation.report.diarization.includingOverlap.errorRate,
+          diarizationComponents: evaluation.report.diarization.excludingOverlap,
+          speakerMapping: evaluation.report.speakerMapping,
+        },
       }),
     );
   });
@@ -180,6 +270,41 @@ async function createSession(
   expect(response.ok(), JSON.stringify(body)).toBeTruthy();
   ACTIVE_SESSION_IDS.add(body.id);
   return body as { id: string };
+}
+
+async function evaluateSpeechSession(
+  request: APIRequestContext,
+  sessionId: string,
+  endMs: number,
+): Promise<SpeechEvaluationResponse> {
+  const response = await request.get(
+    `/api/sessions/${sessionId}/speech-evaluation?startMs=0&endMs=${Math.round(endMs)}&collarMs=250`,
+  );
+  const body = await response.json();
+  expect(response.ok(), JSON.stringify(body)).toBeTruthy();
+  return body as SpeechEvaluationResponse;
+}
+
+function expectRateAtMost(
+  label: string,
+  rate: number | null,
+  threshold: number,
+) {
+  expect(rate, `${label} was not measurable`).not.toBeNull();
+  expect(Number.isFinite(rate), `${label} was not finite`).toBeTruthy();
+  expect(rate!, `${label} exceeded ${threshold}`).toBeLessThanOrEqual(
+    threshold,
+  );
+}
+
+function numericEnv(name: string, fallback: number) {
+  const value = process.env[name];
+  if (!value) return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`${name} must be a non-negative number.`);
+  }
+  return parsed;
 }
 
 async function expectPipelineReady(page: Page) {

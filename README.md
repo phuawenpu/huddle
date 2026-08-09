@@ -20,9 +20,9 @@ Both modes drive the same pipeline: audio → worklet → PCM16 → ASR → tran
 | Metric            | Value                                            |
 | ----------------- | ------------------------------------------------ |
 | TypeScript        | 0 errors                                         |
-| Unit tests        | 105/105 passing                                  |
+| Unit tests        | 110/110 passing                                  |
 | Live audio E2E    | Mic + recorded pipelines pass locally and on Fly |
-| API routes        | 39 endpoints operational                         |
+| API routes        | 40 endpoints operational                         |
 | Frontend pages    | 9 routes functional                              |
 | DB schema         | 11 models, SQLite via Prisma                     |
 | Production data   | 12/12 scenarios at quality score 100             |
@@ -69,6 +69,7 @@ POST /api/sessions/terminate-beacon     — sendBeacon termination endpoint
 POST /api/scenarios/[id]/synthesize     — Generate WAV audio from scenario turns
 POST /api/scenarios/[id]/revise         — Run 1–3 sequential structured transcript revisions
 GET  /api/scenarios/[id]/mixed           — Serve synthesized WAV/MP3 (Range-capable)
+GET  /api/sessions/[id]/speech-evaluation — Score WER, SA-WER, overlap WER, and DER
 GET  /api/recordings                     — List all synthesized recordings + uploads
 POST /api/uploads                        — Upload audio files (WAV, MP3, M4A, WebM, OGG)
 ```
@@ -202,6 +203,12 @@ RUN_PRODUCTION_LIVE=1 BASE_URL=https://huddle-ti5ikw.fly.dev \
   PRODUCTION_LIVE_AUDIO_FILE=<absolute-wav-path> \
   npx playwright test e2e/production-live.spec.ts --project=chromium
 ```
+
+The production test now fails when overall WER exceeds `0.45`, non-overlap DER
+exceeds `0.75`, or overlap speaker-attributed WER exceeds `1.5`. Override those
+gates with `MAX_SPEECH_WER`, `MAX_NON_OVERLAP_DER`, and
+`MAX_OVERLAP_SA_WER`. See the [speech evaluation pipeline](docs/speech-evaluation-pipeline.md)
+for metric definitions, the HTTP reporting interface, and interpretation limits.
 
 ## Architecture
 

@@ -44,10 +44,40 @@ export function isSubstantiveTurn(text: string, durationMs: number): boolean {
  * Word error rate (WER) between reference and hypothesis strings.
  */
 export function wordErrorRate(reference: string, hypothesis: string): number {
-  const refWords = normalizeAsrWords(reference);
-  const hypWords = normalizeAsrWords(hypothesis);
+  const stats = wordErrorStats(
+    normalizeAsrWords(reference),
+    normalizeAsrWords(hypothesis),
+  );
+  return stats.rate ?? 1;
+}
 
-  if (refWords.length === 0) return hypWords.length === 0 ? 0 : 1;
+export interface WordErrorStats {
+  substitutions: number;
+  deletions: number;
+  insertions: number;
+  errors: number;
+  referenceWords: number;
+  hypothesisWords: number;
+  rate: number | null;
+}
+
+/** Calculate lexical edit counts for already-normalized word sequences. */
+export function wordErrorStats(
+  refWords: string[],
+  hypWords: string[],
+): WordErrorStats {
+  if (refWords.length === 0) {
+    const insertions = hypWords.length;
+    return {
+      substitutions: 0,
+      deletions: 0,
+      insertions,
+      errors: insertions,
+      referenceWords: 0,
+      hypothesisWords: hypWords.length,
+      rate: insertions === 0 ? 0 : null,
+    };
+  }
 
   const m = refWords.length;
   const n = hypWords.length;
@@ -69,11 +99,47 @@ export function wordErrorRate(reference: string, hypothesis: string): number {
     }
   }
 
-  return d[m][n] / m;
+  let substitutions = 0;
+  let deletions = 0;
+  let insertions = 0;
+  let i = m;
+  let j = n;
+  while (i > 0 || j > 0) {
+    if (
+      i > 0 &&
+      j > 0 &&
+      refWords[i - 1] === hypWords[j - 1] &&
+      d[i][j] === d[i - 1][j - 1]
+    ) {
+      i--;
+      j--;
+    } else if (i > 0 && j > 0 && d[i][j] === d[i - 1][j - 1] + 1) {
+      substitutions++;
+      i--;
+      j--;
+    } else if (i > 0 && d[i][j] === d[i - 1][j] + 1) {
+      deletions++;
+      i--;
+    } else {
+      insertions++;
+      j--;
+    }
+  }
+
+  const errors = substitutions + deletions + insertions;
+  return {
+    substitutions,
+    deletions,
+    insertions,
+    errors,
+    referenceWords: m,
+    hypothesisWords: n,
+    rate: errors / m,
+  };
 }
 
 /** Compare lexical content rather than punctuation formatting from the ASR. */
-function normalizeAsrWords(value: string): string[] {
+export function normalizeAsrWords(value: string): string[] {
   return (
     value
       .normalize("NFKC")
