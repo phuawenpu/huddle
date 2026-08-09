@@ -13,7 +13,7 @@ The Critique HUD supports two modes:
 
 Both modes drive the same pipeline: audio → worklet → PCM16 → ASR → transcript → analysis → SSE → display.
 
-## Live session AI: system overview
+## Live session AI: readable overview
 
 The live session has two deliberately independent loops. The **capture loop**
 keeps accepting audio and persisting transcript turns. The **synthesis loop**
@@ -50,23 +50,28 @@ flowchart TB
   Turns[("Persisted transcript")]:::store
   Signals["Continuous critique signals"]:::analysis
   Events["SSE snapshots and patches"]:::transport
-  Views["Facilitator HUD and shared display"]:::view
+  HUD["Private facilitator HUD"]:::view
 
   Intent["New facilitator intent"]:::intent
   Cutoff["All substantive turns through now"]:::analysis
   Synthesis["Exhaustive whole-transcript synthesis"]:::analysis
   Grounding["Exact-quote validation"]:::analysis
-  History[("Immutable analysis history")]:::store
+  State[("Versioned meeting state")]:::store
   Fallback["Source-linked fallback"]:::fallback
 
   Frame["Explicit visual capture"]:::visual
   Context["Validate, describe, and timeline-link"]:::visual
 
-  Audio --> PCM --> ASR --> Turns --> Signals --> Events --> Views
+  Review["Facilitator reviews or edits"]:::human
+  Publish["Explicit publish"]:::human
+  Shared["Shared meeting display"]:::shared
+
+  Audio --> PCM --> ASR --> Turns --> Signals --> Events --> HUD
   Intent --> Cutoff
-  Turns --> Cutoff --> Synthesis --> Grounding --> History --> Events
+  Turns --> Cutoff --> Synthesis --> Grounding --> State --> Events
   Frame --> Context -. optional context .-> Cutoff
-  Grounding -. invalid output .-> Fallback --> History
+  Grounding -. invalid output .-> Fallback --> State
+  HUD --> Review --> Publish --> Shared
 
   classDef capture fill:#ecfeff,stroke:#0e7490,color:#0f172a,stroke-width:2px;
   classDef analysis fill:#f5f3ff,stroke:#6d28d9,color:#0f172a,stroke-width:2px;
@@ -76,7 +81,19 @@ flowchart TB
   classDef fallback fill:#fffbeb,stroke:#b45309,color:#451a03,stroke-width:2px;
   classDef transport fill:#eff6ff,stroke:#1d4ed8,color:#0f172a,stroke-width:2px;
   classDef view fill:#ecfdf5,stroke:#047857,color:#052e16,stroke-width:2px;
+  classDef human fill:#f0fdf4,stroke:#15803d,color:#052e16,stroke-width:2px;
+  classDef shared fill:#dcfce7,stroke:#166534,color:#052e16,stroke-width:3px;
+
+  linkStyle 0,1,2,3,4,5 stroke:#0e7490,stroke-width:3px;
+  linkStyle 6,7,8,9,10,11,14,15 stroke:#6d28d9,stroke-width:2px;
+  linkStyle 12,13 stroke:#a21caf,stroke-width:2px;
+  linkStyle 16,17,18 stroke:#15803d,stroke-width:3px;
 ```
+
+The cyan spine is uninterrupted capture and private live feedback. Violet is a
+repeatable semantic-state revision; magenta is optional visual context; amber
+is the safe fallback. Green is the human control boundary: AI interpretations
+remain private until the facilitator reviews and explicitly publishes them.
 
 Key runtime guarantees:
 

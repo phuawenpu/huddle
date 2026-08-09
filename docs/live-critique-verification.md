@@ -31,6 +31,8 @@ not prove that the model's interpretation follows from the quote, that a claim
 is factually correct, or that a visual caption is accurate. Those remain human
 review responsibilities.
 
+## Behavior diagrams
+
 ## Repeated intent analysis
 
 Audio capture and intent-driven synthesis are separate concurrent processes.
@@ -96,6 +98,14 @@ sequenceDiagram
   AI-->>Session: New grounded result or safe fallback
   Session->>Session: Persist analysis B and retain analysis A
   Session-->>HUD: SSE latest synthesis while history remains available
+
+  Note over HUD,AI: AI meeting-state cards and action suggestions remain private
+  HUD->>Session: Save a reviewed title, status, summary, or owner
+  Session->>Session: Persist a human-authored state revision
+  Session-->>HUD: SSE private revision
+  HUD->>Session: Explicitly publish one reviewed card
+  Session->>Session: Revalidate its source quotes against current turns
+  Session-->>HUD: SSE map patch for the shared display
 ```
 
 ## Visual evidence consent flow
