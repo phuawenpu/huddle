@@ -162,21 +162,21 @@ export function SpeakerWaveformStage({
                   </span>
                   <span className="min-w-0 flex-1">
                     <span
-                      className="block truncate text-xs font-semibold text-white"
+                      className="block truncate text-[10px] font-semibold text-white sm:text-xs"
                       style={{ color: isSpeaking ? style.color : undefined }}
                     >
                       {name === label ? `Speaker ${label}` : name}
                     </span>
-                    <span className="block truncate text-[9px] text-hud-muted">
-                      {isSpeaking ? "Speaking now" : `Diarized as ${label}`}
+                    <span
+                      className="block truncate text-[10px] font-bold tabular-nums"
+                      style={{ color: style.color }}
+                      title="Share of finalized speaking time in the last five minutes"
+                    >
+                      {Math.round((talkShares[label] || 0) * 100)}% ·{" "}
+                      <span className="font-normal text-hud-muted">
+                        {isSpeaking ? "speaking" : "5 min"}
+                      </span>
                     </span>
-                  </span>
-                  <span
-                    className="shrink-0 text-xs font-bold tabular-nums"
-                    style={{ color: style.color }}
-                    title="Share of finalized speaking time in the last five minutes"
-                  >
-                    {Math.round((talkShares[label] || 0) * 100)}%
                   </span>
                 </button>
               );

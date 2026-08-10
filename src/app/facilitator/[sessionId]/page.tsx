@@ -794,6 +794,29 @@ export default function FacilitatorPage() {
   };
 
   const isActive = session?.status === "active";
+  const selectedMeetingNode =
+    liveAnalysis?.result.meetingState.nodes.find(
+      (node) => node.id === selectedNodeId,
+    ) || null;
+  const selectedNodePublished = Boolean(
+    selectedMeetingNode && publishedNodeIds.includes(selectedMeetingNode.id),
+  );
+
+  const openVisualEvidenceCapture = () => {
+    const desktopPanel = document.getElementById("visual-evidence-panel");
+    const panel = document.getElementById(
+      "visual-evidence-details",
+    ) as HTMLDetailsElement | null;
+    if (window.matchMedia("(min-width: 1280px)").matches && desktopPanel) {
+      desktopPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      return;
+    }
+    if (!panel) return;
+    panel.open = true;
+    requestAnimationFrame(() =>
+      panel.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+  };
 
   if (error && !session) {
     return (
@@ -813,341 +836,420 @@ export default function FacilitatorPage() {
 
   return (
     <main className="h-dvh max-h-dvh overflow-hidden flex flex-col bg-hud-bg text-hud-text safe-top safe-bottom safe-left safe-right">
-      {/* Header */}
-      <header className="shrink-0 px-4 py-3 border-b border-hud-border flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-bold">
-            {session?.title || "Loading..."}
-          </h1>
-          <div className="flex gap-2 items-center text-sm text-hud-muted">
-            <span
-              className={`w-2 h-2 rounded-full ${isActive ? "bg-green-400 animate-pulse" : "bg-gray-500"}`}
-            />
-            <span>{session?.status || "..."}</span>
-            {isActive && wakeLockSupported && (
+      <div
+        data-testid="facilitator-scroll"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+      >
+        {/* Header */}
+        <header className="shrink-0 px-4 py-3 border-b border-hud-border flex items-center justify-between">
+          <div>
+            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-cyan-200">
+              ✦ Critique HUD
+            </p>
+            <h1 className="text-lg font-bold">
+              {session?.title || "Loading..."}
+            </h1>
+            <div className="flex gap-2 items-center text-sm text-hud-muted">
               <span
-                className={wakeLocked ? "text-green-400" : "text-yellow-400"}
-              >
-                {wakeLocked ? "🔒" : "⚠️"}
-              </span>
-            )}
+                className={`w-2 h-2 rounded-full ${isActive ? "bg-green-400 animate-pulse" : "bg-gray-500"}`}
+              />
+              <span>{session?.status || "..."}</span>
+              {isActive && wakeLockSupported && (
+                <span
+                  className={wakeLocked ? "text-green-400" : "text-yellow-400"}
+                >
+                  {wakeLocked ? "🔒" : "⚠️"}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-        <div className="flex gap-2 text-sm">
-          <span className="text-hud-muted">{streamingMins.toFixed(1)} min</span>
-          {workletLoaded && <span className="text-green-400">Worklet ✓</span>}
-          {pcmReady && <span className="text-green-400">PCM ✓</span>}
-          {asrConnected && <span className="text-green-400">ASR ✓</span>}
-          {sourceKind === "recording" && (
-            <span className="text-hud-accent">Recorded demo</span>
+          <div className="flex max-w-[52%] flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[9px] sm:text-xs">
+            <span className="text-hud-muted">
+              {streamingMins.toFixed(1)} min
+            </span>
+            {workletLoaded && <span className="text-green-400">Worklet ✓</span>}
+            {pcmReady && <span className="text-green-400">PCM ✓</span>}
+            {asrConnected && <span className="text-green-400">ASR ✓</span>}
+            {sourceKind === "recording" && (
+              <span className="text-hud-accent">Recorded demo</span>
+            )}
+            <details className="relative">
+              <summary
+                className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-lg border border-white/10 text-base marker:hidden"
+                aria-label="Session menu"
+              >
+                ⋮
+              </summary>
+              <div className="absolute right-0 top-9 z-50 flex w-36 flex-col overflow-hidden rounded-xl border border-white/15 bg-slate-950 p-1 shadow-2xl">
+                <a
+                  href={`/display/${sessionId}`}
+                  target="_blank"
+                  rel="noopener"
+                  className="rounded-lg px-3 py-2 text-left text-xs text-white hover:bg-white/10"
+                >
+                  Open display
+                </a>
+                <button
+                  type="button"
+                  onClick={() => router.push("/runs")}
+                  className="rounded-lg px-3 py-2 text-left text-xs text-white hover:bg-white/10"
+                >
+                  Runs &amp; exports
+                </button>
+              </div>
+            </details>
+          </div>
+        </header>
+
+        {/* Controls */}
+        <div className="shrink-0 flex items-center justify-between gap-3 border-b border-hud-border bg-hud-surface/50 px-4 py-2">
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-hud-muted">
+              Capture
+            </p>
+            <p className="truncate text-xs text-hud-text/80">
+              {isActive
+                ? activeSpeaker
+                  ? `${
+                      speakerVisualStyle(
+                        activeSpeaker,
+                        turns.map((turn) => turn.providerSpeakerLabel),
+                      ).marker
+                    } ${getParticipantName(activeSpeaker)} speaking`
+                  : "Listening · speaker pending"
+                : session?.runMode === "live"
+                  ? "Microphone ready"
+                  : "Recorded demo ready"}
+            </p>
+          </div>
+          {isActive ? (
+            <button
+              onClick={handleStop}
+              className="px-6 py-3 bg-red-600 text-white rounded-xl font-semibold touch-manipulation active:scale-95"
+              style={{ minHeight: 44 }}
+            >
+              Stop
+            </button>
+          ) : (
+            <button
+              onClick={handleStart}
+              disabled={!session || session.status === "terminated" || starting}
+              className="px-6 py-3 bg-hud-accent text-white rounded-xl font-semibold touch-manipulation active:scale-95 disabled:opacity-50"
+              style={{ minHeight: 44 }}
+            >
+              {!session
+                ? "Loading…"
+                : session.status === "terminated"
+                  ? "Ended"
+                  : starting
+                    ? "Starting…"
+                    : session?.runMode === "live"
+                      ? "Start Mic"
+                      : "Start Recorded Demo"}
+            </button>
           )}
         </div>
-      </header>
 
-      {/* Controls */}
-      <div className="shrink-0 flex items-center justify-between gap-3 border-b border-hud-border bg-hud-surface/50 px-4 py-2">
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-hud-muted">
-            Capture
-          </p>
-          <p className="truncate text-xs text-hud-text/80">
-            {isActive
-              ? activeSpeaker
-                ? `${
-                    speakerVisualStyle(
-                      activeSpeaker,
-                      turns.map((turn) => turn.providerSpeakerLabel),
-                    ).marker
-                  } ${getParticipantName(activeSpeaker)} speaking`
-                : "Listening · speaker pending"
-              : session?.runMode === "live"
-                ? "Microphone ready"
-                : "Recorded demo ready"}
-          </p>
-        </div>
-        {isActive ? (
-          <button
-            onClick={handleStop}
-            className="px-6 py-3 bg-red-600 text-white rounded-xl font-semibold touch-manipulation active:scale-95"
-            style={{ minHeight: 44 }}
-          >
-            Stop
-          </button>
-        ) : (
-          <button
-            onClick={handleStart}
-            disabled={!session || session.status === "terminated" || starting}
-            className="px-6 py-3 bg-hud-accent text-white rounded-xl font-semibold touch-manipulation active:scale-95 disabled:opacity-50"
-            style={{ minHeight: 44 }}
-          >
-            {!session
-              ? "Loading…"
-              : session.status === "terminated"
-                ? "Ended"
-                : starting
-                  ? "Starting…"
-                  : session?.runMode === "live"
-                    ? "Start Mic"
-                    : "Start Recorded Demo"}
-          </button>
+        <SpeakerWaveformStage
+          analyser={analyserNode}
+          meter={meter}
+          active={isActive}
+          activeSpeakerLabel={activeSpeaker}
+          activeSpeakerName={
+            activeSpeaker
+              ? getParticipantName(activeSpeaker)
+              : "Speaker pending"
+          }
+          liveText={livePartial}
+          turns={finalizedTurns}
+          speakerLabels={sessionSpeakerLabels}
+          focusedSpeakerLabel={focusedSpeakerLabel}
+          selectedTurnId={selectedTurnId}
+          getSpeakerName={getParticipantName}
+          onSpeakerFocus={setFocusedSpeakerLabel}
+          onTurnSelect={selectTranscriptTurn}
+        />
+
+        <LiveAnalysisHud
+          analysis={liveAnalysis}
+          intelligence={intelligence}
+          windowAnalysis={windowAnalysis}
+          livePrompt={livePrompt}
+          turns={finalizedTurns}
+          objective={intentObjective}
+          phase={intentPhase}
+          criteriaText={intentCriteria}
+          analyzing={analyzing}
+          ready={Boolean(session)}
+          busyNodeId={busyNodeId}
+          publishedNodeIds={publishedNodeIds}
+          focusedSpeakerLabel={focusedSpeakerLabel}
+          selectedTurnId={selectedTurnId}
+          selectedNodeId={selectedNodeId}
+          getSpeakerName={getParticipantName}
+          onObjectiveChange={setIntentObjective}
+          onPhaseChange={setIntentPhase}
+          onCriteriaChange={setIntentCriteria}
+          onAnalyze={handleRunAnalysis}
+          onEditNode={handleEditMeetingNode}
+          onPublishNode={handlePublishMeetingNode}
+          onSelectNode={selectSemanticNode}
+          onSelectTurn={selectTranscriptTurn}
+        />
+
+        {/* Error display */}
+        {(error || captureError) && (
+          <div className="mx-4 mt-2 p-2 bg-red-900/30 border border-red-700 rounded-lg text-sm text-red-300">
+            {error || captureError}
+          </div>
         )}
-      </div>
 
-      <SpeakerWaveformStage
-        analyser={analyserNode}
-        meter={meter}
-        active={isActive}
-        activeSpeakerLabel={activeSpeaker}
-        activeSpeakerName={
-          activeSpeaker ? getParticipantName(activeSpeaker) : "Speaker pending"
-        }
-        liveText={livePartial}
-        turns={finalizedTurns}
-        speakerLabels={sessionSpeakerLabels}
-        focusedSpeakerLabel={focusedSpeakerLabel}
-        selectedTurnId={selectedTurnId}
-        getSpeakerName={getParticipantName}
-        onSpeakerFocus={setFocusedSpeakerLabel}
-        onTurnSelect={selectTranscriptTurn}
-      />
+        {/* Audio settings readback */}
+        {settings && (
+          <div className="px-4 py-1 text-xs text-hud-muted">
+            Mic: {settings.sampleRate}Hz · {settings.channelCount}ch
+            {settings.echoCancellation && " · echo cancel"}
+            {settings.noiseSuppression && " · noise supp"}
+          </div>
+        )}
 
-      <LiveAnalysisHud
-        analysis={liveAnalysis}
-        intelligence={intelligence}
-        windowAnalysis={windowAnalysis}
-        livePrompt={livePrompt}
-        turns={finalizedTurns}
-        objective={intentObjective}
-        phase={intentPhase}
-        criteriaText={intentCriteria}
-        analyzing={analyzing}
-        ready={Boolean(session)}
-        busyNodeId={busyNodeId}
-        publishedNodeIds={publishedNodeIds}
-        focusedSpeakerLabel={focusedSpeakerLabel}
-        selectedTurnId={selectedTurnId}
-        selectedNodeId={selectedNodeId}
-        getSpeakerName={getParticipantName}
-        onObjectiveChange={setIntentObjective}
-        onPhaseChange={setIntentPhase}
-        onCriteriaChange={setIntentCriteria}
-        onAnalyze={handleRunAnalysis}
-        onEditNode={handleEditMeetingNode}
-        onPublishNode={handlePublishMeetingNode}
-        onSelectNode={selectSemanticNode}
-        onSelectTurn={selectTranscriptTurn}
-      />
-
-      {/* Error display */}
-      {(error || captureError) && (
-        <div className="mx-4 mt-2 p-2 bg-red-900/30 border border-red-700 rounded-lg text-sm text-red-300">
-          {error || captureError}
-        </div>
-      )}
-
-      {/* Audio settings readback */}
-      {settings && (
-        <div className="px-4 py-1 text-xs text-hud-muted">
-          Mic: {settings.sampleRate}Hz · {settings.channelCount}ch
-          {settings.echoCancellation && " · echo cancel"}
-          {settings.noiseSuppression && " · noise supp"}
-        </div>
-      )}
-
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="grid min-h-0 flex-1 xl:grid-cols-[minmax(0,1fr)_22rem]">
-          {/* Transcript */}
-          <section
-            className="relative min-h-0 min-w-0"
-            aria-label="Live transcript"
-          >
-            <div
-              ref={transcriptViewportRef}
-              data-testid="transcript-scroll"
-              data-following={followTranscript ? "true" : "false"}
-              onScroll={handleTranscriptScroll}
-              className="h-full overflow-y-scroll px-4 py-2 space-y-2 overscroll-contain touch-pan-y [scrollbar-gutter:stable]"
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="grid min-h-0 flex-1 xl:grid-cols-[minmax(0,1fr)_22rem]">
+            {/* Transcript */}
+            <section
+              className="relative min-h-0 min-w-0"
+              aria-label="Live transcript"
             >
-              {finalizedTurns.length === 0 && !isActive && (
-                <p className="text-hud-muted text-sm py-8 text-center">
-                  {session?.status === "terminated"
-                    ? "Session ended. No turns recorded."
-                    : "Start capture to begin transcription."}
-                </p>
-              )}
-              {finalizedTurns.length === 0 && isActive && (
-                <p className="text-hud-muted text-sm py-8 text-center">
-                  Listening… speak to begin.
-                </p>
-              )}
+              <div
+                ref={transcriptViewportRef}
+                data-testid="transcript-scroll"
+                data-following={followTranscript ? "true" : "false"}
+                onScroll={handleTranscriptScroll}
+                className="min-h-48 max-h-[34dvh] overflow-y-scroll px-4 py-2 space-y-2 overscroll-contain touch-pan-y [scrollbar-gutter:stable]"
+              >
+                {finalizedTurns.length === 0 && !isActive && (
+                  <p className="text-hud-muted text-sm py-8 text-center">
+                    {session?.status === "terminated"
+                      ? "Session ended. No turns recorded."
+                      : "Start capture to begin transcription."}
+                  </p>
+                )}
+                {finalizedTurns.length === 0 && isActive && (
+                  <p className="text-hud-muted text-sm py-8 text-center">
+                    Listening… speak to begin.
+                  </p>
+                )}
 
-              {finalizedTurns.map((turn) => {
-                const speakerStyle = speakerVisualStyle(
-                  turn.isUnknownSpeaker ? null : turn.providerSpeakerLabel,
-                  speakerLabels,
-                );
-                return (
-                  <article
-                    key={turn.id}
-                    data-testid="transcript-turn"
-                    data-turn-id={turn.id}
-                    data-speaker-label={turn.providerSpeakerLabel}
-                    data-speaker-color={speakerStyle.color}
-                    aria-current={
-                      selectedTurnId === turn.id ? "true" : undefined
-                    }
-                    onClick={() => selectTranscriptTurn(turn.id)}
-                    className={`cursor-pointer rounded-lg border border-l-4 p-3 transition ${
-                      turn.isSubstantive
-                        ? "border-hud-border bg-hud-surface"
-                        : "border-hud-border/50 bg-hud-surface/50"
-                    } ${selectedTurnId === turn.id ? "ring-2 ring-white/35" : ""}`}
-                    style={{
-                      borderLeftColor: speakerStyle.color,
-                      opacity:
-                        focusedSpeakerLabel &&
-                        focusedSpeakerLabel !== turn.providerSpeakerLabel
-                          ? 0.38
-                          : 1,
-                    }}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span
-                        className="rounded px-2 py-0.5 text-xs font-medium"
-                        style={{
-                          background: speakerStyle.softColor,
-                          color: speakerStyle.color,
-                        }}
-                      >
-                        {speakerStyle.marker}{" "}
-                        {turn.isUnknownSpeaker
-                          ? "Unassigned"
-                          : getParticipantName(turn.providerSpeakerLabel)}
-                      </span>
-                      <span className="text-xs tabular-nums text-hud-muted">
-                        {formatSessionTimestamp(turn.startMs)} ·{" "}
-                        {turn.isSubstantive ? "substantive" : "backchannel"}
-                        {turn.isCalibration && " · calibration"}
-                        {turn.possibleOverlap && " · overlap"}
-                        {turn.isManuallyCorrected && " · corrected"}
-                        {turn.wasSpeakerRevised && " · revised"}
-                      </span>
-                    </div>
-                    <p className="text-sm">
-                      {turn.currentText || turn.originalText}
-                    </p>
-                    {turn.analysis?.category && (
-                      <span className="inline-block mt-1 text-xs px-1.5 py-0.5 rounded bg-hud-accent/10 text-hud-accent/70">
-                        {turn.analysis.category}
-                      </span>
-                    )}
+                {finalizedTurns.map((turn) => {
+                  const speakerStyle = speakerVisualStyle(
+                    turn.isUnknownSpeaker ? null : turn.providerSpeakerLabel,
+                    speakerLabels,
+                  );
+                  return (
+                    <article
+                      key={turn.id}
+                      data-testid="transcript-turn"
+                      data-turn-id={turn.id}
+                      data-speaker-label={turn.providerSpeakerLabel}
+                      data-speaker-color={speakerStyle.color}
+                      aria-current={
+                        selectedTurnId === turn.id ? "true" : undefined
+                      }
+                      onClick={() => selectTranscriptTurn(turn.id)}
+                      className={`cursor-pointer rounded-lg border border-l-[3px] p-2 transition ${
+                        turn.isSubstantive
+                          ? "border-hud-border bg-hud-surface"
+                          : "border-hud-border/50 bg-hud-surface/50"
+                      } ${selectedTurnId === turn.id ? "ring-2 ring-white/35" : ""}`}
+                      style={{
+                        borderLeftColor: speakerStyle.color,
+                        opacity:
+                          focusedSpeakerLabel &&
+                          focusedSpeakerLabel !== turn.providerSpeakerLabel
+                            ? 0.38
+                            : 1,
+                      }}
+                    >
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span
+                          className="rounded px-2 py-0.5 text-xs font-medium"
+                          style={{
+                            background: speakerStyle.softColor,
+                            color: speakerStyle.color,
+                          }}
+                        >
+                          {speakerStyle.marker}{" "}
+                          {turn.isUnknownSpeaker
+                            ? "Unassigned"
+                            : getParticipantName(turn.providerSpeakerLabel)}
+                        </span>
+                        <span className="truncate text-[9px] tabular-nums text-hud-muted">
+                          {formatSessionTimestamp(turn.startMs)} ·{" "}
+                          {turn.isSubstantive ? "substantive" : "backchannel"}
+                          {turn.isCalibration && " · calibration"}
+                          {turn.possibleOverlap && " · overlap"}
+                          {turn.isManuallyCorrected && " · corrected"}
+                          {turn.wasSpeakerRevised && " · revised"}
+                        </span>
+                      </div>
+                      <p className="text-xs leading-relaxed text-white/90">
+                        {turn.currentText || turn.originalText}
+                      </p>
+                      {turn.analysis?.category && (
+                        <span className="inline-block mt-1 text-xs px-1.5 py-0.5 rounded bg-hud-accent/10 text-hud-accent/70">
+                          {turn.analysis.category}
+                        </span>
+                      )}
 
-                    {/* Turn actions */}
-                    <details className="mt-1">
-                      <summary className="text-xs text-hud-muted cursor-pointer">
-                        Actions ▸
-                      </summary>
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {["A", "B", "C", "D", "E", "F"].map((label) => (
+                      {/* Turn actions */}
+                      <details className="mt-1">
+                        <summary className="text-xs text-hud-muted cursor-pointer">
+                          Actions ▸
+                        </summary>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {["A", "B", "C", "D", "E", "F"].map((label) => (
+                            <button
+                              key={label}
+                              onClick={() =>
+                                mapSpeaker(turn.providerSpeakerLabel, label)
+                              }
+                              className="px-2 py-1 text-xs rounded bg-hud-surface border border-hud-border text-hud-text"
+                            >
+                              → {label}
+                            </button>
+                          ))}
                           <button
-                            key={label}
-                            onClick={() =>
-                              mapSpeaker(turn.providerSpeakerLabel, label)
-                            }
+                            onClick={() => {
+                              const newText = prompt(
+                                "Correct text:",
+                                turn.currentText,
+                              );
+                              if (newText) correctTurn(turn.id, newText);
+                            }}
                             className="px-2 py-1 text-xs rounded bg-hud-surface border border-hud-border text-hud-text"
                           >
-                            → {label}
+                            ✏ Edit
                           </button>
-                        ))}
-                        <button
-                          onClick={() => {
-                            const newText = prompt(
-                              "Correct text:",
-                              turn.currentText,
-                            );
-                            if (newText) correctTurn(turn.id, newText);
-                          }}
-                          className="px-2 py-1 text-xs rounded bg-hud-surface border border-hud-border text-hud-text"
-                        >
-                          ✏ Edit
-                        </button>
-                      </div>
-                    </details>
-                  </article>
-                );
-              })}
+                        </div>
+                      </details>
+                    </article>
+                  );
+                })}
+              </div>
+              {!followTranscript && unseenTurnCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => scrollTranscriptToLatest("smooth")}
+                  className="absolute bottom-3 left-1/2 -translate-x-1/2 min-h-11 rounded-full border border-hud-accent/50 bg-hud-accent px-4 py-2 text-sm font-semibold text-white shadow-xl shadow-black/40 touch-manipulation"
+                >
+                  {unseenTurnCount} new{" "}
+                  {unseenTurnCount === 1 ? "turn" : "turns"} · Jump to latest
+                </button>
+              )}
+            </section>
+            <div
+              id="visual-evidence-panel"
+              className="hidden min-h-0 scroll-mt-2 xl:flex"
+            >
+              <VisualEvidenceCapture
+                sessionId={sessionId}
+                capturedAtMs={finalizedTurns.at(-1)?.endMs ?? 0}
+                evidence={visualEvidence}
+                onCaptured={(captured) =>
+                  setVisualEvidence((current) => [
+                    captured,
+                    ...current.filter((item) => item.id !== captured.id),
+                  ])
+                }
+              />
             </div>
-            {!followTranscript && unseenTurnCount > 0 && (
-              <button
-                type="button"
-                onClick={() => scrollTranscriptToLatest("smooth")}
-                className="absolute bottom-3 left-1/2 -translate-x-1/2 min-h-11 rounded-full border border-hud-accent/50 bg-hud-accent px-4 py-2 text-sm font-semibold text-white shadow-xl shadow-black/40 touch-manipulation"
-              >
-                {unseenTurnCount} new {unseenTurnCount === 1 ? "turn" : "turns"}{" "}
-                · Jump to latest
-              </button>
-            )}
-          </section>
-          <div className="hidden min-h-0 xl:flex">
-            <VisualEvidenceCapture
-              sessionId={sessionId}
-              capturedAtMs={finalizedTurns.at(-1)?.endMs ?? 0}
-              evidence={visualEvidence}
-              onCaptured={(captured) =>
-                setVisualEvidence((current) => [
-                  captured,
-                  ...current.filter((item) => item.id !== captured.id),
-                ])
-              }
-            />
           </div>
+          <details
+            id="visual-evidence-details"
+            className="shrink-0 scroll-mt-2 border-t border-hud-border xl:hidden"
+          >
+            <summary className="min-h-11 cursor-pointer list-none px-4 py-3 text-xs font-semibold text-fuchsia-200 marker:hidden">
+              Visual evidence · {visualEvidence.length} captured +
+            </summary>
+            <div className="h-[52dvh] border-t border-hud-border">
+              <VisualEvidenceCapture
+                sessionId={sessionId}
+                capturedAtMs={finalizedTurns.at(-1)?.endMs ?? 0}
+                evidence={visualEvidence}
+                onCaptured={(captured) =>
+                  setVisualEvidence((current) => [
+                    captured,
+                    ...current.filter((item) => item.id !== captured.id),
+                  ])
+                }
+              />
+            </div>
+          </details>
         </div>
-        <details className="shrink-0 border-t border-hud-border xl:hidden">
-          <summary className="min-h-11 cursor-pointer list-none px-4 py-3 text-xs font-semibold text-fuchsia-200 marker:hidden">
-            Visual evidence · {visualEvidence.length} captured +
-          </summary>
-          <div className="h-[52dvh] border-t border-hud-border">
-            <VisualEvidenceCapture
-              sessionId={sessionId}
-              capturedAtMs={finalizedTurns.at(-1)?.endMs ?? 0}
-              evidence={visualEvidence}
-              onCaptured={(captured) =>
-                setVisualEvidence((current) => [
-                  captured,
-                  ...current.filter((item) => item.id !== captured.id),
-                ])
-              }
-            />
-          </div>
-        </details>
       </div>
 
-      {/* Navigation */}
-      <nav className="shrink-0 px-4 py-3 border-t border-hud-border flex gap-3">
-        <a
-          href={`/display/${sessionId}`}
-          target="_blank"
-          rel="noopener"
-          className="flex-1 py-3 bg-hud-surface border border-hud-border text-center text-sm rounded-xl touch-manipulation"
-          style={{ minHeight: 44 }}
+      <nav
+        className="grid shrink-0 grid-cols-3 gap-2 border-t border-blue-300/20 bg-[linear-gradient(180deg,rgba(7,13,24,.96),rgba(4,8,16,1))] px-3 py-2 safe-bottom"
+        aria-label="Facilitator control boundary"
+      >
+        <div
+          data-testid="private-control"
+          className="flex min-h-14 flex-col items-center justify-center rounded-xl border border-white/10 bg-white/[0.025] px-2 text-center"
+          title="The facilitator working view remains private"
         >
-          Open Display
-        </a>
-        {session?.runMode !== "live" && (
-          <button
-            onClick={() => router.push("/runs")}
-            className="flex-1 py-3 bg-hud-surface border border-hud-border text-center text-sm rounded-xl touch-manipulation"
-            style={{ minHeight: 44 }}
-          >
-            Runs
-          </button>
-        )}
+          <span
+            className="h-3 w-3 rounded-full border-2 border-slate-300 shadow-[0_0_0_3px_rgba(203,213,225,.12)]"
+            aria-hidden="true"
+          />
+          <span className="text-[10px] font-bold text-white">Private</span>
+          <span className="text-[8px] text-hud-muted">Facilitator only</span>
+        </div>
         <button
-          onClick={() => router.push(`/runs`)}
-          className="flex-1 py-3 bg-hud-surface border border-hud-border text-center text-sm rounded-xl touch-manipulation"
-          style={{ minHeight: 44 }}
+          type="button"
+          data-testid="publish-control"
+          disabled={
+            !selectedMeetingNode ||
+            selectedNodePublished ||
+            busyNodeId === selectedMeetingNode?.id
+          }
+          onClick={() =>
+            selectedMeetingNode &&
+            handlePublishMeetingNode(
+              selectedMeetingNode.id,
+              `${selectedMeetingNode.title} — ${selectedMeetingNode.summary}`,
+            )
+          }
+          className="flex min-h-14 flex-col items-center justify-center rounded-xl border border-blue-300/25 bg-blue-400/10 px-2 text-center text-blue-100 touch-manipulation disabled:opacity-45"
         >
-          Export
+          <span className="text-sm" aria-hidden="true">
+            ↑
+          </span>
+          <span className="text-[10px] font-bold">
+            {selectedNodePublished ? "Published" : "Publish"}
+          </span>
+          <span className="max-w-full truncate text-[8px] text-blue-200/65">
+            {busyNodeId === selectedMeetingNode?.id
+              ? "Sharing…"
+              : selectedMeetingNode
+                ? selectedMeetingNode.title
+                : "Select an insight"}
+          </span>
+        </button>
+        <button
+          type="button"
+          data-testid="capture-control"
+          onClick={openVisualEvidenceCapture}
+          className="flex min-h-14 flex-col items-center justify-center rounded-xl border border-fuchsia-300/25 bg-fuchsia-400/10 px-2 text-center text-fuchsia-100 touch-manipulation"
+          title="Open the deliberate visual evidence capture panel"
+        >
+          <span
+            className="h-4 w-4 rounded-full border-2 border-fuchsia-100 shadow-[inset_0_0_0_3px_rgba(232,121,249,.22)]"
+            aria-hidden="true"
+          />
+          <span className="text-[10px] font-bold">Capture</span>
+          <span className="text-[8px] text-fuchsia-200/65">
+            {visualEvidence.length} evidence
+          </span>
         </button>
       </nav>
     </main>

@@ -820,7 +820,7 @@ test.describe("Mobile-specific assertions", () => {
     expect(count).toBeGreaterThan(0);
   });
 
-  test("iPhone Live Critique keeps speaker waveforms, Now lens, transcript, and inspection reachable", async ({
+  test("iPhone Live Critique keeps the waveform, semantic compass, transcript, and human controls reachable", async ({
     page,
     request,
   }) => {
@@ -840,14 +840,22 @@ test.describe("Mobile-specific assertions", () => {
     });
 
     const main = page.locator("main");
+    const facilitatorScroll = page.getByTestId("facilitator-scroll");
     const waveform = page.getByTestId("speaker-waveform-stage");
     const hud = page.getByTestId("live-analysis-hud");
+    const compass = page.getByTestId("semantic-compass");
     const transcript = page.getByTestId("transcript-scroll");
     await expect(waveform).toBeVisible();
     await expect(page.getByTestId("speaker-waveform-history")).toBeVisible();
-    await expect(hud.getByText("Now lens")).toBeVisible();
+    await expect(hud.getByText("Now Lens")).toBeVisible();
+    await expect(compass).toBeVisible();
     await expect(hud).toBeVisible();
     await expect(transcript).toBeVisible();
+    await expect(page.getByTestId("private-control")).toContainText("Private");
+    await expect(page.getByTestId("publish-control")).toContainText(
+      "Select an insight",
+    );
+    await expect(page.getByTestId("capture-control")).toContainText("Capture");
     await expect(
       page.getByText("Visual evidence · 0 captured +"),
     ).toBeVisible();
@@ -860,15 +868,23 @@ test.describe("Mobile-specific assertions", () => {
     }));
     expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
     expect(layout.scrollHeight).toBeLessThanOrEqual(layout.clientHeight + 1);
+    const scrollLayout = await facilitatorScroll.evaluate((element) => ({
+      scrollWidth: element.scrollWidth,
+      clientWidth: element.clientWidth,
+    }));
+    expect(scrollLayout.scrollWidth).toBeLessThanOrEqual(
+      scrollLayout.clientWidth + 1,
+    );
     const waveformBox = await waveform.boundingBox();
     const hudBox = await hud.boundingBox();
+    const compassBox = await compass.boundingBox();
     const transcriptBox = await transcript.boundingBox();
     expect(waveformBox?.height || 0).toBeGreaterThanOrEqual(140);
     expect(waveformBox?.height || Infinity).toBeLessThanOrEqual(220);
-    expect(hudBox?.height || 0).toBeGreaterThanOrEqual(70);
-    expect(hudBox?.height || Infinity).toBeLessThanOrEqual(
-      (page.viewportSize()?.height || 0) * 0.2,
-    );
+    expect(hudBox?.height || 0).toBeGreaterThanOrEqual(360);
+    expect(hudBox?.height || Infinity).toBeLessThanOrEqual(650);
+    expect(compassBox?.height || 0).toBeGreaterThanOrEqual(300);
+    expect(compassBox?.height || Infinity).toBeLessThanOrEqual(430);
     expect(transcriptBox?.height || 0).toBeGreaterThan(80);
 
     const speakerColors = await page
@@ -896,6 +912,7 @@ test.describe("Mobile-specific assertions", () => {
     await expect
       .poll(() => transcript.evaluate((element) => element.scrollTop))
       .toBe(0);
+    await transcript.scrollIntoViewIfNeeded();
     await expect(page.getByText("Transcript marker 01")).toBeInViewport();
     await transcript.evaluate((element) => {
       element.scrollTop = element.scrollHeight;
@@ -903,6 +920,12 @@ test.describe("Mobile-specific assertions", () => {
     });
     await expect(transcript).toHaveAttribute("data-following", "true");
     await expect(page.getByText("Transcript marker 24")).toBeInViewport();
+
+    await page.getByTestId("capture-control").click();
+    await expect(page.locator("#visual-evidence-details")).toHaveAttribute(
+      "open",
+      "",
+    );
 
     await hud
       .getByTestId("meeting-intelligence-details")
