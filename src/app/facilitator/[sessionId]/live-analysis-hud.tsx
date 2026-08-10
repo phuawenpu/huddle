@@ -10,9 +10,14 @@ import type {
   MeetingStateNode,
   WindowAnalysisSnapshot,
 } from "@/lib/types";
+import { FacilitationNowLens, SemanticCompass } from "./semantic-compass";
 
 interface HudTurn {
   id: string;
+  providerSpeakerLabel?: string;
+  currentText?: string;
+  originalText?: string;
+  startMs?: number;
   isSubstantive: boolean;
   isCalibration: boolean;
   endMs?: number;
@@ -47,12 +52,18 @@ interface LiveAnalysisHudProps {
   ready: boolean;
   busyNodeId: string | null;
   publishedNodeIds: string[];
+  focusedSpeakerLabel: string | null;
+  selectedTurnId: string | null;
+  selectedNodeId: string | null;
+  getSpeakerName: (label: string) => string;
   onObjectiveChange: (value: string) => void;
   onPhaseChange: (value: string) => void;
   onCriteriaChange: (value: string) => void;
   onAnalyze: () => void;
   onEditNode: (nodeId: string, edit: NodeEdit) => Promise<void>;
   onPublishNode: (nodeId: string, text: string) => Promise<void>;
+  onSelectNode: (nodeId: string | null, sourceTurnId?: string) => void;
+  onSelectTurn: (turnId: string) => void;
 }
 
 const PHASE_LABELS: Record<string, string> = {
@@ -128,12 +139,18 @@ export function LiveAnalysisHud({
   ready,
   busyNodeId,
   publishedNodeIds,
+  focusedSpeakerLabel,
+  selectedTurnId,
+  selectedNodeId,
+  getSpeakerName,
   onObjectiveChange,
   onPhaseChange,
   onCriteriaChange,
   onAnalyze,
   onEditNode,
   onPublishNode,
+  onSelectNode,
+  onSelectTurn,
 }: LiveAnalysisHudProps) {
   const substantiveTurns = turns.filter(
     (turn) => turn.isSubstantive && !turn.isCalibration,
@@ -160,16 +177,35 @@ export function LiveAnalysisHud({
       className="shrink-0 border-b border-cyan-400/20 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_40%),linear-gradient(115deg,rgba(20,20,31,0.99),rgba(8,10,16,0.99))]"
       aria-label="Live meeting intelligence"
     >
+      <div className="mx-auto max-w-5xl space-y-2 px-2.5 py-2.5 sm:px-4">
+        <SemanticCompass
+          analysis={analysis}
+          windowAnalysis={windowAnalysis}
+          turns={turns}
+          objective={objective}
+          focusedSpeakerLabel={focusedSpeakerLabel}
+          selectedTurnId={selectedTurnId}
+          selectedNodeId={selectedNodeId}
+          getSpeakerName={getSpeakerName}
+          onSelectNode={onSelectNode}
+          onSelectTurn={onSelectTurn}
+        />
+        <FacilitationNowLens
+          analysis={analysis}
+          intelligence={intelligence}
+          windowAnalysis={windowAnalysis}
+          livePrompt={livePrompt}
+          turns={turns}
+          analyzing={analyzing}
+        />
+      </div>
       <details className="group" data-testid="meeting-intelligence-details">
-        <summary className="min-h-20 cursor-pointer list-none px-3 py-2 marker:hidden sm:px-4">
-          <NowLens
-            analysis={analysis}
-            intelligence={intelligence}
-            windowAnalysis={windowAnalysis}
-            livePrompt={livePrompt}
-            turns={turns}
-            analyzing={analyzing}
-          />
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between border-t border-cyan-300/15 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100 marker:hidden">
+          <span>Analysis controls and source inspector</span>
+          <span className="text-hud-muted">
+            <span className="group-open:hidden">Open +</span>
+            <span className="hidden group-open:inline">Close −</span>
+          </span>
         </summary>
         <div className="max-h-[52dvh] overflow-y-auto border-t border-cyan-300/15 px-3 py-3 sm:px-4">
           <div className="grid gap-3 2xl:grid-cols-[minmax(0,1fr)_21rem]">
@@ -385,88 +421,6 @@ export function LiveAnalysisHud({
         </div>
       </details>
     </section>
-  );
-}
-
-function NowLens({
-  analysis,
-  intelligence,
-  windowAnalysis,
-  livePrompt,
-  turns,
-  analyzing,
-}: Pick<
-  LiveAnalysisHudProps,
-  | "analysis"
-  | "intelligence"
-  | "windowAnalysis"
-  | "livePrompt"
-  | "turns"
-  | "analyzing"
->) {
-  const latestAnalyzedTurn = [...turns]
-    .reverse()
-    .find((turn) => turn.analysis?.theme || turn.analysis?.category);
-  const latestCapturedTurn = turns.at(-1);
-  const topic =
-    windowAnalysis?.theme ||
-    latestAnalyzedTurn?.analysis?.theme ||
-    analysis?.result.headline ||
-    "Listening for the current topic";
-  const state =
-    windowAnalysis?.discussionState ||
-    humanizeKind(
-      latestAnalyzedTurn?.analysis?.category || "collecting context",
-    );
-  const openLoopCount = intelligence?.openLoops.length || 0;
-  const capturedThrough = latestCapturedTurn?.endMs || 0;
-  const analyzedThrough =
-    windowAnalysis?.throughMs ||
-    latestAnalyzedTurn?.endMs ||
-    analysis?.transcriptThroughMs ||
-    0;
-
-  return (
-    <div className="grid gap-1.5" aria-label="Current meeting state">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <span
-            className="relative flex h-2.5 w-2.5 shrink-0"
-            aria-hidden="true"
-          >
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-300 opacity-40" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-cyan-300" />
-          </span>
-          <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-cyan-200">
-            Now lens
-          </span>
-          <span className="rounded-full bg-white/5 px-2 py-0.5 text-[9px] uppercase tracking-wide text-hud-muted">
-            {analyzing ? "reconciling" : state}
-          </span>
-        </div>
-        <span className="shrink-0 text-[9px] text-hud-muted">
-          <span className="group-open:hidden">Inspect map +</span>
-          <span className="hidden group-open:inline">Close map −</span>
-        </span>
-      </div>
-      <p className="line-clamp-1 text-sm font-semibold text-white">{topic}</p>
-      <div className="flex flex-wrap items-center gap-1.5 text-[9px]">
-        <span className="rounded-full border border-hud-border bg-black/20 px-2 py-0.5 text-hud-muted">
-          captured {formatSessionTime(capturedThrough)}
-        </span>
-        <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2 py-0.5 text-cyan-100">
-          analyzed {formatSessionTime(analyzedThrough)}
-        </span>
-        <span className="rounded-full border border-violet-300/20 bg-violet-300/10 px-2 py-0.5 text-violet-100">
-          {openLoopCount} open {openLoopCount === 1 ? "loop" : "loops"}
-        </span>
-      </div>
-      {livePrompt && (
-        <p className="line-clamp-1 rounded-lg border border-amber-300/20 bg-amber-300/10 px-2 py-1 text-[10px] text-amber-100">
-          Private cue · {livePrompt.text}
-        </p>
-      )}
-    </div>
   );
 }
 

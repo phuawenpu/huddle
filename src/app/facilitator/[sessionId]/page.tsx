@@ -121,6 +121,7 @@ export default function FacilitatorPage() {
     null,
   );
   const [selectedTurnId, setSelectedTurnId] = useState<string | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   // Audio capture hook
   const {
@@ -759,6 +760,14 @@ export default function FacilitatorPage() {
     });
   }, []);
 
+  const selectSemanticNode = useCallback(
+    (nodeId: string | null, sourceTurnId?: string) => {
+      setSelectedNodeId(nodeId);
+      if (sourceTurnId) selectTranscriptTurn(sourceTurnId);
+    },
+    [selectTranscriptTurn],
+  );
+
   useEffect(() => {
     const previousCount = previousFinalTurnCountRef.current;
     const addedCount = Math.max(0, finalizedTurns.length - previousCount);
@@ -915,12 +924,18 @@ export default function FacilitatorPage() {
         ready={Boolean(session)}
         busyNodeId={busyNodeId}
         publishedNodeIds={publishedNodeIds}
+        focusedSpeakerLabel={focusedSpeakerLabel}
+        selectedTurnId={selectedTurnId}
+        selectedNodeId={selectedNodeId}
+        getSpeakerName={getParticipantName}
         onObjectiveChange={setIntentObjective}
         onPhaseChange={setIntentPhase}
         onCriteriaChange={setIntentCriteria}
         onAnalyze={handleRunAnalysis}
         onEditNode={handleEditMeetingNode}
         onPublishNode={handlePublishMeetingNode}
+        onSelectNode={selectSemanticNode}
+        onSelectTurn={selectTranscriptTurn}
       />
 
       {/* Error display */}
