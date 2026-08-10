@@ -35,6 +35,77 @@ export async function GET(
   }
 }
 
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  const { id: sessionId } = await context.params;
+  try {
+    const body = await request.json();
+    const providerSessionId = String(body.providerSessionId || "").trim();
+    const revisions = Array.isArray(body.revisions) ? body.revisions : [];
+    if (!providerSessionId || revisions.length === 0) {
+      return NextResponse.json(
+        { error: "A provider session and speaker revisions are required." },
+        { status: 400 },
+      );
+    }
+
+    const updatedTurns: any[] = [];
+    for (const revision of revisions) {
+      const providerTurnOrder = Number(revision?.turnOrder);
+      if (!Number.isInteger(providerTurnOrder) || providerTurnOrder < 0) {
+        continue;
+      }
+      const turns = await prisma.transcriptTurn.findMany({
+        where: { sessionId, providerSessionId, providerTurnOrder },
+        orderBy: { segmentIndex: "asc" },
+      });
+      for (const turn of turns) {
+        const revisedWords = wordsWithinTurn(revision?.words, turn);
+        const revisedLabel =
+          dominantSpeakerLabel(revisedWords) ||
+          normalizeSpeakerLabel(revision?.speakerLabel);
+        const mapping = await prisma.speakerMapping.findUnique({
+          where: {
+            sessionId_speakerLabel: {
+              sessionId,
+              speakerLabel: revisedLabel,
+            },
+          },
+        });
+        const updated = await prisma.transcriptTurn.update({
+          where: { id: turn.id },
+          data: {
+            providerSpeakerLabel: revisedLabel,
+            participantId: mapping?.participantId ?? turn.participantId,
+            wordsJson:
+              revisedWords.length > 0
+                ? JSON.stringify(revisedWords)
+                : turn.wordsJson,
+            isUnknownSpeaker: isUnknownSpeakerLabel(revisedLabel),
+            wasSpeakerRevised: true,
+          },
+        });
+        updatedTurns.push(updated);
+        broadcast(sessionId, turnUpdatedPatch(serializeTurn(updated)));
+      }
+    }
+
+    if (updatedTurns.length > 0) await broadcastMetrics(sessionId);
+    return NextResponse.json({ turns: updatedTurns.map(serializeTurn) });
+  } catch (error) {
+    console.error("Speaker revision persistence failed", {
+      sessionId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return NextResponse.json(
+      { error: "Failed to persist speaker revisions" },
+      { status: 500 },
+    );
+  }
+}
+
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
@@ -205,4 +276,45 @@ function sessionRelativeMs(value: unknown, fallback: number): number {
     );
   }
   return Math.round(numeric);
+}
+
+function normalizeSpeakerLabel(value: unknown): string {
+  const label = String(value || "").trim();
+  return label || "UNKNOWN";
+}
+
+function isUnknownSpeakerLabel(value: unknown): boolean {
+  const label = normalizeSpeakerLabel(value).toUpperCase();
+  return label === "UNKNOWN" || label === "PENDING" || label === "UNASSIGNED";
+}
+
+function wordsWithinTurn(words: unknown, turn: { startMs: number; endMs: number }) {
+  if (!Array.isArray(words)) return [];
+  return words
+    .map((word) => ({
+      text: String(word?.text || word?.word || ""),
+      start: Number(word?.start) || 0,
+      end: Number(word?.end) || 0,
+      confidence: Number(word?.confidence) || 0,
+      wordIsFinal: true,
+      speaker: normalizeSpeakerLabel(word?.speaker),
+    }))
+    .filter(
+      (word) =>
+        word.text && word.end >= turn.startMs && word.start <= turn.endMs,
+    );
+}
+
+function dominantSpeakerLabel(words: Array<{ speaker: string }>): string | null {
+  const counts = new Map<string, number>();
+  for (const word of words) {
+    if (isUnknownSpeakerLabel(word.speaker)) continue;
+    counts.set(word.speaker, (counts.get(word.speaker) || 0) + 1);
+  }
+  return (
+    [...counts.entries()].sort(
+      ([leftLabel, leftCount], [rightLabel, rightCount]) =>
+        rightCount - leftCount || leftLabel.localeCompare(rightLabel),
+    )[0]?.[0] || null
+  );
 }

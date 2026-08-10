@@ -726,6 +726,101 @@ test.describe("Critique HUD — E2E", () => {
     await expect(body).toBeVisible();
   });
 
+  test("four expected speaker slots survive a durable late speaker revision", async ({
+    page,
+    request,
+  }) => {
+    test.skip(
+      test.info().project.name !== "chromium-desktop",
+      "The speaker revision contract is exercised once in desktop Chromium.",
+    );
+    const created = await request.post("/api/sessions", {
+      data: {
+        title: "Four-speaker revision fixture",
+        objective: "Keep expected speakers visible while diarization resolves",
+        phase: "evaluate",
+        criteria: ["Speaker attribution"],
+        speakerCount: 4,
+        runMode: "live",
+      },
+    });
+    const session = await created.json();
+    expect(created.ok(), JSON.stringify(session)).toBeTruthy();
+
+    const providerSessionId = `revision-${session.id}`;
+    for (const [index, label] of ["A", "B"].entries()) {
+      const ingested = await request.post(
+        `/api/sessions/${session.id}/turns`,
+        {
+          data: {
+            providerSessionId,
+            providerTurnOrder: index,
+            segmentIndex: 0,
+            providerSpeakerLabel: label,
+            startMs: index * 1_200,
+            endMs: index * 1_200 + 900,
+            receivedAtMs: index * 1_200 + 900,
+            currentText: `Revision fixture ${label}`,
+            wordsJson: [
+              {
+                text: "Revision",
+                start: index * 1_200,
+                end: index * 1_200 + 400,
+                confidence: 0.98,
+                wordIsFinal: true,
+                speaker: label,
+              },
+            ],
+            isFinal: true,
+          },
+        },
+      );
+      expect(ingested.ok(), await ingested.text()).toBeTruthy();
+    }
+
+    const revised = await request.patch(
+      `/api/sessions/${session.id}/turns`,
+      {
+        data: {
+          providerSessionId,
+          revisions: [
+            {
+              turnOrder: 0,
+              speakerLabel: "D",
+              words: [
+                {
+                  text: "Revision",
+                  start: 0,
+                  end: 400,
+                  confidence: 0.99,
+                  speaker: "D",
+                },
+              ],
+            },
+          ],
+        },
+      },
+    );
+    const revisionBody = await revised.json();
+    expect(revised.ok(), JSON.stringify(revisionBody)).toBeTruthy();
+    expect(revisionBody.turns[0]).toMatchObject({
+      providerSpeakerLabel: "D",
+      wasSpeakerRevised: true,
+    });
+
+    await page.goto(`/facilitator/${session.id}`);
+    const cards = page.getByTestId("speaker-focus");
+    await expect(cards).toHaveCount(4);
+    await expect(cards.nth(0)).toHaveAttribute("data-speaker-label", "A");
+    await expect(cards.nth(0)).toHaveAttribute("data-speaker-detected", "false");
+    await expect(cards.nth(3)).toHaveAttribute("data-speaker-label", "D");
+    await expect(cards.nth(3)).toHaveAttribute("data-speaker-detected", "true");
+    await expect(page.getByText("2/4 speakers detected")).toBeVisible();
+    await expect(
+      page.getByTestId("transcript-turn").filter({ hasText: "Revision fixture A" }),
+    ).toHaveAttribute("data-speaker-label", "D");
+  });
+
   test("synthesized discussion traverses recording → AudioWorklet → PCM → ASR → transcript", async ({
     page,
     request,

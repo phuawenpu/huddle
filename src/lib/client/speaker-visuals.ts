@@ -60,6 +60,16 @@ export const SPEAKER_PALETTE: readonly SpeakerVisualStyle[] = [
   },
 ];
 
+export function expectedSpeakerLabels(count: number): string[] {
+  const boundedCount = Math.max(
+    0,
+    Math.min(SPEAKER_PALETTE.length, Math.floor(Number(count) || 0)),
+  );
+  return Array.from({ length: boundedCount }, (_, index) =>
+    String.fromCharCode(65 + index),
+  );
+}
+
 export function isUnknownSpeakerLabel(label?: string | null): boolean {
   const normalized = String(label || "")
     .trim()

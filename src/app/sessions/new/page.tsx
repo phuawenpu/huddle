@@ -196,12 +196,31 @@ export default function NewSessionPage() {
       if (sessionData.error) throw new Error(sessionData.error);
 
       // Create participants if named
-      const namedParticipants = participants.filter(p => p.trim());
-      for (const name of namedParticipants) {
-        await fetch(`/api/sessions/${sessionData.id}/participants`, {
+      const namedParticipants = participants
+        .map((name, index) => ({ name: name.trim(), index }))
+        .filter((participant) => participant.name);
+      for (const participant of namedParticipants) {
+        const participantResponse = await fetch(
+          `/api/sessions/${sessionData.id}/participants`,
+          {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ displayName: name, role: "reviewer" }),
+            body: JSON.stringify({
+              displayName: participant.name,
+              role: "reviewer",
+            }),
+          },
+        );
+        if (!participantResponse.ok) continue;
+        const createdParticipant = await participantResponse.json();
+        if (audioSource !== "recording") continue;
+        await fetch(`/api/sessions/${sessionData.id}/speaker-mappings`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            speakerLabel: String.fromCharCode(65 + participant.index),
+            participantId: createdParticipant.id,
+          }),
         });
       }
 

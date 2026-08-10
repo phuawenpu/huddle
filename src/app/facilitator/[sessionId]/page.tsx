@@ -8,10 +8,15 @@ import {
   latestAttributedSpeakerLabel,
   type ASRClient,
   type IngestTurnData,
+  type SpeakerRevisionEvent,
 } from "@/lib/client/asr-client";
 import { useWakeLock } from "@/lib/client/wake-lock";
 import { SpeakerWaveformStage } from "@/lib/client/speaker-waveform-stage";
-import { speakerVisualStyle } from "@/lib/client/speaker-visuals";
+import {
+  expectedSpeakerLabels,
+  isUnknownSpeakerLabel,
+  speakerVisualStyle,
+} from "@/lib/client/speaker-visuals";
 import type {
   CritiqueIntelligenceSnapshot,
   LiveAnalysisSnapshot,
@@ -440,6 +445,42 @@ export default function FacilitatorPage() {
     [sessionId],
   );
 
+  const persistSpeakerRevisions = useCallback(
+    async (
+      revision: SpeakerRevisionEvent,
+      providerSessionId: string,
+    ) => {
+      try {
+        const response = await fetch(`/api/sessions/${sessionId}/turns`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            providerSessionId,
+            revisions: revision.revisions,
+          }),
+        });
+        const result = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(result?.error || "Speaker revision could not be saved.");
+        }
+        const revisedTurns = Array.isArray(result?.turns) ? result.turns : [];
+        if (revisedTurns.length === 0) return;
+        const revisedById = new Map(
+          revisedTurns.map((turn: TranscriptTurn) => [turn.id, turn]),
+        );
+        setTurns((current) =>
+          current.map((turn) => revisedById.get(turn.id) || turn),
+        );
+      } catch (cause) {
+        console.error(
+          "Speaker revision persistence error:",
+          cause instanceof Error ? cause.message : cause,
+        );
+      }
+    },
+    [sessionId],
+  );
+
   // Start session
   const handleStart = async () => {
     if (starting || isCapturing) return;
@@ -493,23 +534,9 @@ export default function FacilitatorPage() {
           );
         },
         onSpeakerRevision: (revision) => {
-          // Apply revisions to existing turns
-          for (const rev of revision.revisions) {
-            setTurns((prev) =>
-              prev.map((t) => {
-                if (
-                  t.providerSessionId === asr.getState().sessionId &&
-                  t.providerTurnOrder === rev.turnOrder
-                ) {
-                  return {
-                    ...t,
-                    providerSpeakerLabel: rev.speakerLabel,
-                    wasSpeakerRevised: true,
-                  };
-                }
-                return t;
-              }),
-            );
+          const providerSessionId = asr.getState().sessionId;
+          if (providerSessionId) {
+            void persistSpeakerRevisions(revision, providerSessionId);
           }
         },
         onTermination: () => {
@@ -766,8 +793,15 @@ export default function FacilitatorPage() {
         .filter((label) => Boolean(label)),
     ),
   ];
+  const detectedSpeakerLabels = [
+    ...new Set([
+      ...speakerLabels.filter((label) => !isUnknownSpeakerLabel(label)),
+      ...(activeSpeaker ? [activeSpeaker] : []),
+    ]),
+  ];
   const sessionSpeakerLabels = [
     ...new Set([
+      ...expectedSpeakerLabels(session?.speakerCount || 0),
       ...mappings.map((mapping) => mapping.speakerLabel),
       ...speakerLabels,
       ...(activeSpeaker ? [activeSpeaker] : []),
@@ -1021,6 +1055,7 @@ export default function FacilitatorPage() {
           liveText={livePartial}
           turns={finalizedTurns}
           speakerLabels={sessionSpeakerLabels}
+          detectedSpeakerLabels={detectedSpeakerLabels}
           focusedSpeakerLabel={focusedSpeakerLabel}
           selectedTurnId={selectedTurnId}
           emphasizedSpeakerLabels={selectedNodeSpeakerLabels}

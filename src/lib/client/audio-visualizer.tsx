@@ -27,6 +27,10 @@ export interface VisualizerProps {
   active?: boolean;
   /** CSS class for the container */
   className?: string;
+  /** Stable selector for browser verification */
+  testId?: string;
+  /** Accessible description of the visualized audio */
+  ariaLabel?: string;
 }
 
 export function AudioVisualizer({
@@ -38,6 +42,8 @@ export function AudioVisualizer({
   height = 96,
   active = true,
   className = "",
+  testId,
+  ariaLabel = "Live audio frequency spectrum",
 }: VisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
@@ -67,16 +73,16 @@ export function AudioVisualizer({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const displayWidth = canvas.clientWidth;
     const displayHeight = canvas.clientHeight;
     
     if (canvas.width !== displayWidth * dpr || canvas.height !== displayHeight * dpr) {
-      canvas.width = displayWidth * dpr;
-      canvas.height = displayHeight * dpr;
+      canvas.width = Math.round(displayWidth * dpr);
+      canvas.height = Math.round(displayHeight * dpr);
     }
-    
-    ctx.scale(dpr, dpr);
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     
     const w = displayWidth;
     const h = displayHeight;
@@ -159,6 +165,8 @@ export function AudioVisualizer({
   return (
     <canvas
       ref={canvasRef}
+      data-testid={testId}
+      aria-label={ariaLabel}
       className={className}
       style={{
         width: "100%",

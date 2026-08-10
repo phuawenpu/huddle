@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   SPEAKER_PALETTE,
   UNKNOWN_SPEAKER_STYLE,
+  expectedSpeakerLabels,
   isUnknownSpeakerLabel,
   rollingTalkShares,
   speakerInitial,
@@ -10,6 +11,12 @@ import {
 } from "@/lib/client/speaker-visuals";
 
 describe("speaker visuals", () => {
+  it("creates explicit speaker slots from the configured session count", () => {
+    expect(expectedSpeakerLabels(4)).toEqual(["A", "B", "C", "D"]);
+    expect(expectedSpeakerLabels(99)).toHaveLength(SPEAKER_PALETTE.length);
+    expect(expectedSpeakerLabels(0)).toEqual([]);
+  });
+
   it("assigns distinct, stable styles to the common provider labels", () => {
     const labels = ["C", "A", "B"];
     const styles = ["A", "B", "C"].map((label) =>
