@@ -387,8 +387,8 @@ npm install
 npx prisma generate
 DATABASE_URL=file:./data/app.db npx prisma db push
 
-# Start development server (stubs on — zero API cost)
-npm run dev
+# Start development server with explicit zero-cost provider stubs
+DATABASE_URL=file:./data/app.db ASR_STUB=1 LLM_STUB=1 TTS_STUB=1 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
@@ -400,13 +400,13 @@ Open [http://localhost:3000](http://localhost:3000).
 | `ASSEMBLYAI_API_KEY`        | AssemblyAI streaming ASR                 | (required for live mode) |
 | `OPENAI_API_KEY`            | OpenAI for analysis, generation, TTS     | (required for non-stub)  |
 | `DATABASE_URL`              | SQLite database path                     | `file:./data/app.db`     |
-| `LLM_STUB`                  | Use deterministic stubs                  | `1`                      |
+| `LLM_STUB`                  | Use deterministic stubs when set to `1`  | unset/off                |
 | `ANALYSIS_TIMEOUT_MS`       | Provider deadline before safe fallback   | `12000`                  |
 | `ANALYSIS_REASONING_EFFORT` | GPT reasoning effort for live extraction | `minimal`                |
 | `SCENARIO_MODEL`            | Structured scenario generation model     | `gpt-5.6-terra`          |
 | `SCENARIO_EDIT_MODEL`       | Structured transcript revision model     | `SCENARIO_MODEL`         |
-| `TTS_STUB`                  | Use tone-based TTS stubs                 | `1`                      |
-| `ASR_STUB`                  | Use in-process ASR stub                  | `1`                      |
+| `TTS_STUB`                  | Use tone-based TTS when set to `1`       | unset/off                |
+| `ASR_STUB`                  | Use in-process ASR when set to `1`       | unset/off                |
 | `ASSEMBLYAI_SPEECH_MODEL`   | Streaming diarization model              | `u3-rt-pro`              |
 
 ## Routes
@@ -493,3 +493,106 @@ Third-party software and materials remain governed by their respective
 licences. See [LICENSE.md](LICENSE.md) for the complete current notice.
 Unsolicited contributions are paused as described in
 [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Codex continuation handoff — 2026-08-10T14:16Z
+
+This section is intentionally last. A new Codex session should be able to start
+here, confirm the repository state, and continue without reconstructing the
+latest work from chat history.
+
+### Current verified baseline
+
+- The latest functional application commit is `db33238` (`fix: track live
+  speaker colors accurately`) on `main` in `phuawenpu/huddle`. The commit that
+  adds this handoff is documentation-only and immediately follows that baseline.
+- That functional commit is deployed to Fly app `huddle-ti5ikw` as release
+  `v45`, image `deployment-01KZP0D7VM2WFBP4Y6H2SHSSXW`, in region `sin`.
+  At handoff, the machine was started with `1/1` health check passing, and both
+  `/` and `/api/time` returned HTTP 200.
+- Sprite checkpoint `v5` preserves the verified pre-commit implementation.
+- The README-only follow-up does not require another Fly deployment because it
+  changes no application or runtime files.
+
+### What the latest functional change completed
+
+- Speaker A–F now receive deterministic, stable palette colors even when labels
+  are discovered incrementally. A participant should keep the same color across
+  the speaker strip, live waveform, transcript, and semantic contribution UI.
+- Waveform samples now use the actual audio-capture start time. This aligns their
+  time axis with provider word/turn timestamps so finalized diarized turns can
+  recolor the correct waveform intervals instead of leaving them under a stale
+  provisional Speaker A color.
+- The live speaker indicator prefers the newest confidently attributed final
+  word over the provider's dominant turn label. A new unresolved speech event
+  displays the neutral pending state rather than carrying the prior speaker
+  forward, and finalized speakers clear after a short idle interval.
+- The `turn.final` SSE handler no longer immediately erases the live speaker set
+  by the WebSocket event path.
+- The recorded-browser regression now observes active-speaker transitions
+  `A → B → C` and asserts three distinct speaker colors.
+
+### Verification already completed
+
+- `npm test`: 16 files, 130 tests passed.
+- `npx tsc --noEmit`: passed.
+- Prettier check for all changed TypeScript/TSX files: passed.
+- `DATABASE_URL=file:./data/app.db npm run build`: clean production build passed.
+- Chromium recorded AudioWorklet → PCM → ASR-stub → transcript regression:
+  passed, including `A → B → C` live-speaker transitions and three colors.
+- GitHub local/remote equality and Fly release/health/HTTP checks were confirmed
+  after deployment.
+
+The browser regression used the repository's in-process ASR stub. It proves the
+UI state flow and time alignment, not real-room diarization quality. The existing
+Sprite service `critique-hud-dev` currently supplies only `DATABASE_URL`; without
+an AssemblyAI credential its token route returns 500 unless `ASR_STUB=1` is
+explicitly supplied. Use the explicit stub environment shown in **Quick Start**
+or an isolated managed test service for zero-cost audio-path testing.
+
+### Continue from here
+
+1. Run `git status --short --branch`, `git log -3 --oneline`, and `fly status
+   --app huddle-ti5ikw` before changing anything. Treat `origin/main` as the
+   source of truth.
+2. Perform the next meaningful acceptance test on the deployed app with three
+   physically distinct speakers and a shared room microphone. Confirm that the
+   top capture status, portrait emphasis, waveform colors, and finalized
+   transcript labels change together. Do not claim real-room validation from
+   the stub result above.
+3. If attribution still sticks, collect sanitized WebSocket event metadata only:
+   event type, turn order, `end_of_turn`, turn-level label, final-word labels,
+   and word timestamps. Do not log credentials, raw audio, or participant
+   transcript content. Compare those timestamps with the capture start passed
+   into `SpeakerWaveformStage`.
+4. The next known diarization engineering gap is durable late
+   `SpeakerRevision` handling. The client currently revises matching in-memory
+   turns, but complete persistence/correction of previously segmented turns is
+   still unfinished and is already marked partial in the implementation table.
+5. After any fix, rerun unit tests, TypeScript, a clean production build, and the
+   focused Chromium audio regression. Push the exact commit to `main`, deploy it
+   to Fly, then verify the new release, `1/1` health, `/`, and `/api/time`.
+
+### Files to read first
+
+- `src/app/facilitator/[sessionId]/page.tsx` — WebSocket/SSE state ownership and
+  the live speaker status.
+- `src/lib/client/asr-client.ts` — provider event normalization, live-edge
+  speaker choice, word-level segmentation, and revision events.
+- `src/lib/client/audio-capture.ts` — capture lifecycle and waveform time origin.
+- `src/lib/client/speaker-waveform-stage.tsx` — speaker strip, sampled waveform,
+  finalized-turn reconciliation, focus, and transcript navigation.
+- `src/lib/client/speaker-visuals.ts` — stable palette, attribution lookup, and
+  rolling talk share.
+- `tests/asr-client.test.ts`, `tests/speaker-visuals.test.ts`, and
+  `e2e/critique-hud.spec.ts` — the relevant regression contracts.
+
+Two local reference files are intentionally untracked and excluded from the
+Docker context: `workspace/critique-hud.png` and
+`workspace/critique-hud-live-session-ui-behavior-spec.md`. They are the visual
+and behavioral references for this HUD work; read them locally, but do not add
+them to Git without an explicit repository-content decision.
+
+Finally, preserve the current licensing posture. Copyright and university IP
+ownership remain under review, no public project licence is granted, and the
+repository must not be switched to an open-source licence without explicit
+university/commercialisation direction.
