@@ -262,10 +262,24 @@ Key runtime guarantees:
   unit, build, six-profile browser, Fly redeployment, and production live-session
   checks are now in progress; deployment is not yet claimed complete.
 
+#### Multi-speaker waveform completion — 2026-08-10T23:24Z
+
+- Restored bottom-anchored FFT spectral bars for live room audio. Bar color now
+  follows the currently attributed speaker while the compact history rail keeps
+  finalized speaker attribution visible over time.
+- The speaker strip now reserves every configured slot (A–F), distinguishes
+  detected speakers from speakers still awaiting voice attribution, and reports
+  the detected/configured count instead of collapsing to only the labels already
+  returned by streaming diarization.
+- Late `SpeakerRevision` events are persisted to matching segmented transcript
+  turns and broadcast through SSE. Unit, type, production-build, focused desktop
+  audio/revision browser, portrait-browser, Fly health, and HTTP checks passed;
+  see the final continuation handoff for exact commit and release identifiers.
+
 | Stage                         | Status         | Summary                                                                                                                                                                                                                                   |
 | ----------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **1 — Speech proof**          | ✅ Implemented | AudioWorklet PCM16 resampler, `useAudioCapture` hook (getUserMedia + analyser meter + settings readback), ASR WebSocket client (AssemblyAI v3 protocol), wake lock, sendBeacon termination                                                |
-| **2 — Diarization**           | 🟡 Partial     | Idempotent turn ingest, word-level provider speaker runs, UNKNOWN/PENDING normalization, overlap hints, and mappings work; late SpeakerRevision persistence/correction is incomplete.                                                     |
+| **2 — Diarization**           | 🟡 Partial     | Idempotent turn ingest, word-level provider speaker runs, UNKNOWN/PENDING normalization, overlap hints, mappings, and durable late SpeakerRevision correction work; broader real-room acoustic validation remains pending.                 |
 | **3 — Scenarios + stubs**     | ✅ Implemented | Versioned rich transcripts, one-to-three-pass LLM revision, quality gates, ASR/LLM/TTS stubs, realistic overlap fixtures, and recorded-audio injection through the live Worklet/ASR path work.                                            |
 | **4 — HUD**                   | 🟡 Partial     | Bounded two-way transcript navigation, controlled auto-follow, live waveform, compact synthesis graphs, whole-transcript intent snapshots, deliberate visual context, SSE, simulation badge, and reconnect work; durable event replay is not implemented.          |
 | **5 — TTS + mixing**          | ✅ Implemented | Cached per-turn OpenAI TTS, explicit tone fixtures in stub mode, ffmpeg overlap scheduling/mixing, WAV + MP3 output, manifests, and independent ASR validation.                                                                           |
@@ -494,7 +508,7 @@ licences. See [LICENSE.md](LICENSE.md) for the complete current notice.
 Unsolicited contributions are paused as described in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Codex continuation handoff — 2026-08-10T14:16Z
+## Codex continuation handoff — 2026-08-10T23:24Z
 
 This section is intentionally last. A new Codex session should be able to start
 here, confirm the repository state, and continue without reconstructing the
@@ -502,95 +516,105 @@ latest work from chat history.
 
 ### Current verified baseline
 
-- The latest functional application commit is `db33238` (`fix: track live
-  speaker colors accurately`) on `main` in `phuawenpu/huddle`. The commit that
-  adds this handoff is documentation-only and immediately follows that baseline.
-- That functional commit is deployed to Fly app `huddle-ti5ikw` as release
-  `v45`, image `deployment-01KZP0D7VM2WFBP4Y6H2SHSSXW`, in region `sin`.
-  At handoff, the machine was started with `1/1` health check passing, and both
-  `/` and `/api/time` returned HTTP 200.
-- Sprite checkpoint `v5` preserves the verified pre-commit implementation.
-- The README-only follow-up does not require another Fly deployment because it
-  changes no application or runtime files.
+- The latest functional application commit is `870daac` (`fix: complete
+  multi-speaker waveform flow`) on `main` in `phuawenpu/huddle`. This README
+  handoff is a documentation-only follow-up to that runtime revision.
+- Commit `870daac` is deployed to Fly app `huddle-ti5ikw` as release `v46`, image
+  `deployment-01KZPZN2GHXZQB1WXC08NQS1TV`, in region `sin`. At handoff the
+  machine is started with `1/1` health check passing, and both `/` and
+  `/api/time` return HTTP 200.
+- Sprite checkpoint `v6` preserves the verified implementation before the Git
+  commit and deployment.
+- GitHub commit `717fdb7` captured the interrupted work and also added the HUD
+  reference image and behavior specification under `workspace/`; those files
+  are now tracked repository content, despite the older handoff saying they
+  were intentionally untracked.
 
 ### What the latest functional change completed
 
-- Speaker A–F now receive deterministic, stable palette colors even when labels
-  are discovered incrementally. A participant should keep the same color across
-  the speaker strip, live waveform, transcript, and semantic contribution UI.
-- Waveform samples now use the actual audio-capture start time. This aligns their
-  time axis with provider word/turn timestamps so finalized diarized turns can
-  recolor the correct waveform intervals instead of leaving them under a stale
-  provisional Speaker A color.
-- The live speaker indicator prefers the newest confidently attributed final
-  word over the provider's dominant turn label. A new unresolved speech event
-  displays the neutral pending state rather than carrying the prior speaker
-  forward, and finalized speakers clear after a short idle interval.
-- The `turn.final` SSE handler no longer immediately erases the live speaker set
-  by the WebSocket event path.
-- The recorded-browser regression now observes active-speaker transitions
-  `A → B → C` and asserts three distinct speaker colors.
+- The live room visualizer again uses the earlier frequency-domain spectral
+  bars. Bars share a bottom baseline and extend upward in one direction; their
+  color follows the active attributed speaker. The narrow 30-second history
+  rail below it is also bottom-anchored and retains finalized attribution.
+- Speaker A–F keep deterministic palette colors across the speaker strip,
+  spectrum, history, transcript, and semantic contribution UI.
+- The top speaker strip reserves the configured number of participants before
+  diarization has detected them. A four-person session therefore shows A, B, C,
+  and D, with `awaiting voice` on unresolved slots and an explicit detected/total
+  count, instead of visually collapsing to only A and B.
+- Provider `SpeakerRevision` messages are sent to the turns API, matched by
+  provider session and turn order, applied to each overlapping persisted
+  segment, reconciled with speaker mappings, broadcast through SSE, and merged
+  back into client state. Reloading no longer discards a late C/D correction.
+- Recorded scenarios map their known participant order to provider labels A–F
+  at session creation. Live and uploaded sessions remain unmapped until the
+  facilitator/provider supplies evidence, avoiding fabricated identities.
+- Existing active-speaker timing fixes remain intact: capture-relative waveform
+  timestamps, newest final-word preference, neutral pending state for unresolved
+  speech, a short final-speaker hold, and no premature SSE clearing.
 
-### Verification already completed
+### Verification completed
 
-- `npm test`: 16 files, 130 tests passed.
+- `npm test`: 16 files, 131 tests passed.
 - `npx tsc --noEmit`: passed.
-- Prettier check for all changed TypeScript/TSX files: passed.
 - `DATABASE_URL=file:./data/app.db npm run build`: clean production build passed.
+- Chromium four-speaker regression: four top slots rendered; a persisted A→D
+  late revision survived page load; D was marked detected; the spectral canvas
+  was visible; the UI reported `2/4 speakers detected`.
 - Chromium recorded AudioWorklet → PCM → ASR-stub → transcript regression:
-  passed, including `A → B → C` live-speaker transitions and three colors.
-- GitHub local/remote equality and Fly release/health/HTTP checks were confirmed
-  after deployment.
+  passed, including `A → B → C` active-speaker transitions and distinct colors.
+- iPhone portrait regression: speaker waveform, analysis HUD, semantic compass,
+  transcript, and human controls stayed reachable within the viewport contract.
+- The managed `critique-hud-dev` service was restarted successfully. GitHub push,
+  Fly release `v46`, `1/1` health, `/`, and `/api/time` were verified afterward.
 
-The browser regression used the repository's in-process ASR stub. It proves the
-UI state flow and time alignment, not real-room diarization quality. The existing
-Sprite service `critique-hud-dev` currently supplies only `DATABASE_URL`; without
-an AssemblyAI credential its token route returns 500 unless `ASR_STUB=1` is
-explicitly supplied. Use the explicit stub environment shown in **Quick Start**
-or an isolated managed test service for zero-cost audio-path testing.
+The focused browser audio tests use the repository's in-process ASR stub. They
+prove the application state flow, durable revision path, audio analyzer, and
+responsive UI, but not real-room diarization quality. AssemblyAI streaming
+`max_speakers` is a hint rather than a forced exact count, and multi-speaker
+accuracy can still depend on turn duration, overlap, room noise, and voice
+separation. The UI now exposes that uncertainty instead of inventing C/D labels.
 
 ### Continue from here
 
 1. Run `git status --short --branch`, `git log -3 --oneline`, and `fly status
    --app huddle-ti5ikw` before changing anything. Treat `origin/main` as the
-   source of truth.
-2. Perform the next meaningful acceptance test on the deployed app with three
-   physically distinct speakers and a shared room microphone. Confirm that the
-   top capture status, portrait emphasis, waveform colors, and finalized
-   transcript labels change together. Do not claim real-room validation from
-   the stub result above.
-3. If attribution still sticks, collect sanitized WebSocket event metadata only:
+   source of truth; a documentation-only commit should immediately follow
+   functional commit `870daac`.
+2. Perform the next meaningful acceptance test on the deployed app with three or
+   four physically distinct speakers and a shared room microphone. Confirm the
+   top active state, colored spectral bars, detected/total speaker count, history
+   attribution, and finalized transcript labels change together. Do not claim
+   real-room validation from stub results.
+3. End the session normally and reload it. Confirm any end-of-stream
+   `SpeakerRevision` correction remains visible after reload, especially C/D.
+4. If the provider still emits only A/B, collect sanitized WebSocket metadata:
    event type, turn order, `end_of_turn`, turn-level label, final-word labels,
-   and word timestamps. Do not log credentials, raw audio, or participant
-   transcript content. Compare those timestamps with the capture start passed
-   into `SpeakerWaveformStage`.
-4. The next known diarization engineering gap is durable late
-   `SpeakerRevision` handling. The client currently revises matching in-memory
-   turns, but complete persistence/correction of previously segmented turns is
-   still unfinished and is already marked partial in the implementation table.
-5. After any fix, rerun unit tests, TypeScript, a clean production build, and the
-   focused Chromium audio regression. Push the exact commit to `main`, deploy it
-   to Fly, then verify the new release, `1/1` health, `/`, and `/api/time`.
+   revision labels, and word timestamps. Do not log credentials, raw audio, or
+   transcript content. This distinguishes provider diarization limits from UI or
+   persistence failures.
+5. Do not synthesize missing speaker detections. Keep unresolved configured
+   slots as `awaiting voice`. If physical testing establishes that streaming is
+   inadequate for four speakers, evaluate an explicit post-session batch
+   transcription/reconciliation path as a separate product decision.
 
 ### Files to read first
 
-- `src/app/facilitator/[sessionId]/page.tsx` — WebSocket/SSE state ownership and
-  the live speaker status.
-- `src/lib/client/asr-client.ts` — provider event normalization, live-edge
-  speaker choice, word-level segmentation, and revision events.
-- `src/lib/client/audio-capture.ts` — capture lifecycle and waveform time origin.
-- `src/lib/client/speaker-waveform-stage.tsx` — speaker strip, sampled waveform,
-  finalized-turn reconciliation, focus, and transcript navigation.
-- `src/lib/client/speaker-visuals.ts` — stable palette, attribution lookup, and
-  rolling talk share.
-- `tests/asr-client.test.ts`, `tests/speaker-visuals.test.ts`, and
-  `e2e/critique-hud.spec.ts` — the relevant regression contracts.
-
-Two local reference files are intentionally untracked and excluded from the
-Docker context: `workspace/critique-hud.png` and
-`workspace/critique-hud-live-session-ui-behavior-spec.md`. They are the visual
-and behavioral references for this HUD work; read them locally, but do not add
-them to Git without an explicit repository-content decision.
+- `src/app/facilitator/[sessionId]/page.tsx` — WebSocket/SSE state ownership,
+  configured/detected speaker sets, and revision persistence request.
+- `src/lib/client/audio-visualizer.tsx` — bottom-anchored FFT spectral bars.
+- `src/lib/client/speaker-waveform-stage.tsx` — expected speaker strip, active
+  color, detected count, spectrum, compact history, focus, and navigation.
+- `src/lib/client/asr-client.ts` — provider event normalization, word-level
+  segmentation, live-edge speaker choice, and `SpeakerRevision` events.
+- `src/app/api/sessions/[id]/turns/route.ts` — idempotent ingest and durable late
+  speaker-revision correction/broadcast.
+- `src/lib/client/speaker-visuals.ts`, `tests/speaker-visuals.test.ts`, and
+  `e2e/critique-hud.spec.ts` — palette/expected-label contracts and focused
+  browser regressions.
+- `workspace/critique-hud.png` and
+  `workspace/critique-hud-live-session-ui-behavior-spec.md` — tracked visual and
+  behavioral references for the live HUD.
 
 Finally, preserve the current licensing posture. Copyright and university IP
 ownership remain under review, no public project licence is granted, and the
