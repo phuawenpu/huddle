@@ -302,9 +302,15 @@ export function SemanticCompass({
           focusedSpeakerLabel && node && !hasFocusedSpeaker,
         );
         const maturity = nodeMaturity(node);
+        const wasAdded = Boolean(
+          node && state?.changes.addedNodeIds.includes(node.id),
+        );
+        const wasStrengthened = Boolean(
+          node && state?.changes.strengthenedNodeIds?.includes(node.id),
+        );
         return (
           <button
-            key={slot}
+            key={`${slot}-${node?.id || "empty"}-${state?.revision || 0}`}
             type="button"
             disabled={!node}
             aria-label={
@@ -328,11 +334,7 @@ export function SemanticCompass({
                 : "cursor-default border-dashed opacity-35"
             } ${maturity === "tentative" ? "border-dashed" : ""} ${
               isSelected || isTurnLinked ? "ring-2 ring-white/70" : ""
-            } ${isDimmed ? "opacity-20" : "opacity-100"} ${
-              node && state?.changes.addedNodeIds.includes(node.id)
-                ? "semantic-bloom"
-                : ""
-            }`}
+            } ${isDimmed ? "opacity-20" : "opacity-100"} ${wasAdded ? "semantic-bloom" : ""} ${wasStrengthened && !wasAdded ? "semantic-pulse" : ""}`}
             style={{
               left: `${config.x}%`,
               top: `${config.y}%`,
@@ -486,6 +488,27 @@ export function FacilitationNowLens({
     deriveFacilitationPrompt(nodes, turns) ||
     "Listen for the next useful facilitation move";
   const capturedThrough = turns.at(-1)?.endMs || 0;
+  const changedNodeIds = new Set([
+    ...(analysis?.result.meetingState.changes.addedNodeIds || []),
+    ...(analysis?.result.meetingState.changes.strengthenedNodeIds || []),
+  ]);
+  const changedKinds = new Set(
+    nodes
+      .filter((node) => changedNodeIds.has(node.id))
+      .map((node) => node.kind),
+  );
+  const tensionChanged = changedKinds.has("issue") || changedKinds.has("need");
+  const openLoopChanged = changedKinds.has("question");
+  const promptChanged = [...changedKinds].some((kind) =>
+    [
+      "proposal",
+      "criterion",
+      "evidence",
+      "decision",
+      "action",
+      "experiment",
+    ].includes(kind),
+  );
 
   return (
     <section
@@ -504,9 +527,24 @@ export function FacilitationNowLens({
         </span>
       </header>
       <div className="grid grid-cols-3 divide-x divide-white/15">
-        <NowField label="Main tension" value={tension} color="#c084fc" />
-        <NowField label="Open loop" value={openLoop} color="#86ef6b" />
-        <NowField label="Prompt" value={prompt} color="#fb923c" />
+        <NowField
+          label="Main tension"
+          value={tension}
+          color="#c084fc"
+          highlight={tensionChanged}
+        />
+        <NowField
+          label="Open loop"
+          value={openLoop}
+          color="#86ef6b"
+          highlight={openLoopChanged}
+        />
+        <NowField
+          label="Prompt"
+          value={prompt}
+          color="#fb923c"
+          highlight={promptChanged}
+        />
       </div>
     </section>
   );
@@ -516,13 +554,17 @@ function NowField({
   label,
   value,
   color,
+  highlight,
 }: {
   label: string;
   value: string;
   color: string;
+  highlight: boolean;
 }) {
   return (
-    <div className="min-w-0 px-2 first:pl-0 last:pr-0">
+    <div
+      className={`min-w-0 rounded-lg px-2 first:pl-0 last:pr-0 ${highlight ? "semantic-lens-highlight" : ""}`}
+    >
       <p
         className="text-[8px] font-bold uppercase tracking-[0.08em]"
         style={{ color }}

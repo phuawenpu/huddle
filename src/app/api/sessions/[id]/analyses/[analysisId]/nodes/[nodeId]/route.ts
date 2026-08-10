@@ -66,6 +66,7 @@ export async function PATCH(
         changes: {
           addedNodeIds: [],
           retainedNodeIds: state.nodes.map((node) => node.id),
+          strengthenedNodeIds: [],
           removedNodeIds: [],
           humanEditedNodeIds: [nodeId],
         },

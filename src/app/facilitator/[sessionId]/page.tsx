@@ -1060,6 +1060,9 @@ export default function FacilitatorPage() {
                     turn.isUnknownSpeaker ? null : turn.providerSpeakerLabel,
                     speakerLabels,
                   );
+                  const participantName = getParticipantName(
+                    turn.providerSpeakerLabel,
+                  );
                   const isSemanticSource = selectedNodeTurnIds.has(turn.id);
                   return (
                     <article
@@ -1101,7 +1104,9 @@ export default function FacilitatorPage() {
                           {speakerStyle.marker}{" "}
                           {turn.isUnknownSpeaker
                             ? "Unassigned"
-                            : getParticipantName(turn.providerSpeakerLabel)}
+                            : participantName === turn.providerSpeakerLabel
+                              ? `Speaker ${participantName}`
+                              : participantName}
                         </span>
                         <span className="truncate text-[9px] tabular-nums text-hud-muted">
                           {formatSessionTimestamp(turn.startMs)} ·{" "}

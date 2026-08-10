@@ -508,6 +508,7 @@ export interface MeetingState {
   changes: {
     addedNodeIds: string[];
     retainedNodeIds: string[];
+    strengthenedNodeIds?: string[];
     removedNodeIds: string[];
     humanEditedNodeIds?: string[];
   };

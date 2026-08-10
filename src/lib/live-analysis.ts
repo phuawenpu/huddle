@@ -1008,9 +1008,10 @@ function versionedState(
   facilitatorActions: FacilitatorAction[],
   config: LiveAnalysisConfig,
 ): MeetingState {
-  const previousIds = new Set(
-    config.previousState?.nodes.map((node) => node.id) || [],
+  const previousNodes = new Map(
+    config.previousState?.nodes.map((node) => [node.id, node]) || [],
   );
+  const previousIds = new Set(previousNodes.keys());
   const currentIds = new Set(nodes.map((node) => node.id));
   return {
     schemaVersion: 1,
@@ -1027,6 +1028,16 @@ function versionedState(
         .map((node) => node.id),
       retainedNodeIds: nodes
         .filter((node) => previousIds.has(node.id))
+        .map((node) => node.id),
+      strengthenedNodeIds: nodes
+        .filter((node) => {
+          const previous = previousNodes.get(node.id);
+          if (!previous) return false;
+          return (
+            node.supportingTurnIds.length > previous.supportingTurnIds.length ||
+            node.sourceQuotes.length > previous.sourceQuotes.length
+          );
+        })
         .map((node) => node.id),
       removedNodeIds: [...previousIds].filter((id) => !currentIds.has(id)),
     },

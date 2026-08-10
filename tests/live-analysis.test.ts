@@ -73,6 +73,36 @@ describe("whole-transcript live analysis", () => {
     ]);
   });
 
+  it("marks a retained semantic node when new grounding strengthens it", async () => {
+    vi.stubEnv("LLM_STUB", "1");
+    const config = {
+      objective: "Assess warning comprehension",
+      phase: "evaluate",
+      criteria: ["Warnings are understood"],
+    };
+    const first = await analyzeFullTranscript(turns, [], config);
+    const grounded = first.meetingState.nodes.find(
+      (node) => node.supportingTurnIds.length > 0,
+    );
+    expect(grounded).toBeTruthy();
+
+    const second = await analyzeFullTranscript(turns, [], {
+      ...config,
+      previousState: {
+        ...first.meetingState,
+        nodes: first.meetingState.nodes.map((node) =>
+          node.id === grounded?.id
+            ? { ...node, supportingTurnIds: [], sourceQuotes: [] }
+            : node,
+        ),
+      },
+    });
+
+    expect(second.meetingState.changes.strengthenedNodeIds).toContain(
+      grounded?.id,
+    );
+  });
+
   it("truncates long HUD headlines on a word boundary", async () => {
     vi.stubEnv("LLM_STUB", "1");
     const result = await analyzeFullTranscript(turns, [], {
