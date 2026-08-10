@@ -815,6 +815,7 @@ test.describe("Critique HUD — E2E", () => {
     await expect(cards.nth(0)).toHaveAttribute("data-speaker-detected", "false");
     await expect(cards.nth(3)).toHaveAttribute("data-speaker-label", "D");
     await expect(cards.nth(3)).toHaveAttribute("data-speaker-detected", "true");
+    await expect(page.getByTestId("speaker-spectrum")).toBeVisible();
     await expect(page.getByText("2/4 speakers detected")).toBeVisible();
     await expect(
       page.getByTestId("transcript-turn").filter({ hasText: "Revision fixture A" }),

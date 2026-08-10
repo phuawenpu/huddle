@@ -78,7 +78,7 @@ export async function PATCH(
           where: { id: turn.id },
           data: {
             providerSpeakerLabel: revisedLabel,
-            participantId: mapping?.participantId ?? turn.participantId,
+            participantId: mapping?.participantId ?? null,
             wordsJson:
               revisedWords.length > 0
                 ? JSON.stringify(revisedWords)
@@ -288,7 +288,10 @@ function isUnknownSpeakerLabel(value: unknown): boolean {
   return label === "UNKNOWN" || label === "PENDING" || label === "UNASSIGNED";
 }
 
-function wordsWithinTurn(words: unknown, turn: { startMs: number; endMs: number }) {
+function wordsWithinTurn(
+  words: unknown,
+  turn: { startMs: number; endMs: number },
+) {
   if (!Array.isArray(words)) return [];
   return words
     .map((word) => ({
@@ -305,7 +308,9 @@ function wordsWithinTurn(words: unknown, turn: { startMs: number; endMs: number 
     );
 }
 
-function dominantSpeakerLabel(words: Array<{ speaker: string }>): string | null {
+function dominantSpeakerLabel(
+  words: Array<{ speaker: string }>,
+): string | null {
   const counts = new Map<string, number>();
   for (const word of words) {
     if (isUnknownSpeakerLabel(word.speaker)) continue;

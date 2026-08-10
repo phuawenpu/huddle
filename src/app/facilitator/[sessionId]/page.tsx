@@ -446,10 +446,7 @@ export default function FacilitatorPage() {
   );
 
   const persistSpeakerRevisions = useCallback(
-    async (
-      revision: SpeakerRevisionEvent,
-      providerSessionId: string,
-    ) => {
+    async (revision: SpeakerRevisionEvent, providerSessionId: string) => {
       try {
         const response = await fetch(`/api/sessions/${sessionId}/turns`, {
           method: "PATCH",
@@ -461,12 +458,17 @@ export default function FacilitatorPage() {
         });
         const result = await response.json().catch(() => null);
         if (!response.ok) {
-          throw new Error(result?.error || "Speaker revision could not be saved.");
+          throw new Error(
+            result?.error || "Speaker revision could not be saved.",
+          );
         }
         const revisedTurns = Array.isArray(result?.turns) ? result.turns : [];
         if (revisedTurns.length === 0) return;
-        const revisedById = new Map(
-          revisedTurns.map((turn: TranscriptTurn) => [turn.id, turn]),
+        const revisedById = new Map<string, TranscriptTurn>(
+          revisedTurns.map((turn: TranscriptTurn): [string, TranscriptTurn] => [
+            turn.id,
+            turn,
+          ]),
         );
         setTurns((current) =>
           current.map((turn) => revisedById.get(turn.id) || turn),

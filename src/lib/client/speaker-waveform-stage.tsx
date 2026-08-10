@@ -133,7 +133,7 @@ export function SpeakerWaveformStage({
       className="relative shrink-0 overflow-hidden border-b border-cyan-300/15 bg-[radial-gradient(circle_at_18%_0%,rgba(91,141,255,0.13),transparent_48%),linear-gradient(145deg,rgba(10,17,29,0.99),rgba(5,9,17,0.99))] px-3 py-2.5 sm:px-4"
       aria-label="Live speaker and room-audio timeline"
     >
-      <div className="mx-auto flex h-[clamp(168px,24dvh,214px)] max-w-5xl flex-col gap-2">
+      <div className="mx-auto flex h-[clamp(158px,22dvh,198px)] max-w-5xl flex-col gap-2">
         <div
           className="grid auto-cols-[minmax(5rem,1fr)] grid-flow-col gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] sm:auto-cols-[minmax(7.25rem,1fr)] sm:gap-2"
           aria-label="Recent participation, last five minutes"
