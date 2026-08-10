@@ -471,6 +471,14 @@ test.describe("Critique HUD — E2E", () => {
     // This deliberately proves that persisted analysis scope survives reloads.
     await page.reload();
     await expect(hud).toBeVisible();
+    const reloadedInspector = hud.getByTestId("meeting-intelligence-details");
+    if (
+      !(await reloadedInspector.evaluate((element) =>
+        element.hasAttribute("open"),
+      ))
+    ) {
+      await reloadedInspector.locator(":scope > summary").click();
+    }
     await expect(
       hud.getByText("4 new turns since this snapshot"),
     ).toBeVisible();
@@ -546,13 +554,32 @@ test.describe("Critique HUD — E2E", () => {
     ).json();
     expect(currentSession.status).toBe("active");
 
+    const publishableNode = hud
+      .locator('[data-testid^="semantic-node-"]:not([disabled])')
+      .first();
+    const publishedNodeId = await publishableNode.getAttribute("data-node-id");
+    const publishedNode = history[0].result.meetingState.nodes.find(
+      (node: { id: string }) => node.id === publishedNodeId,
+    );
+    expect(publishedNode).toBeTruthy();
+    await publishableNode.click();
+    const publishControl = page.getByTestId("publish-control");
+    await expect(publishControl).toBeEnabled();
+    await publishControl.click();
+    await expect(publishControl).toContainText("Published");
+
     await page.goto(`/display/${session.id}`);
-    await expect(page.getByText("Intent synthesis")).toBeVisible();
+    await expect(page.getByText("Shared meeting canvas")).toBeVisible();
+    await expect(
+      page.getByText(`${publishedNode.title} — ${publishedNode.summary}`, {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(page.getByText("Intent synthesis")).toHaveCount(0);
     await expect(
       page.getByText(history[0].result.headline, { exact: true }),
-    ).toBeVisible();
-    await expect(page.getByLabel("Discussion phase allocation")).toBeVisible();
-    await expect(page.getByText("1 visual context frame")).toBeVisible();
+    ).toHaveCount(0);
+    await expect(page.getByText("1 visual context frame")).toHaveCount(0);
   });
 
   test("camera preview is consent-driven and captures one deliberate HUD evidence frame", async ({
