@@ -17,6 +17,8 @@ export interface AudioCaptureOptions {
 export interface AudioCaptureState {
   isCapturing: boolean;
   sourceKind: "microphone" | "recording" | null;
+  /** performance.now() when the captured audio timeline began. */
+  startedAtMs: number | null;
   settings: MediaTrackSettings | null;
   meter: number;
   error: string | null;
@@ -40,6 +42,7 @@ export function useAudioCapture(options: AudioCaptureOptions) {
   const [state, setState] = useState<AudioCaptureState>({
     isCapturing: false,
     sourceKind: null,
+    startedAtMs: null,
     settings: null,
     meter: 0,
     error: null,
@@ -116,6 +119,7 @@ export function useAudioCapture(options: AudioCaptureOptions) {
       ...current,
       isCapturing: false,
       sourceKind: null,
+      startedAtMs: null,
       meter: 0,
       workletLoaded: false,
       analyserNode: null,
@@ -126,7 +130,7 @@ export function useAudioCapture(options: AudioCaptureOptions) {
     const missing = checkBaseCapabilities();
     if (missing.length) {
       throw new Error(
-        `Missing browser capabilities: ${missing.join(", ")}. Please use a current browser.`
+        `Missing browser capabilities: ${missing.join(", ")}. Please use a current browser.`,
       );
     }
     const AudioContextConstructor =
@@ -135,7 +139,9 @@ export function useAudioCapture(options: AudioCaptureOptions) {
     contextRef.current = context;
     if (context.state === "suspended") await context.resume();
     if (!context.audioWorklet) {
-      throw new Error("AudioWorklet is unavailable. Open this page over HTTPS in a current browser.");
+      throw new Error(
+        "AudioWorklet is unavailable. Open this page over HTTPS in a current browser.",
+      );
     }
     await context.audioWorklet.addModule("/worklets/pcm-resampler.js");
     return context;
@@ -146,11 +152,14 @@ export function useAudioCapture(options: AudioCaptureOptions) {
       context: AudioContext,
       source: AudioNode,
       sourceKind: "microphone" | "recording",
-      monitor: boolean
+      monitor: boolean,
     ) => {
       const worklet = new AudioWorkletNode(context, "pcm-resampler");
       workletNodeRef.current = worklet;
-      worklet.port.postMessage({ type: "setTargetRate", rate: targetSampleRate });
+      worklet.port.postMessage({
+        type: "setTargetRate",
+        rate: targetSampleRate,
+      });
       worklet.port.postMessage({ type: "setFrameMs", ms: frameMs });
       worklet.port.onmessage = (event) => {
         if (event.data.type === "pcm16") {
@@ -199,11 +208,12 @@ export function useAudioCapture(options: AudioCaptureOptions) {
         error: null,
         isCapturing: true,
         sourceKind,
+        startedAtMs: performance.now(),
         workletLoaded: true,
         analyserNode: analyser,
       }));
     },
-    [frameMs, targetSampleRate]
+    [frameMs, targetSampleRate],
   );
 
   const start = useCallback(async () => {
@@ -212,7 +222,9 @@ export function useAudioCapture(options: AudioCaptureOptions) {
     setState((current) => ({ ...current, error: null }));
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error("getUserMedia is unavailable. Open this page over HTTPS and allow microphone access.");
+        throw new Error(
+          "getUserMedia is unavailable. Open this page over HTTPS and allow microphone access.",
+        );
       }
       // Create/resume the context at the start of the click handler so mobile
       // browsers retain the user activation needed for audio.
@@ -231,23 +243,25 @@ export function useAudioCapture(options: AudioCaptureOptions) {
         contextPromise,
         streamPromise,
       ]);
-      if (contextResult.status === "rejected" || streamResult.status === "rejected") {
+      if (
+        contextResult.status === "rejected" ||
+        streamResult.status === "rejected"
+      ) {
         if (streamResult.status === "fulfilled") {
           streamResult.value.getTracks().forEach((track) => track.stop());
         }
-        throw (
-          contextResult.status === "rejected"
-            ? contextResult.reason
-            : streamResult.status === "rejected"
-              ? streamResult.reason
-              : new Error("Microphone startup failed.")
-        );
+        throw contextResult.status === "rejected"
+          ? contextResult.reason
+          : streamResult.status === "rejected"
+            ? streamResult.reason
+            : new Error("Microphone startup failed.");
       }
       const context = contextResult.value;
       const stream = streamResult.value;
       streamRef.current = stream;
       const track = stream.getAudioTracks()[0];
-      if (!track) throw new Error("The browser returned no microphone audio track.");
+      if (!track)
+        throw new Error("The browser returned no microphone audio track.");
       const actualSettings = track.getSettings();
       setState((current) => ({ ...current, settings: actualSettings }));
       onSettingsReadback?.(actualSettings);
@@ -255,11 +269,12 @@ export function useAudioCapture(options: AudioCaptureOptions) {
         context,
         context.createMediaStreamSource(stream),
         "microphone",
-        false
+        false,
       );
     } catch (error: any) {
       cleanup();
-      const normalized = error instanceof Error ? error : new Error(String(error));
+      const normalized =
+        error instanceof Error ? error : new Error(String(error));
       setState((current) => ({ ...current, error: normalized.message }));
       onError?.(normalized);
       throw normalized;
@@ -287,9 +302,13 @@ export function useAudioCapture(options: AudioCaptureOptions) {
         const response = await fetch(url, { cache: "no-store" });
         if (!response.ok) {
           const detail = await response.json().catch(() => null);
-          throw new Error(detail?.error || `Could not load recording (${response.status}).`);
+          throw new Error(
+            detail?.error || `Could not load recording (${response.status}).`,
+          );
         }
-        const decoded = await context.decodeAudioData(await response.arrayBuffer());
+        const decoded = await context.decodeAudioData(
+          await response.arrayBuffer(),
+        );
         const source = context.createBufferSource();
         source.buffer = decoded;
         fileSourceRef.current = source;
@@ -301,13 +320,14 @@ export function useAudioCapture(options: AudioCaptureOptions) {
         source.start();
       } catch (error: any) {
         cleanup();
-        const normalized = error instanceof Error ? error : new Error(String(error));
+        const normalized =
+          error instanceof Error ? error : new Error(String(error));
         setState((current) => ({ ...current, error: normalized.message }));
         onError?.(normalized);
         throw normalized;
       }
     },
-    [state.isCapturing, createContext, connectSource, cleanup, onError]
+    [state.isCapturing, createContext, connectSource, cleanup, onError],
   );
 
   const stop = useCallback(() => cleanup(true), [cleanup]);

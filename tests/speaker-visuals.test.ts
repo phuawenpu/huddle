@@ -19,6 +19,12 @@ describe("speaker visuals", () => {
     expect(new Set(styles.map((style) => style.color)).size).toBe(3);
     expect(speakerVisualStyle("A", labels)).toEqual(styles[0]);
     expect(styles.every((style) => style.marker.length > 0)).toBe(true);
+    expect(speakerVisualStyle("B", ["B"]).color).toBe(
+      speakerVisualStyle("B", ["A", "B", "C"]).color,
+    );
+    expect(speakerVisualStyle("Speaker C", ["Speaker C"]).color).toBe(
+      speakerVisualStyle("C", ["A", "B", "C"]).color,
+    );
   });
 
   it("uses the neutral style while attribution is unknown", () => {

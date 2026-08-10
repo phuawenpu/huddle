@@ -83,6 +83,12 @@ export function speakerVisualStyle(
 ): SpeakerVisualStyle {
   if (isUnknownSpeakerLabel(label)) return UNKNOWN_SPEAKER_STYLE;
   const normalized = String(label).trim();
+  const providerLabel = normalized.match(/^(?:speaker\s+)?([a-z])$/i)?.[1];
+  if (providerLabel) {
+    return SPEAKER_PALETTE[
+      (providerLabel.toUpperCase().charCodeAt(0) - 65) % SPEAKER_PALETTE.length
+    ];
+  }
   const ordered = [
     ...new Set(labels.filter((value) => !isUnknownSpeakerLabel(value))),
   ]

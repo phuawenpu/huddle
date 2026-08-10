@@ -28,6 +28,26 @@ export interface TurnEvent {
   languageConfidence?: number;
 }
 
+/**
+ * Resolve the speaker nearest the live edge of a streaming Turn. The provider's
+ * turn-level label describes the dominant speaker, so it can remain `A` when a
+ * second speaker enters near the end of the same Turn. Final word labels are
+ * temporally precise and therefore take precedence for the current-speaker UI.
+ */
+export function latestAttributedSpeakerLabel(
+  turn: Pick<TurnEvent, "speakerLabel" | "words">,
+): string | null {
+  const latestWordLabel = [...(turn.words || [])]
+    .reverse()
+    .find(
+      (word) => word.wordIsFinal && !isUnknownSpeakerLabel(word.speaker),
+    )?.speaker;
+  if (latestWordLabel) return latestWordLabel.trim();
+  return isUnknownSpeakerLabel(turn.speakerLabel)
+    ? null
+    : String(turn.speakerLabel).trim();
+}
+
 export interface WordEvent {
   text: string;
   start: number;

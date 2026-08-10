@@ -22,6 +22,7 @@ interface SpeakerWaveformStageProps {
   active: boolean;
   activeSpeakerLabel: string | null;
   activeSpeakerName: string;
+  captureStartedAtMs?: number | null;
   liveText?: string;
   turns: SpeakerTimelineTurn[];
   speakerLabels?: string[];
@@ -43,6 +44,7 @@ export function SpeakerWaveformStage({
   active,
   activeSpeakerLabel,
   activeSpeakerName,
+  captureStartedAtMs = null,
   liveText,
   turns,
   speakerLabels = [],
@@ -57,7 +59,6 @@ export function SpeakerWaveformStage({
   const [samples, setSamples] = useState<WaveformSample[]>([]);
   const meterRef = useRef(meter);
   const speakerRef = useRef(activeSpeakerLabel);
-  const startedAtRef = useRef<number | null>(null);
   const labels = useMemo(
     () => [
       ...new Set(
@@ -93,27 +94,23 @@ export function SpeakerWaveformStage({
   }, [activeSpeakerLabel]);
 
   useEffect(() => {
-    if (!active) {
-      startedAtRef.current = null;
-      return;
-    }
-    if (startedAtRef.current == null) startedAtRef.current = performance.now();
+    if (!active) return;
+    const timelineStartedAt = captureStartedAtMs ?? performance.now();
     const maximumSamples = Math.ceil(
       (historySeconds * 1000) / SAMPLE_INTERVAL_MS,
     );
     const interval = window.setInterval(() => {
-      const startedAt = startedAtRef.current ?? performance.now();
       setSamples((current) => [
         ...current.slice(-(maximumSamples - 1)),
         {
-          atMs: Math.max(0, performance.now() - startedAt),
+          atMs: Math.max(0, performance.now() - timelineStartedAt),
           level: Math.max(0, Math.min(1, meterRef.current)),
           provisionalSpeakerLabel: speakerRef.current,
         },
       ]);
     }, SAMPLE_INTERVAL_MS);
     return () => window.clearInterval(interval);
-  }, [active, historySeconds]);
+  }, [active, captureStartedAtMs, historySeconds]);
 
   return (
     <section
@@ -144,6 +141,7 @@ export function SpeakerWaveformStage({
                   aria-pressed={isFocused}
                   data-testid="speaker-focus"
                   data-speaker-label={label}
+                  data-speaker-color={style.color}
                   onClick={() => onSpeakerFocus?.(isFocused ? null : label)}
                   className={`group flex min-h-[58px] items-center gap-2 rounded-xl border bg-black/20 px-2 py-1.5 text-left transition focus:outline-none focus:ring-2 focus:ring-white/35 ${
                     isFocused

@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAudioCapture } from "@/lib/client/audio-capture";
 import {
   createASRClient,
+  latestAttributedSpeakerLabel,
   type ASRClient,
   type IngestTurnData,
 } from "@/lib/client/asr-client";
@@ -113,6 +114,9 @@ export default function FacilitatorPage() {
   const pcm16CountRef = useRef(0);
   const pendingPcmRef = useRef<ArrayBuffer[]>([]);
   const recordingEndedHandlerRef = useRef<() => void>(() => {});
+  const speakerIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const transcriptViewportRef = useRef<HTMLDivElement | null>(null);
   const previousFinalTurnCountRef = useRef(0);
   const [followTranscript, setFollowTranscript] = useState(true);
@@ -130,6 +134,7 @@ export default function FacilitatorPage() {
     stop: stopCapture,
     isCapturing,
     sourceKind,
+    startedAtMs: captureStartedAtMs,
     settings,
     meter,
     error: captureError,
@@ -154,6 +159,36 @@ export default function FacilitatorPage() {
     },
     onSourceEnded: () => recordingEndedHandlerRef.current(),
   });
+
+  const clearSpeakerIdleTimer = useCallback(() => {
+    if (!speakerIdleTimerRef.current) return;
+    clearTimeout(speakerIdleTimerRef.current);
+    speakerIdleTimerRef.current = null;
+  }, []);
+
+  const updateLiveSpeaker = useCallback(
+    (label: string | null, endOfTurn = false) => {
+      clearSpeakerIdleTimer();
+      if (label) setActiveSpeaker(label);
+      if (!endOfTurn) return;
+
+      const endedSpeaker = label;
+      speakerIdleTimerRef.current = setTimeout(() => {
+        setActiveSpeaker((current) =>
+          !endedSpeaker || current === endedSpeaker ? null : current,
+        );
+        speakerIdleTimerRef.current = null;
+      }, 1_200);
+    },
+    [clearSpeakerIdleTimer],
+  );
+
+  useEffect(
+    () => () => {
+      clearSpeakerIdleTimer();
+    },
+    [clearSpeakerIdleTimer],
+  );
 
   // Wake lock
   const {
@@ -268,7 +303,6 @@ export default function FacilitatorPage() {
           return [...prev, turn];
         });
         setLivePartial("");
-        setActiveSpeaker(null);
       } catch {}
     });
 
@@ -442,16 +476,21 @@ export default function FacilitatorPage() {
           tokenData.wsUrl ||
           `${tokenData.wsBase}/v3/ws?sample_rate=16000&speech_model=u3-rt-pro&format_turns=true&speaker_labels=true&max_speakers=${Math.max(2, session?.speakerCount || 2)}&token=${encodeURIComponent(tokenData.token)}`,
         onTurn: (turn) => {
+          updateLiveSpeaker(latestAttributedSpeakerLabel(turn), turn.endOfTurn);
           if (turn.endOfTurn) {
-            setActiveSpeaker(null);
             setLivePartial("");
           } else {
-            setActiveSpeaker(turn.speakerLabel || null);
             setLivePartial(turn.transcript);
           }
         },
         onSpeechStarted: (event) => {
-          setActiveSpeaker(event.speakerLabel || null);
+          clearSpeakerIdleTimer();
+          setActiveSpeaker(
+            latestAttributedSpeakerLabel({
+              speakerLabel: event.speakerLabel,
+              words: [],
+            }),
+          );
         },
         onSpeakerRevision: (revision) => {
           // Apply revisions to existing turns
@@ -475,6 +514,8 @@ export default function FacilitatorPage() {
         },
         onTermination: () => {
           setAsrConnected(false);
+          clearSpeakerIdleTimer();
+          setActiveSpeaker(null);
           stopCapture();
           setPcmReady(false);
           releaseWakeLock();
@@ -546,6 +587,8 @@ export default function FacilitatorPage() {
     setPcmReady(false);
     pendingPcmRef.current = [];
     releaseWakeLock();
+    clearSpeakerIdleTimer();
+    setActiveSpeaker(null);
 
     try {
       await fetch(`/api/sessions/${sessionId}/terminate`, { method: "POST" });
@@ -974,6 +1017,7 @@ export default function FacilitatorPage() {
               ? getParticipantName(activeSpeaker)
               : "Speaker pending"
           }
+          captureStartedAtMs={captureStartedAtMs}
           liveText={livePartial}
           turns={finalizedTurns}
           speakerLabels={sessionSpeakerLabels}

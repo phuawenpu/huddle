@@ -1,7 +1,60 @@
 import { describe, expect, it } from "vitest";
-import { segmentFinalTurn, type TurnEvent } from "@/lib/client/asr-client";
+import {
+  latestAttributedSpeakerLabel,
+  segmentFinalTurn,
+  type TurnEvent,
+} from "@/lib/client/asr-client";
 
 describe("streaming ASR final-turn segmentation", () => {
+  it("uses the latest finalized word speaker at the live edge", () => {
+    expect(
+      latestAttributedSpeakerLabel({
+        speakerLabel: "A",
+        words: [
+          {
+            text: "Earlier",
+            start: 0,
+            end: 300,
+            confidence: 0.98,
+            wordIsFinal: true,
+            speaker: "A",
+          },
+          {
+            text: "response",
+            start: 320,
+            end: 700,
+            confidence: 0.97,
+            wordIsFinal: true,
+            speaker: "B",
+          },
+        ],
+      }),
+    ).toBe("B");
+  });
+
+  it("falls back to the dominant turn label until word attribution resolves", () => {
+    expect(
+      latestAttributedSpeakerLabel({
+        speakerLabel: "C",
+        words: [
+          {
+            text: "Resolving",
+            start: 0,
+            end: 300,
+            confidence: 0.8,
+            wordIsFinal: false,
+          },
+        ],
+      }),
+    ).toBe("C");
+    expect(
+      latestAttributedSpeakerLabel({
+        speakerLabel: "UNKNOWN",
+        words: [],
+      }),
+    ).toBeNull();
+  });
+
   it("preserves contiguous word-level speaker changes as separate segments", () => {
     const turn: TurnEvent = {
       turnOrder: 7,

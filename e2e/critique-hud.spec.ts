@@ -758,6 +758,28 @@ test.describe("Critique HUD — E2E", () => {
     expect(created.ok(), JSON.stringify(session)).toBeTruthy();
 
     await page.goto(`/facilitator/${session.id}`);
+    await page.evaluate(() => {
+      const stage = document.querySelector(
+        '[data-testid="speaker-waveform-stage"]',
+      );
+      const transitions: string[] = [];
+      (
+        window as typeof window & { __speakerTransitions?: string[] }
+      ).__speakerTransitions = transitions;
+      const rememberSpeaker = () => {
+        const label = stage?.getAttribute("data-active-speaker");
+        if (label && label !== "pending" && transitions.at(-1) !== label) {
+          transitions.push(label);
+        }
+      };
+      rememberSpeaker();
+      if (stage) {
+        new MutationObserver(rememberSpeaker).observe(stage, {
+          attributes: true,
+          attributeFilter: ["data-active-speaker"],
+        });
+      }
+    });
     await page.getByRole("button", { name: "Start Recorded Demo" }).click();
     await expect(page.getByText("Worklet ✓")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("PCM ✓")).toBeVisible({ timeout: 15_000 });
@@ -767,8 +789,28 @@ test.describe("Critique HUD — E2E", () => {
         "I think we should focus on the user journey for the onboarding flow.",
       ),
     ).toBeVisible({ timeout: 12_000 });
+    await expect(
+      page.getByText(
+        "We ran usability tests last sprint and the drop-off rate at step three was 45 percent.",
+      ),
+    ).toBeVisible({ timeout: 12_000 });
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (window as typeof window & { __speakerTransitions?: string[] })
+              .__speakerTransitions || [],
+        ),
+      )
+      .toEqual(expect.arrayContaining(["A", "B", "C"]));
+
+    const speakerCards = page.getByTestId("speaker-focus");
+    await expect(speakerCards).toHaveCount(3);
+    const speakerColors = await speakerCards.evaluateAll((cards) =>
+      cards.map((card) => card.getAttribute("data-speaker-color")),
+    );
+    expect(new Set(speakerColors).size).toBe(3);
     await expect(page.getByText("Audio capture error:")).toHaveCount(0);
-    await page.getByRole("button", { name: "Stop" }).click();
     await expect(page.getByRole("button", { name: "Ended" })).toBeVisible();
   }, 60_000);
 
