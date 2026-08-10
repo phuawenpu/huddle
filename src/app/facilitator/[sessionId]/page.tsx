@@ -117,6 +117,10 @@ export default function FacilitatorPage() {
   const previousFinalTurnCountRef = useRef(0);
   const [followTranscript, setFollowTranscript] = useState(true);
   const [unseenTurnCount, setUnseenTurnCount] = useState(0);
+  const [focusedSpeakerLabel, setFocusedSpeakerLabel] = useState<string | null>(
+    null,
+  );
+  const [selectedTurnId, setSelectedTurnId] = useState<string | null>(null);
 
   // Audio capture hook
   const {
@@ -718,6 +722,13 @@ export default function FacilitatorPage() {
         .filter((label) => Boolean(label)),
     ),
   ];
+  const sessionSpeakerLabels = [
+    ...new Set([
+      ...mappings.map((mapping) => mapping.speakerLabel),
+      ...speakerLabels,
+      ...(activeSpeaker ? [activeSpeaker] : []),
+    ]),
+  ];
 
   const scrollTranscriptToLatest = useCallback((behavior: ScrollBehavior) => {
     const viewport = transcriptViewportRef.current;
@@ -735,6 +746,17 @@ export default function FacilitatorPage() {
     const isAtLatest = distanceFromBottom <= 48;
     setFollowTranscript(isAtLatest);
     if (isAtLatest) setUnseenTurnCount(0);
+  }, []);
+
+  const selectTranscriptTurn = useCallback((turnId: string) => {
+    setSelectedTurnId(turnId);
+    requestAnimationFrame(() => {
+      const viewport = transcriptViewportRef.current;
+      const turn = [
+        ...(viewport?.querySelectorAll<HTMLElement>("[data-turn-id]") || []),
+      ].find((element) => element.dataset.turnId === turnId);
+      turn?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
   }, []);
 
   useEffect(() => {
@@ -872,7 +894,12 @@ export default function FacilitatorPage() {
         }
         liveText={livePartial}
         turns={finalizedTurns}
+        speakerLabels={sessionSpeakerLabels}
+        focusedSpeakerLabel={focusedSpeakerLabel}
+        selectedTurnId={selectedTurnId}
         getSpeakerName={getParticipantName}
+        onSpeakerFocus={setFocusedSpeakerLabel}
+        onTurnSelect={selectTranscriptTurn}
       />
 
       <LiveAnalysisHud
@@ -945,17 +972,29 @@ export default function FacilitatorPage() {
                   speakerLabels,
                 );
                 return (
-                  <div
+                  <article
                     key={turn.id}
                     data-testid="transcript-turn"
+                    data-turn-id={turn.id}
                     data-speaker-label={turn.providerSpeakerLabel}
                     data-speaker-color={speakerStyle.color}
-                    className={`rounded-lg border border-l-4 p-3 ${
+                    aria-current={
+                      selectedTurnId === turn.id ? "true" : undefined
+                    }
+                    onClick={() => selectTranscriptTurn(turn.id)}
+                    className={`cursor-pointer rounded-lg border border-l-4 p-3 transition ${
                       turn.isSubstantive
                         ? "border-hud-border bg-hud-surface"
                         : "border-hud-border/50 bg-hud-surface/50"
-                    }`}
-                    style={{ borderLeftColor: speakerStyle.color }}
+                    } ${selectedTurnId === turn.id ? "ring-2 ring-white/35" : ""}`}
+                    style={{
+                      borderLeftColor: speakerStyle.color,
+                      opacity:
+                        focusedSpeakerLabel &&
+                        focusedSpeakerLabel !== turn.providerSpeakerLabel
+                          ? 0.38
+                          : 1,
+                    }}
                   >
                     <div className="flex items-center justify-between mb-1">
                       <span
@@ -970,7 +1009,8 @@ export default function FacilitatorPage() {
                           ? "Unassigned"
                           : getParticipantName(turn.providerSpeakerLabel)}
                       </span>
-                      <span className="text-xs text-hud-muted">
+                      <span className="text-xs tabular-nums text-hud-muted">
+                        {formatSessionTimestamp(turn.startMs)} ·{" "}
                         {turn.isSubstantive ? "substantive" : "backchannel"}
                         {turn.isCalibration && " · calibration"}
                         {turn.possibleOverlap && " · overlap"}
@@ -1018,7 +1058,7 @@ export default function FacilitatorPage() {
                         </button>
                       </div>
                     </details>
-                  </div>
+                  </article>
                 );
               })}
             </div>
@@ -1117,4 +1157,9 @@ function mergeVisualEvidence(
   const byId = new Map(current.map((item) => [item.id, item]));
   for (const item of incoming) byId.set(item.id, item);
   return [...byId.values()].sort((a, b) => b.capturedAtMs - a.capturedAtMs);
+}
+
+function formatSessionTimestamp(milliseconds: number) {
+  const seconds = Math.max(0, Math.round(milliseconds / 1_000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }

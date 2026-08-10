@@ -3,6 +3,8 @@ import {
   SPEAKER_PALETTE,
   UNKNOWN_SPEAKER_STYLE,
   isUnknownSpeakerLabel,
+  rollingTalkShares,
+  speakerInitial,
   speakerAtTime,
   speakerVisualStyle,
 } from "@/lib/client/speaker-visuals";
@@ -57,6 +59,31 @@ describe("speaker visuals", () => {
     for (const style of SPEAKER_PALETTE) {
       expect(contrastRatio(style.color, "#05070d")).toBeGreaterThanOrEqual(4.5);
     }
+  });
+
+  it("reports recent finalized speaking-time share within an explicit window", () => {
+    const turns = [
+      { providerSpeakerLabel: "A", startMs: 0, endMs: 30_000 },
+      { providerSpeakerLabel: "B", startMs: 30_000, endMs: 50_000 },
+      { providerSpeakerLabel: "A", startMs: 50_000, endMs: 60_000 },
+      { providerSpeakerLabel: "C", startMs: 60_000, endMs: 70_000 },
+    ];
+
+    expect(rollingTalkShares(turns, ["A", "B", "C"], 70_000)).toEqual({
+      A: 40 / 70,
+      B: 20 / 70,
+      C: 10 / 70,
+    });
+    expect(rollingTalkShares(turns, ["A", "B", "C"], 70_000, 20_000)).toEqual({
+      A: 0.5,
+      B: 0,
+      C: 0.5,
+    });
+  });
+
+  it("uses participant names for accessible avatar initials", () => {
+    expect(speakerInitial("Jordan Lee", "B")).toBe("J");
+    expect(speakerInitial("", "C")).toBe("C");
   });
 });
 

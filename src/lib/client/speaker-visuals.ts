@@ -6,6 +6,7 @@ export interface SpeakerVisualStyle {
 }
 
 export interface SpeakerTimelineTurn {
+  id?: string;
   providerSpeakerLabel: string;
   startMs: number;
   endMs: number;
@@ -22,40 +23,40 @@ export const UNKNOWN_SPEAKER_STYLE: SpeakerVisualStyle = {
 
 export const SPEAKER_PALETTE: readonly SpeakerVisualStyle[] = [
   {
-    name: "cyan",
-    color: "#22d3ee",
-    softColor: "rgba(34, 211, 238, 0.22)",
-    marker: "●",
-  },
-  {
-    name: "amber",
-    color: "#fbbf24",
-    softColor: "rgba(251, 191, 36, 0.22)",
-    marker: "◆",
-  },
-  {
     name: "violet",
     color: "#c084fc",
     softColor: "rgba(192, 132, 252, 0.22)",
-    marker: "■",
+    marker: "A",
   },
   {
-    name: "lime",
-    color: "#a3e635",
-    softColor: "rgba(163, 230, 53, 0.22)",
-    marker: "▲",
+    name: "green",
+    color: "#86ef6b",
+    softColor: "rgba(134, 239, 107, 0.2)",
+    marker: "B",
+  },
+  {
+    name: "orange",
+    color: "#fb923c",
+    softColor: "rgba(251, 146, 60, 0.22)",
+    marker: "C",
+  },
+  {
+    name: "cyan",
+    color: "#22d3ee",
+    softColor: "rgba(34, 211, 238, 0.22)",
+    marker: "D",
   },
   {
     name: "pink",
     color: "#f472b6",
     softColor: "rgba(244, 114, 182, 0.22)",
-    marker: "✦",
+    marker: "E",
   },
   {
     name: "blue",
     color: "#60a5fa",
     softColor: "rgba(96, 165, 250, 0.22)",
-    marker: "⬟",
+    marker: "F",
   },
 ];
 
@@ -111,6 +112,47 @@ export function speakerAtTime(
     possibleOverlap:
       matches.length > 1 || matches.some((turn) => turn.possibleOverlap),
   };
+}
+
+export function rollingTalkShares(
+  turns: readonly SpeakerTimelineTurn[],
+  labels: readonly string[],
+  throughMs: number,
+  windowMs = 5 * 60 * 1_000,
+): Record<string, number> {
+  const normalizedLabels = [
+    ...new Set(labels.filter((label) => !isUnknownSpeakerLabel(label))),
+  ];
+  const windowEnd = Math.max(0, throughMs);
+  const windowStart = Math.max(0, windowEnd - Math.max(1, windowMs));
+  const durations = Object.fromEntries(
+    normalizedLabels.map((label) => [label, 0]),
+  );
+
+  for (const turn of turns) {
+    if (isUnknownSpeakerLabel(turn.providerSpeakerLabel)) continue;
+    const start = Math.max(windowStart, Math.max(0, turn.startMs));
+    const end = Math.min(windowEnd, Math.max(turn.startMs, turn.endMs));
+    if (end <= start) continue;
+    durations[turn.providerSpeakerLabel] =
+      (durations[turn.providerSpeakerLabel] || 0) + (end - start);
+  }
+
+  const total = Object.values(durations).reduce(
+    (sum, duration) => sum + duration,
+    0,
+  );
+  return Object.fromEntries(
+    normalizedLabels.map((label) => [
+      label,
+      total > 0 ? durations[label] / total : 0,
+    ]),
+  );
+}
+
+export function speakerInitial(name: string, fallbackLabel: string): string {
+  const initial = name.trim().match(/[\p{L}\p{N}]/u)?.[0];
+  return (initial || fallbackLabel.trim().charAt(0) || "?").toUpperCase();
 }
 
 function stableSpeakerHash(label: string): number {
