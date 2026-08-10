@@ -4,6 +4,11 @@ A shared cognitive mirror for Design Thinking critiques — a Next.js web applic
 
 **Deployed:** [huddle-ti5ikw.fly.dev](https://huddle-ti5ikw.fly.dev)
 
+**Licensing status:** This repository is publicly viewable, but no public
+licence is currently granted for its original project materials. Copyright
+ownership and commercialisation rights are under institutional review. See
+[Licensing Status](#licensing-status) for details.
+
 ## Overview
 
 The Critique HUD supports two modes:
@@ -472,6 +477,19 @@ flyctl secrets list --app huddle-ti5ikw   # verify keys deployed
 7. **Mobile is first-class.**
 8. **Real audio path always.**
 
-## License
+## Licensing Status
 
-MIT
+This repository is publicly viewable, but public availability does not grant
+permission to use, copy, modify, distribute, sublicense, sell, commercially
+exploit, deploy as a service, or create derivative works from its original
+project materials.
+
+Copyright ownership and commercialisation rights are currently under review
+with the relevant university. Until that review and any associated agreements
+are complete, no public licence is granted except for the limited rights
+provided through GitHub's Terms of Service and any rights required by law.
+
+Third-party software and materials remain governed by their respective
+licences. See [LICENSE.md](LICENSE.md) for the complete current notice.
+Unsolicited contributions are paused as described in
+[CONTRIBUTING.md](CONTRIBUTING.md).
