@@ -341,6 +341,7 @@ test.describe("Critique HUD — E2E", () => {
 
     await viewport.evaluate((element) => element.scrollTo({ top: 0 }));
     await expect(viewport).toHaveAttribute("data-following", "false");
+    await viewport.scrollIntoViewIfNeeded();
     await expect(page.getByText("Transcript marker 01")).toBeInViewport();
     await expect(page.getByText("Transcript marker 32")).not.toBeInViewport();
 

@@ -801,6 +801,20 @@ export default function FacilitatorPage() {
   const selectedNodePublished = Boolean(
     selectedMeetingNode && publishedNodeIds.includes(selectedMeetingNode.id),
   );
+  const selectedNodeTurnIds = new Set([
+    ...(selectedMeetingNode?.supportingTurnIds || []),
+    ...(selectedMeetingNode?.sourceQuotes.map((source) => source.turnId) || []),
+  ]);
+  const selectedNodeSpeakerLabels = [
+    ...new Set([
+      ...(selectedMeetingNode?.sourceQuotes
+        .map((source) => source.speakerLabel)
+        .filter((label): label is string => Boolean(label)) || []),
+      ...finalizedTurns
+        .filter((turn) => selectedNodeTurnIds.has(turn.id))
+        .map((turn) => turn.providerSpeakerLabel),
+    ]),
+  ];
 
   const openVisualEvidenceCapture = () => {
     const desktopPanel = document.getElementById("visual-evidence-panel");
@@ -965,6 +979,7 @@ export default function FacilitatorPage() {
           speakerLabels={sessionSpeakerLabels}
           focusedSpeakerLabel={focusedSpeakerLabel}
           selectedTurnId={selectedTurnId}
+          emphasizedSpeakerLabels={selectedNodeSpeakerLabels}
           getSpeakerName={getParticipantName}
           onSpeakerFocus={setFocusedSpeakerLabel}
           onTurnSelect={selectTranscriptTurn}
@@ -1045,6 +1060,7 @@ export default function FacilitatorPage() {
                     turn.isUnknownSpeaker ? null : turn.providerSpeakerLabel,
                     speakerLabels,
                   );
+                  const isSemanticSource = selectedNodeTurnIds.has(turn.id);
                   return (
                     <article
                       key={turn.id}
@@ -1060,7 +1076,11 @@ export default function FacilitatorPage() {
                         turn.isSubstantive
                           ? "border-hud-border bg-hud-surface"
                           : "border-hud-border/50 bg-hud-surface/50"
-                      } ${selectedTurnId === turn.id ? "ring-2 ring-white/35" : ""}`}
+                      } ${selectedTurnId === turn.id ? "ring-2 ring-white/35" : ""} ${
+                        isSemanticSource
+                          ? "bg-blue-400/[0.09] ring-1 ring-blue-300/30"
+                          : ""
+                      }`}
                       style={{
                         borderLeftColor: speakerStyle.color,
                         opacity:
@@ -1098,6 +1118,11 @@ export default function FacilitatorPage() {
                       {turn.analysis?.category && (
                         <span className="inline-block mt-1 text-xs px-1.5 py-0.5 rounded bg-hud-accent/10 text-hud-accent/70">
                           {turn.analysis.category}
+                        </span>
+                      )}
+                      {isSemanticSource && (
+                        <span className="ml-1 inline-block rounded bg-blue-300/10 px-1.5 py-0.5 text-[9px] text-blue-200">
+                          selected insight source
                         </span>
                       )}
 

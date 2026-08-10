@@ -27,6 +27,7 @@ interface SpeakerWaveformStageProps {
   speakerLabels?: string[];
   focusedSpeakerLabel?: string | null;
   selectedTurnId?: string | null;
+  emphasizedSpeakerLabels?: string[];
   getSpeakerName: (label: string) => string;
   onSpeakerFocus?: (label: string | null) => void;
   onTurnSelect?: (turnId: string) => void;
@@ -47,6 +48,7 @@ export function SpeakerWaveformStage({
   speakerLabels = [],
   focusedSpeakerLabel = null,
   selectedTurnId = null,
+  emphasizedSpeakerLabels = [],
   getSpeakerName,
   onSpeakerFocus,
   onTurnSelect,
@@ -132,6 +134,8 @@ export function SpeakerWaveformStage({
               const style = speakerVisualStyle(label, labels);
               const isSpeaking = active && activeSpeakerLabel === label;
               const isFocused = focusedSpeakerLabel === label;
+              const isEmphasized = emphasizedSpeakerLabels.includes(label);
+              const hasSemanticEmphasis = emphasizedSpeakerLabels.length > 0;
               return (
                 <button
                   key={label}
@@ -145,7 +149,14 @@ export function SpeakerWaveformStage({
                     isFocused
                       ? "border-white/40 bg-white/[0.07]"
                       : "border-white/10 hover:bg-white/[0.05]"
-                  } ${focusedSpeakerLabel && !isFocused ? "opacity-45" : "opacity-100"}`}
+                  } ${
+                    (focusedSpeakerLabel && !isFocused) ||
+                    (!focusedSpeakerLabel &&
+                      hasSemanticEmphasis &&
+                      !isEmphasized)
+                      ? "opacity-35"
+                      : "opacity-100"
+                  }`}
                 >
                   <span
                     className={`grid h-10 w-10 shrink-0 place-items-center rounded-full border-2 bg-slate-950 text-sm font-bold shadow-[0_0_0_3px_rgba(255,255,255,0.025)] transition ${isSpeaking ? "scale-105" : ""}`}
@@ -204,6 +215,7 @@ export function SpeakerWaveformStage({
             labels={labels}
             historySeconds={historySeconds}
             focusedSpeakerLabel={focusedSpeakerLabel}
+            emphasizedSpeakerLabels={emphasizedSpeakerLabels}
             selectedTurnId={selectedTurnId}
             onTurnSelect={onTurnSelect}
           />
@@ -242,6 +254,7 @@ function SpeakerHistoryCanvas({
   labels,
   historySeconds,
   focusedSpeakerLabel,
+  emphasizedSpeakerLabels,
   selectedTurnId,
   onTurnSelect,
 }: {
@@ -250,6 +263,7 @@ function SpeakerHistoryCanvas({
   labels: string[];
   historySeconds: number;
   focusedSpeakerLabel: string | null;
+  emphasizedSpeakerLabels: string[];
   selectedTurnId: string | null;
   onTurnSelect?: (turnId: string) => void;
 }) {
@@ -304,21 +318,19 @@ function SpeakerHistoryCanvas({
         turns,
       );
       const style = speakerVisualStyle(attribution.label, labels);
-      const syntheticLevel = 0.1 + Math.abs(Math.sin(index * 0.57)) * 0.56;
-      const level = sample
-        ? sample.level
-        : speakerAtTime(atMs, null, turns).label
-          ? syntheticLevel
-          : 0;
+      const level = sample?.level || 0;
       const barHeight = Math.max(level > 0 ? 2 : 1, level * (height - 8));
       const x = (index / columns) * width;
       const barWidth = Math.max(1.25, width / columns - 0.55);
       const y = (height - barHeight) / 2;
-      context.fillStyle = style.color;
+      context.fillStyle = sample ? style.color : "#64748b";
       context.globalAlpha =
-        focusedSpeakerLabel && attribution.label !== focusedSpeakerLabel
+        (focusedSpeakerLabel && attribution.label !== focusedSpeakerLabel) ||
+        (!focusedSpeakerLabel &&
+          emphasizedSpeakerLabels.length > 0 &&
+          !emphasizedSpeakerLabels.includes(attribution.label || ""))
           ? 0.16
-          : attribution.label
+          : sample && attribution.label
             ? 0.9
             : 0.25;
       context.fillRect(x, y, barWidth, barHeight);
@@ -356,6 +368,7 @@ function SpeakerHistoryCanvas({
     context.fillRect(width - 1, 0, 1, height);
   }, [
     focusedSpeakerLabel,
+    emphasizedSpeakerLabels,
     historySeconds,
     labels,
     samples,

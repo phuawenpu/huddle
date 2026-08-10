@@ -249,6 +249,13 @@ export function LiveAnalysisHud({
                   {analysis && (
                     <div className="flex flex-wrap justify-end gap-1.5 text-[10px]">
                       <span className="rounded-full border border-hud-border bg-hud-bg/70 px-2 py-1 text-hud-muted">
+                        {analysis.transcriptTurnCount} turns ·{" "}
+                        {analysis.transcriptWordCount} words
+                      </span>
+                      <span className="rounded-full border border-fuchsia-400/20 bg-fuchsia-400/10 px-2 py-1 text-fuchsia-200">
+                        {analysis.visualEvidenceCount} visual
+                      </span>
+                      <span className="rounded-full border border-hud-border bg-hud-bg/70 px-2 py-1 text-hud-muted">
                         through{" "}
                         {formatSessionTime(analysis.transcriptThroughMs)}
                       </span>
@@ -276,9 +283,9 @@ export function LiveAnalysisHud({
                 )}
                 {analysis && newSinceSnapshot > 0 && (
                   <p className="mt-2 inline-flex rounded-full bg-cyan-400/10 px-2 py-1 text-[11px] font-medium text-cyan-200">
-                    The discussion has moved on · refresh to include{" "}
                     {newSinceSnapshot} new{" "}
-                    {newSinceSnapshot === 1 ? "turn" : "turns"}
+                    {newSinceSnapshot === 1 ? "turn" : "turns"} since this
+                    snapshot · refresh to include them
                   </p>
                 )}
               </header>

@@ -20,6 +20,8 @@ interface CompassTurn {
   originalText?: string;
   startMs?: number;
   endMs?: number;
+  isSubstantive?: boolean;
+  isCalibration?: boolean;
   analysis?: { category?: string; theme?: string };
 }
 
@@ -146,6 +148,13 @@ export function SemanticCompass({
     state?.nodes.find((node) => node.kind === "question")?.summary ||
     "The live focus will sharpen as substantive turns accumulate.";
   const selectedNode = state?.nodes.find((node) => node.id === selectedNodeId);
+  const selectedRelationships = selectedNode
+    ? (state?.relations || []).filter(
+        (relation) =>
+          relation.fromNodeId === selectedNode.id ||
+          relation.toNodeId === selectedNode.id,
+      )
+    : [];
 
   return (
     <div
@@ -399,6 +408,23 @@ export function SemanticCompass({
                   {formatSessionTime(selectedNode.sourceQuotes[0].startMs || 0)}
                 </p>
               )}
+              {selectedRelationships.length > 0 && (
+                <p className="mt-1 line-clamp-1 text-[8px] text-blue-200/70">
+                  {selectedRelationships
+                    .slice(0, 3)
+                    .map((relation) => {
+                      const otherId =
+                        relation.fromNodeId === selectedNode.id
+                          ? relation.toNodeId
+                          : relation.fromNodeId;
+                      const other = state?.nodes.find(
+                        (candidate) => candidate.id === otherId,
+                      );
+                      return `${relation.type.replaceAll("_", " ")} ${other?.title || "related idea"}`;
+                    })
+                    .join(" · ")}
+                </p>
+              )}
             </div>
             <div className="flex shrink-0 gap-1">
               {selectedNode.sourceQuotes[0]?.turnId && (
@@ -457,7 +483,7 @@ export function FacilitationNowLens({
   const prompt =
     primaryAction?.prompt ||
     livePrompt?.text ||
-    derivePrompt(nodes) ||
+    deriveFacilitationPrompt(nodes, turns) ||
     "Listen for the next useful facilitation move";
   const capturedThrough = turns.at(-1)?.endMs || 0;
 
@@ -577,7 +603,10 @@ function nodeMaturity(
   return "tentative";
 }
 
-function derivePrompt(nodes: MeetingStateNode[]) {
+export function deriveFacilitationPrompt(
+  nodes: MeetingStateNode[],
+  turns: CompassTurn[],
+) {
   const hasIssue = nodes.some((node) => ["issue", "need"].includes(node.kind));
   const evidence = nodes.filter((node) => node.kind === "evidence");
   const proposal = nodes.find((node) => node.kind === "proposal");
@@ -590,6 +619,41 @@ function derivePrompt(nodes: MeetingStateNode[]) {
   if (proposal && evidence.length > 0)
     return "Test for agreement on the proposal";
   if (decision && !decision.owner) return "Confirm an owner and next action";
+  const participationPrompt = deriveParticipationPrompt(turns);
+  if (participationPrompt) return participationPrompt;
+  return null;
+}
+
+function deriveParticipationPrompt(turns: CompassTurn[]) {
+  const eligible = turns.filter(
+    (turn) =>
+      turn.isSubstantive !== false &&
+      !turn.isCalibration &&
+      Boolean(turn.providerSpeakerLabel) &&
+      typeof turn.startMs === "number" &&
+      typeof turn.endMs === "number",
+  );
+  const throughMs = Math.max(...eligible.map((turn) => turn.endMs || 0), 0);
+  const windowStartMs = Math.max(0, throughMs - 5 * 60 * 1_000);
+  const durations = new Map<string, number>();
+  for (const turn of eligible) {
+    const start = Math.max(windowStartMs, turn.startMs || 0);
+    const end = Math.min(throughMs, turn.endMs || start);
+    if (end <= start || !turn.providerSpeakerLabel) continue;
+    durations.set(
+      turn.providerSpeakerLabel,
+      (durations.get(turn.providerSpeakerLabel) || 0) + (end - start),
+    );
+  }
+  const total = [...durations.values()].reduce(
+    (sum, duration) => sum + duration,
+    0,
+  );
+  if (durations.size < 2 || total < 30_000) return null;
+  const shares = [...durations.values()].map((duration) => duration / total);
+  if (Math.max(...shares) >= 0.6 && Math.min(...shares) <= 0.2) {
+    return "Invite another perspective";
+  }
   return null;
 }
 

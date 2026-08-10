@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  deriveFacilitationPrompt,
   selectCompassNodes,
   selectCompassRelations,
 } from "@/app/facilitator/[sessionId]/semantic-compass";
@@ -46,6 +47,28 @@ describe("semantic compass selection", () => {
     expect(
       selectCompassRelations(relations, visible).map(({ id }) => id),
     ).toEqual(["r-6", "r-5", "r-4", "r-3", "r-2"]);
+  });
+
+  it("offers one participation prompt only after a sustained recent imbalance", () => {
+    const turns = [
+      {
+        id: "a-1",
+        providerSpeakerLabel: "A",
+        startMs: 0,
+        endMs: 25_000,
+      },
+      {
+        id: "b-1",
+        providerSpeakerLabel: "B",
+        startMs: 25_000,
+        endMs: 30_000,
+      },
+    ];
+
+    expect(deriveFacilitationPrompt([], turns)).toBe(
+      "Invite another perspective",
+    );
+    expect(deriveFacilitationPrompt([], turns.slice(0, 1))).toBeNull();
   });
 });
 
