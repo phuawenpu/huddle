@@ -308,6 +308,12 @@ export function SemanticCompass({
         const wasStrengthened = Boolean(
           node && state?.changes.strengthenedNodeIds?.includes(node.id),
         );
+        const wasPromoted = Boolean(
+          node && state?.changes.promotedNodeIds?.includes(node.id),
+        );
+        const wasFaded = Boolean(
+          node && state?.changes.fadedNodeIds?.includes(node.id),
+        );
         return (
           <button
             key={`${slot}-${node?.id || "empty"}-${state?.revision || 0}`}
@@ -334,7 +340,7 @@ export function SemanticCompass({
                 : "cursor-default border-dashed opacity-35"
             } ${maturity === "tentative" ? "border-dashed" : ""} ${
               isSelected || isTurnLinked ? "ring-2 ring-white/70" : ""
-            } ${isDimmed ? "opacity-20" : "opacity-100"} ${wasAdded ? "semantic-bloom" : ""} ${wasStrengthened && !wasAdded ? "semantic-pulse" : ""}`}
+            } ${isDimmed ? "opacity-20" : maturity === "historical" ? "opacity-45" : "opacity-100"} ${wasAdded ? "semantic-bloom" : ""} ${wasPromoted && !wasAdded ? "semantic-settle" : ""} ${wasStrengthened && !wasAdded && !wasPromoted ? "semantic-pulse" : ""} ${wasFaded && !wasAdded ? "semantic-fade" : ""}`}
             style={{
               left: `${config.x}%`,
               top: `${config.y}%`,
@@ -491,6 +497,7 @@ export function FacilitationNowLens({
   const changedNodeIds = new Set([
     ...(analysis?.result.meetingState.changes.addedNodeIds || []),
     ...(analysis?.result.meetingState.changes.strengthenedNodeIds || []),
+    ...(analysis?.result.meetingState.changes.promotedNodeIds || []),
   ]);
   const changedKinds = new Set(
     nodes
@@ -637,8 +644,9 @@ function nodeContributors(node: MeetingStateNode, turns: CompassTurn[]) {
 
 function nodeMaturity(
   node?: MeetingStateNode,
-): "emerging" | "tentative" | "grounded" | "resolved" {
+): "emerging" | "tentative" | "grounded" | "resolved" | "historical" {
   if (!node) return "emerging";
+  if (node.status === "rejected") return "historical";
   if (["accepted", "committed", "done"].includes(node.status))
     return "resolved";
   if (node.sourceQuotes.length > 0) return "grounded";

@@ -101,6 +101,7 @@ describe("whole-transcript live analysis", () => {
     expect(second.meetingState.changes.strengthenedNodeIds).toContain(
       grounded?.id,
     );
+    expect(second.meetingState.changes.promotedNodeIds).toContain(grounded?.id);
   });
 
   it("truncates long HUD headlines on a word boundary", async () => {

@@ -67,6 +67,15 @@ export async function PATCH(
           addedNodeIds: [],
           retainedNodeIds: state.nodes.map((node) => node.id),
           strengthenedNodeIds: [],
+          promotedNodeIds:
+            !["accepted", "committed", "done"].includes(existing.status) &&
+            ["accepted", "committed", "done"].includes(updated.status)
+              ? [nodeId]
+              : [],
+          fadedNodeIds:
+            existing.status !== "rejected" && updated.status === "rejected"
+              ? [nodeId]
+              : [],
           removedNodeIds: [],
           humanEditedNodeIds: [nodeId],
         },

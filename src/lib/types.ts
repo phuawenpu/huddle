@@ -509,6 +509,8 @@ export interface MeetingState {
     addedNodeIds: string[];
     retainedNodeIds: string[];
     strengthenedNodeIds?: string[];
+    promotedNodeIds?: string[];
+    fadedNodeIds?: string[];
     removedNodeIds: string[];
     humanEditedNodeIds?: string[];
   };

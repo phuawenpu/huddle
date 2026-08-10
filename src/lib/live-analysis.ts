@@ -1039,9 +1039,31 @@ function versionedState(
           );
         })
         .map((node) => node.id),
+      promotedNodeIds: nodes
+        .filter((node) => {
+          const previous = previousNodes.get(node.id);
+          return previous && nodeMaturityRank(node) > nodeMaturityRank(previous);
+        })
+        .map((node) => node.id),
+      fadedNodeIds: nodes
+        .filter((node) => {
+          const previous = previousNodes.get(node.id);
+          return (
+            previous &&
+            previous.status !== "rejected" &&
+            node.status === "rejected"
+          );
+        })
+        .map((node) => node.id),
       removedNodeIds: [...previousIds].filter((id) => !currentIds.has(id)),
     },
   };
+}
+
+function nodeMaturityRank(node: MeetingStateNode) {
+  if (["accepted", "committed", "done"].includes(node.status)) return 3;
+  if (node.sourceQuotes.length > 0) return 2;
+  return 1;
 }
 
 function addCriterionNodes(nodes: MeetingStateNode[], criteria: string[]) {
