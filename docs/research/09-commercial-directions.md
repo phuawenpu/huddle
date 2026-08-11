@@ -176,13 +176,22 @@ From the codebase audit
 
 ## Licensing and commercial model
 
-With the repository under Apache-2.0 (see LICENSE.md), the natural model is
-**open core**: the capture/analysis engine stays open; revenue comes from
-hosted SaaS, enterprise features (SSO, retention, audit), support, and
-self-host deployment assistance. The license's patent grant and trademark
-reservation support this: anyone may deploy commercially, but the project
-name and the maintained, evaluated, hosted version remain the vendor's
-differentiators.
+The repository is licensed **AGPL-3.0 with an attribution additional term
+(section 7(b)) plus a separate commercial-licensing option** (see
+LICENSE.md). This is the copyleft dual-licensing model:
+
+- anyone may use, modify, and deploy the software — including commercially —
+  as long as they keep attribution and release their modified source,
+  including for hosted/SaaS deployments (the AGPL network clause);
+- organizations that want closed-source or obligation-free commercial use
+  buy a commercial license from the maintainer.
+
+Revenue therefore comes from four sources: commercial licenses for
+proprietary use, the hosted SaaS operated by the maintainer, enterprise
+features and support (SSO, retention, audit, deployment assistance), and the
+fact that the maintained, evaluated, trademarked version remains the
+canonical one. AGPL also acts as a competitive moat: a large vendor cannot
+absorb the codebase into a closed competing product.
 
 ## Falsifiable gates before scaling spend
 

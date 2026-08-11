@@ -4,9 +4,10 @@ A shared cognitive mirror for Design Thinking critiques — a Next.js web applic
 
 **Deployed:** [huddle-ti5ikw.fly.dev](https://huddle-ti5ikw.fly.dev)
 
-**License:** [Apache License, Version 2.0](LICENSE.md) — open source and
-cleared for commercial use, including self-hosted and hosted (SaaS)
-deployment. See [License](#license) for details.
+**License:** [GNU AGPLv3](LICENSE.md) — free and open source, including for
+commercial use, with attribution and copyleft (share-back) obligations for
+distributed and hosted deployments. Commercial licenses without copyleft are
+available from the maintainer. See [License](#license).
 
 ## Overview
 
@@ -493,17 +494,24 @@ flyctl secrets list --app huddle-ti5ikw   # verify keys deployed
 
 ## License
 
-This project is open source under the
-[Apache License, Version 2.0](LICENSE.md). The license permits commercial
-use, modification, distribution, sublicensing, self-hosted and hosted
-(SaaS) deployment, and derivative works, subject to the standard Apache-2.0
-conditions (notice retention; patent-litigation termination; no trademark
-rights in project names or logos).
+This project is free and open source under the
+[GNU Affero General Public License, Version 3.0](LICENSE.md) (AGPL-3.0),
+with an additional attribution term under section 7(b). In plain terms:
+
+- you may use, modify, and deploy it, **including commercially**;
+- you must preserve the copyright, license, and author-attribution notices;
+- if you distribute a modified version **or run it as a hosted/network
+  service**, you must release your modified source under the AGPL-3.0 to its
+  users (share-alike / copyleft).
+
+To use the software **without** these share-back obligations — for example in
+a closed-source commercial product — a separate commercial license is
+required; contact the maintainer via the GitHub repository.
 
 Third-party software and materials remain governed by their respective
 licences, and the runtime providers (AssemblyAI, OpenAI) are governed by
 their own commercial terms. See [LICENSE.md](LICENSE.md) for the full text
-and scope notes. Contributions are welcome under inbound=outbound Apache-2.0
+and scope notes. Contributions are welcome under inbound=outbound AGPL-3.0
 terms as described in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Codex continuation handoff — 2026-08-10T23:24Z
@@ -615,6 +623,6 @@ separation. The UI now exposes that uncertainty instead of inventing C/D labels.
   behavioral references for the live HUD.
 
 Finally, preserve the current licensing posture. The project is open source
-under the Apache License, Version 2.0 and cleared for commercial deployment;
-do not change the licence without an explicit maintainer decision recorded in
-the repository.
+under the AGPL-3.0 with an attribution additional term and a separate
+commercial-licensing option; do not change the licence without an explicit
+maintainer decision recorded in the repository.

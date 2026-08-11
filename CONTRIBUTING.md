@@ -3,16 +3,18 @@
 Thank you for your interest in Critique HUD.
 
 Contributions are welcome. The project is open-source under the
-[Apache License, Version 2.0](LICENSE.md), which permits commercial use,
-modification, self-hosted and hosted deployment, and derivative works.
+[GNU Affero General Public License, Version 3.0](LICENSE.md) (AGPL-3.0),
+which permits commercial use, modification, and deployment with copyleft
+(share-back) and attribution obligations. A separate commercial license is
+available for closed-source use.
 
 ## Contribution terms
 
 Unless you explicitly state otherwise, any contribution intentionally
 submitted for inclusion in this project (pull request, patch, issue content,
 documentation, design, or other material) is licensed under the project's
-Apache License, Version 2.0, without additional terms or conditions
-("inbound = outbound"), consistent with Section 5 of the License.
+GNU Affero General Public License, Version 3.0, without additional terms or
+conditions ("inbound = outbound").
 
 By submitting a contribution you confirm that:
 
