@@ -2,21 +2,34 @@
 
 Thank you for your interest in Critique HUD.
 
-Unsolicited contributions are temporarily paused while copyright ownership,
-commercialisation rights, and the project's institutional licensing framework
-are reviewed. Please do not submit source code, documentation, designs,
-datasets, recordings, prompts, or other creative material through pull
-requests, issues, or other repository channels unless the repository
-maintainer has first confirmed in writing that an approved contribution
-agreement is in place.
+Contributions are welcome. The project is open-source under the
+[Apache License, Version 2.0](LICENSE.md), which permits commercial use,
+modification, self-hosted and hosted deployment, and derivative works.
 
-Opening an issue or pull request does not transfer ownership, grant a licence,
-or require the project to review or use submitted material. Unsolicited pull
-requests may be closed without substantive review to avoid uncertainty about
-rights and provenance.
+## Contribution terms
 
-When contributions reopen, the applicable rightsholder or rightsholders will
-publish an approved contribution process and agreement. General licensing
-enquiries should be directed privately to the repository maintainer.
+Unless you explicitly state otherwise, any contribution intentionally
+submitted for inclusion in this project (pull request, patch, issue content,
+documentation, design, or other material) is licensed under the project's
+Apache License, Version 2.0, without additional terms or conditions
+("inbound = outbound"), consistent with Section 5 of the License.
 
-See `LICENSE.md` for the repository's current licensing status.
+By submitting a contribution you confirm that:
+
+1. you have the right to submit it under these terms;
+2. it does not knowingly include third-party material under incompatible
+   terms; and
+3. you understand that opening an issue or pull request does not require
+   the project to review, accept, or use the submitted material.
+
+## Process
+
+- Open an issue to discuss substantial changes before implementing them.
+- Keep pull requests focused and verifiable: `npm test`, `npx tsc --noEmit`,
+  and `npm run build` should pass.
+- Do not submit datasets, recordings, personal data, secrets, or provider
+  credentials. Simulated or stubbed fixtures only.
+
+General licensing enquiries should be directed to the repository maintainer.
+
+See `LICENSE.md` for the full license text and scope notes.
