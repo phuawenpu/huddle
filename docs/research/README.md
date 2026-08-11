@@ -1,11 +1,11 @@
 # Critique HUD research, product evolution, and system diagrams
 
 **Audit date:** 2026-08-09
-**Scope:** two source studies (whose PDFs are not retained in the repository), the current `main` codebase, and targeted online reviews of product prior art, live meeting dynamics, visualization, and mixed reality.
+**Scope:** peer-reviewed literature across HCI/CSCW, design studies, the learning sciences, speech processing, and management science; the current `main` codebase; and targeted online reviews of product prior art, live meeting dynamics, visualization, and mixed reality.
 
 This folder separates four questions that should not be collapsed:
 
-1. **What the research contributes** — the empirical and participatory-design findings.
+1. **What the published research establishes** — the peer-reviewed findings and the design requirements they support.
 2. **What the current prototype actually implements** — verified from source and tests.
 3. **What a defensible next-generation information system could contribute** — seven design iterations, with an earlier five-diagram interpretation retained in the archive.
 4. **Whether the repository can become a business** — tested against current meeting-intelligence, artifact-review, AEC-coordination, and research-repository products.
@@ -17,7 +17,8 @@ This folder separates four questions that should not be collapsed:
 | [`06-product-and-investor-assessment.md`](06-product-and-investor-assessment.md)                 | Detailed demand evidence, competitive boundary, beachhead, moat, risks, pricing hypotheses, sources, and falsifiable gates   |
 | [`07-realistic-conversation-simulation.md`](07-realistic-conversation-simulation.md)             | Realistic multi-party STT simulation, WER/diarization scoring, fixtures, limitations, and repeatable evaluation procedure     |
 | [`08-meeting-dynamics-visualization.md`](08-meeting-dynamics-visualization.md)                   | Evidence-weighted design vocabulary for topic dynamics, response structure, participation, meeting tools, and AR             |
-| [`01-research-synthesis.md`](01-research-synthesis.md)                                           | Novel aspects of the two studies and the design requirements they establish                                                  |
+| [`09-commercial-directions.md`](09-commercial-directions.md)                                     | Peer-reviewed demand signals, ranked commercial verticals, capability extensions, licensing model, and falsifiable gates          |
+| [`01-research-synthesis.md`](01-research-synthesis.md) | Peer-reviewed evidence base, derived design requirements, and precisely-stated novelty claims |
 | [`02-codebase-audit.md`](02-codebase-audit.md)                                                   | Detailed architecture, data flow, implementation coverage, risks, and evidence                                               |
 | [`03-novelty-landscape.md`](03-novelty-landscape.md)                                             | Targeted comparison with current research and products; novelty boundary                                                     |
 | [`04-system-versions.md`](04-system-versions.md)                                                 | Seven system versions, operating models, comparisons, and ranked selection                                                   |
@@ -76,7 +77,7 @@ Ledger, evaluation twin, experience/governance, production architecture,
 business wedge, investor gates, and source traceability. Its source is
 [`generate_critique_intelligence_system_detailed.py`](archive/diagrams-2026-08-07/generate_critique_intelligence_system_detailed.py).
 
-These diagrams are retained as a dated research artifact rather than the current product direction. They blended findings from the two papers with an earlier reading of the application and may understate the implemented system and its broader potential.
+These diagrams are retained as a dated research artifact rather than the current product direction. They blended the earlier literature reading with an earlier reading of the application and may understate the implemented system and its broader potential.
 
 1. Live Critique Mirror — Version 1: live, dual-surface cognitive mirror
 2. Intent Ledger — Version 2: longitudinal critique-to-revision provenance

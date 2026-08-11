@@ -1,8 +1,9 @@
 # Product and investor assessment: from meeting notes to a critique ledger
 
 **Assessment date:** 2026-08-07
-**Evidence standard:** current product documentation, vendor pricing, the local
-research corpus, source-code audit, automated tests, and a live Fly.io probe.
+**Evidence standard:** current product documentation, vendor pricing, the
+peer-reviewed literature base, source-code audit, automated tests, and a live
+Fly.io probe.
 
 ## Independent verdict
 

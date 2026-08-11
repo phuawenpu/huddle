@@ -250,7 +250,7 @@ This table is based on public descriptions, not source-code audits of the extern
 
 **Result: weak as a standalone novelty claim.**
 
-The local papers, Critsly, Reflection in co-action, DCAI, and EFFORT-AI all occupy adjacent versions of reflective or collaborative AI. Use this as framing, not the sole contribution.
+Critsly, Reflection in co-action, DCAI, and EFFORT-AI all occupy adjacent versions of reflective or collaborative AI. Use this as framing, not the sole contribution.
 
 ### Test 2 — “Real-time LLM discussion map”
 

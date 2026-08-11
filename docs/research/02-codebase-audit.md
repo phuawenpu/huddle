@@ -11,7 +11,7 @@ Critique HUD is a coherent Next.js prototype with two substantial technical path
 
 Its best implemented information-system idea is the **dual surface**: a private facilitator view can capture and correct information while a restrained public display mirrors selected discourse structure. Its strongest engineering idea is the **provider-stubbed acoustic evaluation harness**, including cached per-turn TTS, overlap scheduling, mixed audio, and independent speech validation.
 
-The code does not yet implement the full research system described in the papers. It lacks artifact context, real identity/visibility governance, longitudinal critique-to-revision provenance, post-jury workflows, and reliable correction/revision propagation. Several README stage claims describe intended or scaffolded behavior as completed. The report therefore uses four labels:
+The code does not yet implement the full target system described in the research program. It lacks artifact context, real identity/visibility governance, longitudinal critique-to-revision provenance, post-jury workflows, and reliable correction/revision propagation. Several README stage claims describe intended or scaffolded behavior as completed. The report therefore uses four labels:
 
 - **Implemented** — present in source and covered by a meaningful verification path.
 - **Partial** — a visible path exists, but important semantics or end-to-end behavior are missing.
@@ -446,7 +446,7 @@ The AssemblyAI and OpenAI keys remain server-side, and `.env` is ignored by Git.
 5. Add integration tests for ASR messages, revision persistence, corrections, SSE, and guard enforcement.
 6. Add real-device smoke tests for Chromium, Firefox, and WebKit.
 
-### P2 — to realize the papers’ information system
+### P2 — to realize the target information system
 
 1. Introduce project/artifact/revision and feedback-provenance models.
 2. Implement critique modes with different authority, timing, and visibility.
@@ -458,4 +458,4 @@ The AssemblyAI and OpenAI keys remain server-side, and `.env` is ignored by Git.
 
 ## Bottom line
 
-The repository is a credible engineering prototype and a useful testbed. It is not yet a faithful implementation of Studioboard or a validated novel information system. Its path to defensible novelty is to stop treating the transcript, flat map, or LLM label as the product and instead implement the **governed provenance loop connecting intent, critique evidence, learner judgment, action, and revision**.
+The repository is a credible engineering prototype and a useful testbed. It is not yet a faithful implementation of the target critique-ledger system or a validated novel information system. Its path to defensible novelty is to stop treating the transcript, flat map, or LLM label as the product and instead implement the **governed provenance loop connecting intent, critique evidence, learner judgment, action, and revision**.

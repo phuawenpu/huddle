@@ -647,7 +647,7 @@ Students rehearse a critique by testing their project narrative against multiple
 
 ### Novelty test
 
-Critsly already includes multi-perspective critique, the local participatory paper proposes stakeholder simulation, and role-playing LLMs are established. The role-boundary and evidence-grounding mechanism is useful but not the strongest standalone novelty.
+Critsly already includes multi-perspective critique, stakeholder simulation appears in the participatory-design literature, and role-playing LLMs are established. The role-boundary and evidence-grounding mechanism is useful but not the strongest standalone novelty.
 
 ### Research use
 
@@ -720,6 +720,6 @@ Stakeholder Rehearsal becomes a Reflective Twin mode. Critique Observatory becom
 
 ## Recommended system name and one-sentence definition
 
-**Studioboard Critique Ledger**
+**Huddle Critique Ledger**
 
 > An agency-preserving information system that links co-present architecture critique to versioned design intent, student judgment, and artifact revision while keeping every AI interpretation provisional, source-traceable, audience-aware, and correctable.

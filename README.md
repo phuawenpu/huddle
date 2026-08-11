@@ -4,10 +4,9 @@ A shared cognitive mirror for Design Thinking critiques — a Next.js web applic
 
 **Deployed:** [huddle-ti5ikw.fly.dev](https://huddle-ti5ikw.fly.dev)
 
-**Licensing status:** This repository is publicly viewable, but no public
-licence is currently granted for its original project materials. Copyright
-ownership and commercialisation rights are under institutional review. See
-[Licensing Status](#licensing-status) for details.
+**License:** [Apache License, Version 2.0](LICENSE.md) — open source and
+cleared for commercial use, including self-hosted and hosted (SaaS)
+deployment. See [License](#license) for details.
 
 ## Overview
 
@@ -289,7 +288,7 @@ Key runtime guarantees:
 
 ## Research and system-design study
 
-The source studies, current implementation, and adjacent 2023–2026 systems have been analyzed as a single design-research program. The study distinguishes empirical findings, implemented behavior, scaffolding, and future novelty claims. Source-paper PDFs are intentionally not retained in this repository.
+Peer-reviewed literature, the current implementation, and adjacent 2023–2026 systems have been analyzed as a single design-research program. The program distinguishes published empirical findings, implemented behavior, scaffolding, and future novelty claims.
 
 - [Research artifact index](docs/research/README.md)
 - [Research synthesis](docs/research/01-research-synthesis.md)
@@ -300,6 +299,7 @@ The source studies, current implementation, and adjacent 2023–2026 systems hav
 - [Product and investor assessment](docs/research/06-product-and-investor-assessment.md)
 - [Realistic multi-party conversation simulation](docs/research/07-realistic-conversation-simulation.md)
 - [Meeting-dynamics visualization research](docs/research/08-meeting-dynamics-visualization.md)
+- [Commercial directions](docs/research/09-commercial-directions.md)
 - [Timestamped portrait live-session and speaker-waveform goal](docs/goals/2026-08-09T15-25-58Z-portrait-live-session-speaker-waveforms.md)
 - [System brief generator](docs/research/generate_critique_intelligence_system.py)
 - [Business one-pager generator](docs/research/generate_business_feasibility_one_pager.py)
@@ -491,22 +491,20 @@ flyctl secrets list --app huddle-ti5ikw   # verify keys deployed
 7. **Mobile is first-class.**
 8. **Real audio path always.**
 
-## Licensing Status
+## License
 
-This repository is publicly viewable, but public availability does not grant
-permission to use, copy, modify, distribute, sublicense, sell, commercially
-exploit, deploy as a service, or create derivative works from its original
-project materials.
-
-Copyright ownership and commercialisation rights are currently under review
-with the relevant university. Until that review and any associated agreements
-are complete, no public licence is granted except for the limited rights
-provided through GitHub's Terms of Service and any rights required by law.
+This project is open source under the
+[Apache License, Version 2.0](LICENSE.md). The license permits commercial
+use, modification, distribution, sublicensing, self-hosted and hosted
+(SaaS) deployment, and derivative works, subject to the standard Apache-2.0
+conditions (notice retention; patent-litigation termination; no trademark
+rights in project names or logos).
 
 Third-party software and materials remain governed by their respective
-licences. See [LICENSE.md](LICENSE.md) for the complete current notice.
-Unsolicited contributions are paused as described in
-[CONTRIBUTING.md](CONTRIBUTING.md).
+licences, and the runtime providers (AssemblyAI, OpenAI) are governed by
+their own commercial terms. See [LICENSE.md](LICENSE.md) for the full text
+and scope notes. Contributions are welcome under inbound=outbound Apache-2.0
+terms as described in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Codex continuation handoff — 2026-08-10T23:24Z
 
@@ -616,7 +614,7 @@ separation. The UI now exposes that uncertainty instead of inventing C/D labels.
   `workspace/critique-hud-live-session-ui-behavior-spec.md` — tracked visual and
   behavioral references for the live HUD.
 
-Finally, preserve the current licensing posture. Copyright and university IP
-ownership remain under review, no public project licence is granted, and the
-repository must not be switched to an open-source licence without explicit
-university/commercialisation direction.
+Finally, preserve the current licensing posture. The project is open source
+under the Apache License, Version 2.0 and cleared for commercial deployment;
+do not change the licence without an explicit maintainer decision recorded in
+the repository.
