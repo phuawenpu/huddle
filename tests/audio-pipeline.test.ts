@@ -4,6 +4,7 @@ import { join } from "path";
 import { afterEach, describe, expect, it } from "vitest";
 import { synthesizeScenarioAudio } from "@/lib/audio-pipeline";
 import { validateRenderedSpeech } from "@/lib/audio-validation";
+import { PRECONFIGURED_SCENARIOS } from "@/lib/preconfigured-scenarios";
 import { createDefaultCasting } from "@/lib/voice-casting";
 
 let temporaryDirectory: string | undefined;
@@ -103,10 +104,10 @@ describe("multi-speaker audio pipeline", () => {
     expect(manifest.transcriptFingerprint).toMatch(/^[a-f0-9]{64}$/);
     expect(manifest.turns).toHaveLength(7);
     expect(manifest.turns[1].scheduledStartMs).toBeGreaterThan(
-      manifest.turns[0].scheduledEndMs
+      manifest.turns[0].scheduledEndMs,
     );
     expect(manifest.turns[6].scheduledStartMs).toBeLessThan(
-      manifest.turns[5].scheduledEndMs
+      manifest.turns[5].scheduledEndMs,
     );
     expect(manifest.turns[6].overlapMs).toBeGreaterThan(0);
     expect(manifest.durationMs).toBeGreaterThan(3_000);
@@ -117,7 +118,26 @@ describe("multi-speaker audio pipeline", () => {
       speechExpected: false,
     });
     expect(
-      await stat(join(temporaryDirectory, scenarioId, "validation.json"))
+      await stat(join(temporaryDirectory, scenarioId, "validation.json")),
     ).toBeTruthy();
+  }, 60_000);
+
+  it("renders the Housing Renewal preset with its early minimal overlap", async () => {
+    temporaryDirectory = await mkdtemp(join(tmpdir(), "huddle-housing-audio-"));
+    process.env.ASSET_DIR = temporaryDirectory;
+    process.env.TTS_STUB = "1";
+    const scenario = PRECONFIGURED_SCENARIOS.find(
+      ({ id }) => id === "preset-v1-resident-led-shared-spaces",
+    );
+    expect(scenario).toBeTruthy();
+
+    const manifest = await synthesizeScenarioAudio({
+      scenarioId: scenario!.id,
+      speakers: scenario!.speakers,
+      turns: scenario!.turns,
+    });
+
+    expect(manifest.turns.some(({ overlapMs }) => overlapMs > 0)).toBe(true);
+    expect(manifest.durationMs).toBeGreaterThan(0);
   }, 60_000);
 });

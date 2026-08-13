@@ -392,10 +392,10 @@ as production-secure.
 
 The ten reusable examples live in
 `src/lib/preconfigured-scenarios.ts`, rather than only in a deployment database.
-Database startup inserts any missing case using stable `preset-v1-*` IDs and
-never overwrites an existing transcript or rendered mix. The catalogue is
-therefore restored automatically on a fresh SQLite volume and startup is
-idempotent.
+Database startup inserts any missing case using stable `preset-v1-*` IDs,
+refreshes catalogue-owned duration and budget metadata, and never overwrites an
+existing transcript or rendered mix. The catalogue is therefore restored
+automatically on a fresh SQLite volume and startup is idempotent.
 
 The source file enforces a hard maximum of ten cases, while tests check unique
 IDs, valid casts and transcripts, meeting/domain diversity, reaction links,

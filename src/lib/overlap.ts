@@ -21,8 +21,12 @@ export interface OverlapViolation {
  * 2. Never three concurrent speakers
  * 3. Max overlap duration ≤ 1500ms
  * 4. Overlaps only at turn boundaries (within first/last 500ms of a turn)
+ * 5. The first and second main-discussion turns do not overlap each other
  */
-export function validateOverlapRules(turns: ScenarioTurn[], calibrationIndices: number[] = []): OverlapValidationResult {
+export function validateOverlapRules(
+  turns: ScenarioTurn[],
+  calibrationIndices: number[] = [],
+): OverlapValidationResult {
   const violations: OverlapViolation[] = [];
   const calibSet = new Set(calibrationIndices);
 
@@ -52,12 +56,11 @@ export function validateOverlapRules(turns: ScenarioTurn[], calibrationIndices: 
       }
 
       const firstMainIndex =
-        calibrationIndices.length > 0
-          ? Math.max(...calibrationIndices) + 1
-          : 0;
+        calibrationIndices.length > 0 ? Math.max(...calibrationIndices) + 1 : 0;
       if (
         calibrationIndices.length > 0 &&
-        (i < firstMainIndex + 2 || otherIdx < firstMainIndex + 2)
+        i === firstMainIndex &&
+        otherIdx === firstMainIndex + 1
       ) {
         violations.push({
           rule: "no_early_overlap",
@@ -110,7 +113,7 @@ export function validateOverlapRules(turns: ScenarioTurn[], calibrationIndices: 
       }
       const shorterDuration = Math.min(
         turn.endMs! - turn.startMs!,
-        other.endMs! - other.startMs!
+        other.endMs! - other.startMs!,
       );
       if (overlapDuration > shorterDuration * 0.6) {
         violations.push({

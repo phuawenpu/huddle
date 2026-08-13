@@ -2,7 +2,12 @@ import { describe, it, expect } from "vitest";
 import { validateOverlapRules } from "@/lib/overlap";
 import type { ScenarioTurn } from "@/lib/types";
 
-function makeTurn(index: number, startMs: number, endMs: number, overlaps?: number[]): ScenarioTurn {
+function makeTurn(
+  index: number,
+  startMs: number,
+  endMs: number,
+  overlaps?: number[],
+): ScenarioTurn {
   return {
     index,
     speakerIndex: index % 4,
@@ -39,17 +44,16 @@ describe("validateOverlapRules", () => {
       { ...makeTurn(1, 4800, 9000, [0]), speakerIndex: 2 },
     ];
     const result = validateOverlapRules(turns);
-    expect(result.violations.some(v => v.rule === "no_self_overlap")).toBe(true);
+    expect(result.violations.some((v) => v.rule === "no_self_overlap")).toBe(
+      true,
+    );
   });
 
   it("rejects overlap longer than 60% of the shorter clip", () => {
-    const turns = [
-      makeTurn(0, 0, 5000, [1]),
-      makeTurn(1, 3800, 5600, [0]),
-    ];
+    const turns = [makeTurn(0, 0, 5000, [1]), makeTurn(1, 3800, 5600, [0])];
     const result = validateOverlapRules(turns);
     expect(
-      result.violations.some(v => v.rule === "max_overlap_60_percent")
+      result.violations.some((v) => v.rule === "max_overlap_60_percent"),
     ).toBe(true);
   });
 
@@ -60,7 +64,9 @@ describe("validateOverlapRules", () => {
     ];
     const result = validateOverlapRules(turns);
     expect(result.valid).toBe(false);
-    expect(result.violations.some(v => v.rule === "max_overlap_1500ms")).toBe(true);
+    expect(result.violations.some((v) => v.rule === "max_overlap_1500ms")).toBe(
+      true,
+    );
   });
 
   it("rejects three-way overlap", () => {
@@ -71,18 +77,44 @@ describe("validateOverlapRules", () => {
     ];
     const result = validateOverlapRules(turns);
     expect(result.valid).toBe(false);
-    expect(result.violations.some(v => v.rule === "no_three_way_overlap")).toBe(true);
+    expect(
+      result.violations.some((v) => v.rule === "no_three_way_overlap"),
+    ).toBe(true);
   });
 
   it("rejects calibration overlap", () => {
-    const turns = [
-      makeTurn(0, 0, 5000, [1]),
-      makeTurn(1, 4500, 10000, [0]),
-    ];
+    const turns = [makeTurn(0, 0, 5000, [1]), makeTurn(1, 4500, 10000, [0])];
     // Mark turn 0 as calibration
     const result = validateOverlapRules(turns, [0]);
     expect(result.valid).toBe(false);
-    expect(result.violations.some(v => v.rule === "no_calibration_overlap")).toBe(true);
+    expect(
+      result.violations.some((v) => v.rule === "no_calibration_overlap"),
+    ).toBe(true);
+  });
+
+  it("rejects overlap between the first two main-discussion turns", () => {
+    const turns = [
+      { ...makeTurn(0, 0, 3000), isCalibration: true },
+      makeTurn(1, 3500, 8500, [2]),
+      makeTurn(2, 8000, 13000, [1]),
+    ];
+    const result = validateOverlapRules(turns, [0]);
+
+    expect(result.violations.some((v) => v.rule === "no_early_overlap")).toBe(
+      true,
+    );
+  });
+
+  it("allows a minimal overlap from the third main turn into the second", () => {
+    const turns = [
+      { ...makeTurn(0, 0, 3000), isCalibration: true },
+      makeTurn(1, 3500, 8500),
+      makeTurn(2, 9000, 14000, [3]),
+      makeTurn(3, 13480, 18000, [2]),
+    ];
+    const result = validateOverlapRules(turns, [0]);
+
+    expect(result.valid).toBe(true);
   });
 
   it("rejects mid-turn overlap (not at boundary)", () => {
@@ -92,7 +124,9 @@ describe("validateOverlapRules", () => {
     ];
     const result = validateOverlapRules(turns);
     expect(result.valid).toBe(false);
-    expect(result.violations.some(v => v.rule === "boundary_only_overlap")).toBe(true);
+    expect(
+      result.violations.some((v) => v.rule === "boundary_only_overlap"),
+    ).toBe(true);
   });
 
   it("passes empty turn list", () => {

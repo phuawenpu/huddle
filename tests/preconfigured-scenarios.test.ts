@@ -22,6 +22,11 @@ describe("preconfigured scenario catalogue", () => {
     expect(
       new Set(PRECONFIGURED_SCENARIOS.map(({ title }) => title)).size,
     ).toBe(10);
+    expect(
+      new Set(
+        PRECONFIGURED_SCENARIOS.map(({ durationMinutes }) => durationMinutes),
+      ),
+    ).toEqual(new Set([3, 4, 5]));
 
     for (const scenario of PRECONFIGURED_SCENARIOS) {
       expect(scenario.id.startsWith(PRECONFIGURED_SCENARIO_PREFIX)).toBe(true);
@@ -116,7 +121,10 @@ describe("preconfigured scenario catalogue", () => {
       expect(call[0].where.id.startsWith(PRECONFIGURED_SCENARIO_PREFIX)).toBe(
         true,
       );
-      expect(call[0].update).toEqual({});
+      expect(call[0].update).toEqual({
+        durationMinutes: call[0].create.durationMinutes,
+        budgetJson: call[0].create.budgetJson,
+      });
       expect(call[0].create.status).toBe("draft");
     }
   });

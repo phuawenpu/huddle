@@ -40,6 +40,7 @@ interface ScenarioBlueprint {
   slug: string;
   title: string;
   description: string;
+  durationMinutes: 3 | 4 | 5;
   topic: string;
   domain: string;
   workshopType: string;
@@ -86,6 +87,7 @@ const BLUEPRINTS: ScenarioBlueprint[] = [
   {
     slug: "accessible-transit-kiosk",
     title: "Transit Kiosk: Recovering from Ticketing Errors",
+    durationMinutes: 3,
     description:
       "A prototype review where accessibility evidence, queue pressure, privacy, and technical constraints pull the team toward different recovery designs.",
     topic: "Accessible error recovery for a public-transit ticket kiosk",
@@ -255,6 +257,7 @@ const BLUEPRINTS: ScenarioBlueprint[] = [
   {
     slug: "rural-telehealth-handoff",
     title: "Telehealth: Rural Appointment Handoff",
+    durationMinutes: 4,
     description:
       "A service-design critique of booking, connectivity failure, clinical escalation, and the work transferred to patients and rural clinic staff.",
     topic:
@@ -426,6 +429,7 @@ const BLUEPRINTS: ScenarioBlueprint[] = [
   {
     slug: "school-heatwave-priorities",
     title: "School Heatwave: Cooling Priorities",
+    durationMinutes: 5,
     description:
       "A participatory prioritization meeting balancing immediate relief, long-term adaptation, disability access, maintenance, and a fixed capital budget.",
     topic: "Prioritizing heat-resilience measures for an ageing public school",
@@ -607,6 +611,7 @@ const BLUEPRINTS: ScenarioBlueprint[] = [
   {
     slug: "bank-scam-warning",
     title: "Banking App: Scam Warning Without Panic",
+    durationMinutes: 3,
     description:
       "A concept critique where fraud prevention, accessibility, customer autonomy, and support capacity collide around a high-friction payment warning.",
     topic: "A just-in-time scam intervention for unusual bank transfers",
@@ -777,6 +782,7 @@ const BLUEPRINTS: ScenarioBlueprint[] = [
   {
     slug: "warehouse-handover-retro",
     title: "Warehouse: Shift Handover Retrospective",
+    durationMinutes: 4,
     description:
       "A blameless operations retrospective that surfaces conflicting accounts, informal workarounds, safety signals, and ownership across day and night shifts.",
     topic: "Missed replenishment alerts during warehouse shift handover",
@@ -948,6 +954,7 @@ const BLUEPRINTS: ScenarioBlueprint[] = [
   {
     slug: "museum-sensory-wayfinding",
     title: "Museum: Sensory-Friendly Wayfinding Synthesis",
+    durationMinutes: 5,
     description:
       "A research-synthesis workshop where conflicting visitor behaviours challenge a proposed quiet route and expose gaps between maps, staff practice, and sensory conditions.",
     topic: "Synthesizing research for sensory-friendly museum wayfinding",
@@ -1130,6 +1137,7 @@ const BLUEPRINTS: ScenarioBlueprint[] = [
   {
     slug: "hiring-ai-review-boundaries",
     title: "Hiring Assistant: Human Review Boundaries",
+    durationMinutes: 5,
     description:
       "A governance-oriented design review of an AI-assisted applicant triage flow, with disagreement about efficiency, explanation, disability disclosure, and accountable human judgment.",
     topic: "Human review and explanation in AI-assisted recruitment triage",
@@ -1309,6 +1317,7 @@ const BLUEPRINTS: ScenarioBlueprint[] = [
   {
     slug: "shelter-intake-framing",
     title: "Emergency Shelter: Trauma-Informed Intake",
+    durationMinutes: 3,
     description:
       "A problem-framing session that challenges a faster digital intake concept by exposing safety, repetition, translation, staff discretion, and data-retention tensions.",
     topic: "Reframing emergency-shelter intake around safety and continuity",
@@ -1477,6 +1486,7 @@ const BLUEPRINTS: ScenarioBlueprint[] = [
   {
     slug: "hybrid-release-incident",
     title: "Incident Review: Hybrid Release Breakdown",
+    durationMinutes: 4,
     description:
       "A blameless incident review of a failed release where remote participation, ambiguous approval, monitoring gaps, and status pressure create competing explanations.",
     topic:
@@ -1656,6 +1666,7 @@ const BLUEPRINTS: ScenarioBlueprint[] = [
   {
     slug: "resident-led-shared-spaces",
     title: "Housing Renewal: Resident-Led Shared Spaces",
+    durationMinutes: 4,
     description:
       "A participatory ideation review where maintenance, youth use, older residents, safety, and informal social life challenge a polished courtyard concept.",
     topic: "Resident-led renewal of shared spaces in a housing estate",
@@ -1844,8 +1855,9 @@ export const PRECONFIGURED_SCENARIOS: PreconfiguredScenario[] =
   BLUEPRINTS.map(buildScenario);
 
 /**
- * Inserts missing catalogue cases without overwriting a rendered mix or any
- * local transcript edits. The stable IDs make startup safe to run repeatedly.
+ * Inserts missing catalogue cases and refreshes safe display/budget metadata
+ * without overwriting a rendered mix or local transcript edits. The stable IDs
+ * make startup safe to run repeatedly.
  */
 export async function seedPreconfiguredScenarios(
   client: PrismaClient,
@@ -1853,7 +1865,10 @@ export async function seedPreconfiguredScenarios(
   for (const scenario of PRECONFIGURED_SCENARIOS) {
     await client.scenario.upsert({
       where: { id: scenario.id },
-      update: {},
+      update: {
+        durationMinutes: scenario.durationMinutes,
+        budgetJson: JSON.stringify(scenario.budget),
+      },
       create: {
         id: scenario.id,
         title: scenario.title,
@@ -1974,7 +1989,7 @@ function buildScenario(blueprint: ScenarioBlueprint): PreconfiguredScenario {
     [...calibrationTurns, ...dialogueTurns],
     speakers.length,
   );
-  const durationMinutes = 3;
+  const durationMinutes = blueprint.durationMinutes;
   return {
     id: `${PRECONFIGURED_SCENARIO_PREFIX}${blueprint.slug}`,
     title: blueprint.title,
