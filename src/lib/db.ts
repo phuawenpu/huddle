@@ -8,7 +8,10 @@ const globalForPrisma = globalThis as unknown as {
 const client = globalForPrisma.prisma || new PrismaClient();
 export const prisma = client;
 export const databaseReady =
-  globalForPrisma.databaseReady || initializeDatabase(client);
+  globalForPrisma.databaseReady ||
+  (process.env.HUD_SKIP_DATABASE_INIT === "1"
+    ? Promise.resolve()
+    : initializeDatabase(client));
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = client;

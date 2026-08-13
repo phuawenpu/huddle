@@ -11,6 +11,9 @@ COPY package.json package-lock.json* ./
 RUN npm ci
 COPY . .
 ENV DATABASE_URL=file:./data/app.db
+# Next imports route modules while collecting build metadata. The production
+# database lives on a runtime-only volume, so do not initialize it here.
+ENV HUD_SKIP_DATABASE_INIT=1
 RUN npx prisma generate
 RUN npm run build
 
