@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { seedPreconfiguredScenarios } from "./preconfigured-scenarios";
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
@@ -93,6 +94,7 @@ async function initializeDatabase(client: PrismaClient): Promise<void> {
     await client.$executeRawUnsafe(
       `CREATE INDEX IF NOT EXISTS "ProviderUsageWindow_provider_windowKind_windowStart_idx" ON "ProviderUsageWindow"("provider", "windowKind", "windowStart")`,
     );
+    await seedPreconfiguredScenarios(client);
   } catch (e: any) {
     console.error("DB additive migration error:", e.message);
     throw e;

@@ -13,6 +13,7 @@ interface ScenarioItem {
   difficulty: string;
   status: string;
   createdAt: string;
+  isPreconfigured?: boolean;
   transcriptQuality?: { score: number; errors: string[]; warnings: string[] };
 }
 
@@ -24,8 +25,8 @@ export default function ScenariosPage() {
 
   useEffect(() => {
     fetch("/api/scenarios")
-      .then(r => r.json())
-      .then(data => setScenarios(Array.isArray(data) ? data : []))
+      .then((r) => r.json())
+      .then((data) => setScenarios(Array.isArray(data) ? data : []))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -33,7 +34,7 @@ export default function ScenariosPage() {
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this scenario?")) return;
     await fetch(`/api/scenarios/${id}`, { method: "DELETE" });
-    setScenarios(prev => prev.filter(s => s.id !== id));
+    setScenarios((prev) => prev.filter((s) => s.id !== id));
   };
 
   const handleDuplicate = async (id: string) => {
@@ -55,7 +56,7 @@ export default function ScenariosPage() {
       setError(newScenario.error || "Could not duplicate scenario");
       return;
     }
-    setScenarios(prev => [newScenario, ...prev]);
+    setScenarios((prev) => [newScenario, ...prev]);
   };
 
   const handleLaunch = async (scenario: ScenarioItem) => {
@@ -102,7 +103,9 @@ export default function ScenariosPage() {
             </button>
             <div>
               <h1 className="text-2xl font-bold text-hud-text">Scenarios</h1>
-              <p className="text-hud-muted text-sm">{scenarios.length} scenarios</p>
+              <p className="text-hud-muted text-sm">
+                {scenarios.length} scenarios
+              </p>
             </div>
           </div>
           <button
@@ -121,7 +124,9 @@ export default function ScenariosPage() {
         )}
 
         {loading ? (
-          <div className="text-hud-muted text-center py-12 animate-pulse">Loading…</div>
+          <div className="text-hud-muted text-center py-12 animate-pulse">
+            Loading…
+          </div>
         ) : scenarios.length === 0 ? (
           <div className="text-center py-12 space-y-4">
             <p className="text-hud-muted">No scenarios yet</p>
@@ -135,7 +140,7 @@ export default function ScenariosPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {scenarios.map(s => (
+            {scenarios.map((s) => (
               <div
                 key={s.id}
                 className="bg-hud-surface border border-hud-border rounded-xl p-4 hover:border-hud-accent/50 transition-colors cursor-pointer"
@@ -144,34 +149,54 @@ export default function ScenariosPage() {
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-hud-text truncate">{s.title}</h3>
+                    <h3 className="font-semibold text-hud-text truncate">
+                      {s.title}
+                    </h3>
                     <p className="text-sm text-hud-muted truncate">{s.topic}</p>
                     <div className="flex flex-wrap gap-3 mt-2 text-xs">
-                      <span className="text-hud-accent">{s.durationMinutes}min</span>
-                      <span className="text-hud-muted">{s.speakerCount} speakers</span>
+                      <span className="text-hud-accent">
+                        {s.durationMinutes}min
+                      </span>
+                      <span className="text-hud-muted">
+                        {s.speakerCount} speakers
+                      </span>
                       <span className="text-hud-muted">{s.crossTalkLevel}</span>
                       <span className="text-hud-muted">{s.difficulty}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-                        s.status === "approved" ? "bg-hud-success/20 text-hud-success" :
-                        s.status === "ready" ? "bg-hud-accent/20 text-hud-accent" :
-                        "bg-hud-muted/20 text-hud-muted"
-                      }`}>
+                      {s.isPreconfigured && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] bg-hud-accent/20 text-hud-accent">
+                          preconfigured
+                        </span>
+                      )}
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] ${
+                          s.status === "approved"
+                            ? "bg-hud-success/20 text-hud-success"
+                            : s.status === "ready"
+                              ? "bg-hud-accent/20 text-hud-accent"
+                              : "bg-hud-muted/20 text-hud-muted"
+                        }`}
+                      >
                         {s.status}
                       </span>
                       {s.transcriptQuality && (
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-                          s.transcriptQuality.errors.length
-                            ? "bg-hud-danger/20 text-hud-danger"
-                            : s.transcriptQuality.warnings.length
-                              ? "bg-hud-warn/20 text-hud-warn"
-                              : "bg-hud-success/20 text-hud-success"
-                        }`}>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] ${
+                            s.transcriptQuality.errors.length
+                              ? "bg-hud-danger/20 text-hud-danger"
+                              : s.transcriptQuality.warnings.length
+                                ? "bg-hud-warn/20 text-hud-warn"
+                                : "bg-hud-success/20 text-hud-success"
+                          }`}
+                        >
                           transcript {s.transcriptQuality.score}/100
                         </span>
                       )}
                     </div>
                   </div>
-                  <div className="flex gap-1 ml-3" onClick={e => e.stopPropagation()}>
+                  <div
+                    className="flex gap-1 ml-3"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <button
                       onClick={() => handleLaunch(s)}
                       disabled={
@@ -192,14 +217,16 @@ export default function ScenariosPage() {
                     >
                       ⧉
                     </button>
-                    <button
-                      onClick={() => handleDelete(s.id)}
-                      className="px-3 py-2 text-xs bg-hud-surface border border-hud-border rounded-lg text-hud-danger touch-manipulation"
-                      style={{ minHeight: 36 }}
-                      title="Delete"
-                    >
-                      ✕
-                    </button>
+                    {!s.isPreconfigured && (
+                      <button
+                        onClick={() => handleDelete(s.id)}
+                        className="px-3 py-2 text-xs bg-hud-surface border border-hud-border rounded-lg text-hud-danger touch-manipulation"
+                        style={{ minHeight: 36 }}
+                        title="Delete"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

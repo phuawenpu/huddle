@@ -10,6 +10,7 @@ import {
   validateTranscriptForRevision,
 } from "@/lib/scenario-transcript";
 import type { ScenarioSpeaker, ScenarioTurn } from "@/lib/types";
+import { isPreconfiguredScenarioId } from "@/lib/preconfigured-scenarios";
 
 export async function GET(
   request: NextRequest,
@@ -146,6 +147,15 @@ export async function DELETE(
 ) {
   const { id } = await context.params;
   try {
+    if (isPreconfiguredScenarioId(id)) {
+      return NextResponse.json(
+        {
+          error:
+            "Preconfigured scenarios are retained as reusable examples. Duplicate this scenario to create a removable copy.",
+        },
+        { status: 409 },
+      );
+    }
     await prisma.scenario.delete({ where: { id } });
     return NextResponse.json({ deleted: true });
   } catch {

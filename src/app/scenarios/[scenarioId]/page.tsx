@@ -85,6 +85,7 @@ interface ScenarioData {
   };
   approvedAt?: string;
   realizedDurationMs?: number;
+  isPreconfigured?: boolean;
 }
 
 export default function ScenarioDetailPage() {
@@ -125,6 +126,33 @@ export default function ScenarioDetailPage() {
 
   const handlePreflight = async () => {
     await runAction("Checking audio readiness", "preflight");
+  };
+
+  const handlePrepareSimulation = async () => {
+    setAction("Preparing audio and running preflight");
+    setActionError("");
+    try {
+      for (const endpoint of ["synthesize", "preflight"]) {
+        const response = await fetch(
+          `/api/scenarios/${params.scenarioId}/${endpoint}`,
+          { method: "POST" },
+        );
+        const body = await response.json();
+        if (!response.ok) {
+          throw new Error(
+            body.error ||
+              (endpoint === "synthesize"
+                ? "Audio preparation failed"
+                : "Preflight failed"),
+          );
+        }
+      }
+      await loadScenario();
+    } catch (error: any) {
+      setActionError(error?.message || "Simulation preparation failed");
+    } finally {
+      setAction("");
+    }
   };
 
   const handleRevise = async () => {
@@ -251,6 +279,19 @@ export default function ScenarioDetailPage() {
             </div>
           </div>
         </header>
+
+        {scenario.isPreconfigured && (
+          <div className="rounded-xl border border-hud-accent/30 bg-hud-accent/10 p-4 text-sm text-hud-text">
+            <p className="font-semibold text-hud-accent">
+              Preconfigured scenario
+            </p>
+            <p className="mt-1 text-hud-muted">
+              This provider-free script is restored on fresh deployments. You
+              can synthesize it as-is, or duplicate it from the scenario list
+              before making a custom revision.
+            </p>
+          </div>
+        )}
 
         {/* Objective */}
         <div className="bg-hud-surface border border-hud-border rounded-xl p-4">
@@ -650,6 +691,18 @@ export default function ScenarioDetailPage() {
               {actionError || `${action}… This can take several minutes.`}
             </div>
           )}
+          {scenario.isPreconfigured &&
+            !["ready", "approved"].includes(scenario.status) && (
+              <button
+                onClick={handlePrepareSimulation}
+                disabled={Boolean(action)}
+                className="px-4 py-3 bg-hud-accent text-white rounded-xl text-sm font-medium
+                  hover:bg-hud-accent-dim transition-all touch-manipulation disabled:opacity-50"
+                style={{ minHeight: 48 }}
+              >
+                Prepare Audio &amp; Preflight
+              </button>
+            )}
           <button
             onClick={handleSynthesize}
             disabled={Boolean(action)}

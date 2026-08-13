@@ -4,6 +4,7 @@ import {
   TRANSCRIPT_FORMAT_VERSION,
 } from "./scenario-transcript";
 import type { ScenarioSpeaker, ScenarioTurn } from "./types";
+import { isPreconfiguredScenarioId } from "./preconfigured-scenarios";
 
 export function serializeScenarioRecord(scenario: any) {
   const speakers = safeParseJson<ScenarioSpeaker[]>(scenario.speakersJson, []);
@@ -13,6 +14,7 @@ export function serializeScenarioRecord(scenario: any) {
   );
   return {
     ...scenario,
+    isPreconfigured: isPreconfiguredScenarioId(String(scenario.id || "")),
     criteria: safeParseJson(scenario.criteria, []),
     budget: safeParseJson(scenario.budgetJson, null),
     speakers: scenario.speakersJson ? speakers : null,

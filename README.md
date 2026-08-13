@@ -216,13 +216,13 @@ Key runtime guarantees:
 | Metric           | Value                                          |
 | ---------------- | ---------------------------------------------- |
 | TypeScript       | 0 errors                                       |
-| Unit tests       | 134/134 passing                                |
+| Unit tests       | 138/138 passing                                |
 | Live audio E2E   | Mic + recorded pipelines pass locally          |
 | API routes       | 46 endpoints operational                       |
 | Frontend pages   | 10 routes functional                           |
 | DB schema        | 14 models, SQLite via Prisma                   |
-| Production data  | 12/12 scenarios at quality score 100           |
-| Scenario audit   | 0 errors, warnings, or exact duplicate lines   |
+| Scenario catalog | 10 version-controlled preconfigured cases      |
+| Scenario audit   | 0 transcript errors across all catalog cases   |
 | Provider secrets | Server-side environment configuration required |
 | Dependency audit | 3 high transitive findings; major fix pending  |
 
@@ -364,13 +364,13 @@ as production-secure.
 
 ### ⚠ Overlap Naturalness
 
-**Status: production scenarios use version-2 causal, timing-aware transcripts; deterministic stub dialogue remains a protocol fixture rather than a naturalness benchmark.**
+**Status: catalogue and generated scenarios use version-2 causal, timing-aware transcripts; deterministic stub dialogue remains a protocol fixture rather than a naturalness benchmark.**
 
 ✅ **What works:**
 
 - Stable utterance IDs, response links, dialogue acts, delivery guidance, variable gaps, anchored overlap types/resolution, and post-synthesis realized timing
 - Quality gates for duplicate speech, reaction coverage, round-robin order, participation, speaking density, and invalid overlap graphs
-- Twelve audited production scenarios score 100 with 33 authored overlaps and no exact duplicate lines, quality errors, or warnings
+- Ten version-controlled catalogue scenarios cover design critique, research synthesis, prioritization, service design, responsible-AI governance, co-design, and operational retrospectives, with 23 authored overlap events and no transcript quality errors
 - Independent ASR validation of the approved Climate mix sampled 11 clips at 0.002 average lexical WER
 
 ❌ **What needs fixing:**
@@ -387,6 +387,25 @@ as production-secure.
 4. Any material revision returns the scenario to draft, clears stale realized timing and approval/preflight state, and invalidates the old mix while preserving reusable fingerprinted clips.
 5. Synthesis renders per-turn speech, measures clips, resolves planned transitions into an absolute timeline, mixes WAV/MP3 output, and records the realized transcript.
 6. Independent ASR validation, preflight, and approval apply to that exact fingerprinted mix before playback or a recorded live demo.
+
+### Preconfigured scenario catalogue
+
+The ten reusable examples live in
+`src/lib/preconfigured-scenarios.ts`, rather than only in a deployment database.
+Database startup inserts any missing case using stable `preset-v1-*` IDs and
+never overwrites an existing transcript or rendered mix. The catalogue is
+therefore restored automatically on a fresh SQLite volume and startup is
+idempotent.
+
+The source file enforces a hard maximum of ten cases, while tests check unique
+IDs, valid casts and transcripts, meeting/domain diversity, reaction links,
+quality gates, and all supported overlap forms. Creating the catalogue makes no
+OpenAI or AssemblyAI request. Provider calls happen only after an authenticated
+user explicitly requests transcript revision, speech synthesis, validation, or
+a live session. Duplicate a preconfigured case before making experimental edits;
+the built-in case itself cannot be deleted from the scenario library. Its detail
+page offers one explicit **Prepare Audio & Preflight** action; this is the point
+at which provider-backed speech rendering and validation may incur usage.
 
 ## Quick Start
 
@@ -533,9 +552,8 @@ latest work from chat history.
 
 ### Current verified baseline
 
-- The latest functional application commit is `870daac` (`fix: complete
-  multi-speaker waveform flow`) on `main` in `phuawenpu/huddle`. This README
-  handoff is a documentation-only follow-up to that runtime revision.
+- The verified functional baseline is the current tip of `main`; use
+  `git log -1 --oneline` rather than relying on an embedded commit ID.
 - Sprite checkpoint `v6` preserves the verified implementation before the Git
   commit and deployment.
 - GitHub commit `717fdb7` captured the interrupted work and also added the HUD
