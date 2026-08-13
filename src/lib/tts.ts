@@ -1,3 +1,5 @@
+import { openAiFetch } from "./openai-client";
+
 export interface TtsSynthesisInput {
   text: string;
   voiceId: string;
@@ -31,18 +33,16 @@ const STUB_FREQUENCIES: Record<string, number> = {
 
 class OpenAiTtsProvider implements TtsProvider {
   constructor(
-    private readonly apiKey: string,
     private readonly model = process.env.TTS_MODEL || "gpt-4o-mini-tts"
   ) {}
 
   async synthesize(input: TtsSynthesisInput) {
     let lastError = "Speech generation failed";
     for (let attempt = 0; attempt < 3; attempt++) {
-      const response = await fetch("https://api.openai.com/v1/audio/speech", {
+      const response = await openAiFetch("/v1/audio/speech", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
           model: this.model,
@@ -52,15 +52,15 @@ class OpenAiTtsProvider implements TtsProvider {
           response_format: "wav",
           speed: input.speakingRate || 1,
         }),
-      });
+      }, { operation: "speech-synthesis", timeoutMs: 60_000 });
       if (response.ok) {
         return {
           bytes: Buffer.from(await response.arrayBuffer()),
           contentType: "audio/wav" as const,
         };
       }
-      const detail = await response.text();
-      lastError = `Speech API returned ${response.status}: ${detail.slice(0, 240)}`;
+      await response.text();
+      lastError = `Speech service returned ${response.status}.`;
       if (response.status !== 429 && response.status < 500) break;
       await new Promise((resolve) =>
         setTimeout(resolve, 600 * 2 ** attempt + Math.random() * 150)
@@ -123,8 +123,8 @@ export function createTtsProvider(): TtsProvider {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error(
-      "Real speech synthesis requires OPENAI_API_KEY. Set TTS_STUB=1 only for deterministic tone fixtures."
+      "Real speech synthesis requires a configured model service."
     );
   }
-  return new OpenAiTtsProvider(apiKey);
+  return new OpenAiTtsProvider();
 }

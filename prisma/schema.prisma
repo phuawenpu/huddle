@@ -225,3 +225,15 @@ model TopicSuggestionCache {
   suggestionsJson String
   createdAt       DateTime @default(now())
 }
+
+model ProviderUsageWindow {
+  id          String   @id
+  provider    String
+  operation   String
+  windowKind  String
+  windowStart Int
+  count       Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  @@index([provider, windowKind, windowStart])
+}

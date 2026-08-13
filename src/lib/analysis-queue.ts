@@ -50,6 +50,7 @@ const sessionQueues = new Map<
     lastPromptId: string | null;
     promptTimer: ReturnType<typeof setTimeout> | null;
     windowAnalysisInFlight: boolean;
+    lastWindowThroughTurnId: string | null;
   }
 >();
 
@@ -64,6 +65,7 @@ function getSessionQueue(sessionId: string) {
       lastPromptId: null,
       promptTimer: null,
       windowAnalysisInFlight: false,
+      lastWindowThroughTurnId: null,
     });
   }
   return sessionQueues.get(sessionId)!;
@@ -283,6 +285,8 @@ async function runWindowAnalysis(sessionId: string): Promise<void> {
     };
 
     const chronologicalTurns = [...recentTurns].reverse();
+    const throughTurn = chronologicalTurns.at(-1)!;
+    if (q.lastWindowThroughTurnId === throughTurn.id) return;
     const windowAnalysis = await analyzeWindow(
       chronologicalTurns.map((t) => ({
         id: t.id,
@@ -295,7 +299,7 @@ async function runWindowAnalysis(sessionId: string): Promise<void> {
       config,
     );
 
-    const throughTurn = chronologicalTurns.at(-1)!;
+    q.lastWindowThroughTurnId = throughTurn.id;
     publish(
       sessionId,
       windowAnalysisPatch({

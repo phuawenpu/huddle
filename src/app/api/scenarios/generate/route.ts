@@ -37,18 +37,26 @@ export async function POST(request: NextRequest) {
     }
 
     const input: ScenarioGenerationInput = {
-      topic: String(topic || "Design Thinking topic"),
+      topic: boundedText(topic, "Design Thinking topic", 500),
       durationMinutes: Number(durationMinutes) || 8,
       speakerCount: Number(speakerCount) || 4,
       difficulty: difficulty || "realistic",
       crossTalkLevel: (crossTalkLevel || "occasional") as CrossTalkLevel,
-      workshopType: body.workshopType,
-      objective: body.objective,
-      criteria: body.criteria,
-      disagreementLevel: body.disagreementLevel,
-      evidenceQuality: body.evidenceQuality,
-      facilitationQuality: body.facilitationQuality,
-      language: body.language || "English",
+      workshopType: boundedText(body.workshopType, "concept critique", 80),
+      objective: boundedText(body.objective, "", 500) || undefined,
+      criteria: Array.isArray(body.criteria)
+        ? body.criteria
+            .filter(
+              (value: unknown): value is string => typeof value === "string",
+            )
+            .map((value: string) => value.trim().slice(0, 240))
+            .filter(Boolean)
+            .slice(0, 12)
+        : [],
+      disagreementLevel: boundedText(body.disagreementLevel, "moderate", 40),
+      evidenceQuality: boundedText(body.evidenceQuality, "mixed", 40),
+      facilitationQuality: boundedText(body.facilitationQuality, "light", 40),
+      language: boundedText(body.language, "English", 40),
     };
     const prompts = buildDiscussionPrompts(input);
     const isStub = process.env.LLM_STUB === "1";
@@ -71,7 +79,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Dialogue generation is unavailable because OPENAI_API_KEY is not configured. Set LLM_STUB=1 explicitly for deterministic development fixtures.",
+            "Dialogue generation is unavailable because the model service is not configured.",
         },
         { status: 503 },
       );
@@ -80,12 +88,12 @@ export async function POST(request: NextRequest) {
     let qualityFeedback = "";
     for (let qualityAttempt = 0; qualityAttempt < 2; qualityAttempt++) {
       const content = await requestStructuredJson<any>({
-        apiKey,
         model: process.env.SCENARIO_MODEL || "gpt-5.6-terra",
         system: prompts.system,
         user: `${prompts.user}${qualityFeedback}`,
         schema: GENERATED_SCENARIO_JSON_SCHEMA,
         maxCompletionTokens: 32_000,
+        operation: "scenario-generation",
       });
       const generated = normalizeGeneratedScenario(
         content,
@@ -119,4 +127,13 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
+}
+
+function boundedText(value: unknown, fallback: string, maximum: number) {
+  return (
+    (typeof value === "string" ? value : fallback)
+      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "")
+      .trim()
+      .slice(0, maximum) || fallback
+  );
 }

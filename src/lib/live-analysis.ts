@@ -13,6 +13,8 @@ import type {
   MeetingStateRelation,
   TargetAgreement,
 } from "./types";
+import { openAiFetch } from "./openai-client";
+import { UNTRUSTED_INPUT_POLICY } from "./prompt-security";
 
 export interface LiveAnalysisTurn {
   id: string;
@@ -183,19 +185,20 @@ async function requestAnalysis(payload: Record<string, unknown>) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), configuredTimeoutMs());
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await openAiFetch("/v1/chat/completions", {
       method: "POST",
       signal: controller.signal,
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
         model: process.env.ANALYSIS_MODEL || "gpt-5-mini-2025-08-07",
         messages: [
           {
             role: "system",
-            content: `You maintain a live, mixed-initiative meeting map for a design facilitator. Analyze all supplied turns against the facilitator intent. Do not score people, infer emotion, or reduce the meeting to speaking/count metrics.
+            content: `${UNTRUSTED_INPUT_POLICY}
+
+You maintain a live, mixed-initiative meeting map for a design facilitator. Analyze all supplied turns against the facilitator intent. Do not score people, infer emotion, or reduce the meeting to speaking/count metrics.
 
 Return one JSON object with:
 - headline and summary
@@ -219,7 +222,7 @@ Agreement is always about a specific proposal or decision and will be computed f
         max_completion_tokens: 5000,
         reasoning_effort: process.env.ANALYSIS_REASONING_EFFORT || "minimal",
       }),
-    });
+    }, { operation: "full-analysis", timeoutMs: configuredTimeoutMs() });
     if (!response.ok) {
       throw new Error(`analysis provider returned ${response.status}`);
     }

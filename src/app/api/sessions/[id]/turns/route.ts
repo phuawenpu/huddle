@@ -113,6 +113,45 @@ export async function POST(
   const { id: sessionId } = await context.params;
   try {
     const body = await request.json();
+    const providerSessionId = String(body.providerSessionId || "").trim();
+    const providerTurnOrder = Number(body.providerTurnOrder);
+    const segmentIndex = Number(body.segmentIndex || 0);
+    const suppliedText = String(body.currentText || body.originalText || "");
+    if (
+      !providerSessionId ||
+      providerSessionId.length > 200 ||
+      !Number.isInteger(providerTurnOrder) ||
+      providerTurnOrder < 0 ||
+      providerTurnOrder > 2_000_000 ||
+      !Number.isInteger(segmentIndex) ||
+      segmentIndex < 0 ||
+      segmentIndex > 100
+    ) {
+      return NextResponse.json(
+        { error: "Invalid transcription turn identifiers." },
+        { status: 400 },
+      );
+    }
+    if (suppliedText.length > 12_000) {
+      return NextResponse.json(
+        { error: "Transcription turn is too large." },
+        { status: 413 },
+      );
+    }
+    if (Array.isArray(body.wordsJson) && body.wordsJson.length > 1_000) {
+      return NextResponse.json(
+        { error: "Transcription word detail is too large." },
+        { status: 413 },
+      );
+    }
+    body.providerSessionId = providerSessionId;
+    body.providerTurnOrder = providerTurnOrder;
+    body.segmentIndex = segmentIndex;
+    body.providerSpeakerLabel = String(body.providerSpeakerLabel || "")
+      .trim()
+      .slice(0, 64);
+    body.currentText = suppliedText;
+    body.originalText = suppliedText;
 
     const existing = await prisma.transcriptTurn.findUnique({
       where: {

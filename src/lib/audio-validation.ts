@@ -2,6 +2,7 @@ import { readFile, writeFile } from "fs/promises";
 import { join } from "path";
 import { wordErrorRate } from "./utils";
 import type { AudioManifest } from "./audio-pipeline";
+import { openAiFetch } from "./openai-client";
 
 export interface AudioValidationTurn {
   id: string;
@@ -50,7 +51,7 @@ export async function validateRenderedSpeech(
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    throw new Error("Independent audio validation requires OPENAI_API_KEY.");
+    throw new Error("Independent audio validation requires a configured model service.");
   }
   const model = process.env.AUDIO_VALIDATION_MODEL || "gpt-4o-mini-transcribe";
   const sampled = selectSample(manifest);
@@ -62,17 +63,17 @@ export async function validateRenderedSpeech(
     form.append("file", new Blob([clip], { type: "audio/wav" }), `${turn.id}.wav`);
     form.append("model", model);
     form.append("response_format", "json");
-    const response = await fetch(
-      "https://api.openai.com/v1/audio/transcriptions",
+    const response = await openAiFetch(
+      "/v1/audio/transcriptions",
       {
         method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}` },
         body: form,
-      }
+      },
+      { operation: "audio-validation", timeoutMs: 60_000 },
     );
     if (!response.ok) {
       throw new Error(
-        `Independent ASR returned ${response.status}: ${(await response.text()).slice(0, 240)}`
+        `Independent speech validation returned ${response.status}.`
       );
     }
     const body = await response.json();

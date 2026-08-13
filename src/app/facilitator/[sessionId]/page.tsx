@@ -502,22 +502,11 @@ export default function FacilitatorPage() {
         await startCapture();
       }
 
-      // Get ASR token
-      const tokenRes = await fetch(
-        `/api/providers/assemblyai/token?max_speakers=${Math.max(2, session?.speakerCount || 2)}`,
-      );
-      const tokenData = await tokenRes.json();
-      if (!tokenRes.ok || tokenData.error) {
-        throw new Error(
-          tokenData.error || "Could not obtain an ASR session token.",
-        );
-      }
-
       // Create ASR client
+      const websocketProtocol =
+        window.location.protocol === "https:" ? "wss:" : "ws:";
       const asr = createASRClient({
-        wsUrl:
-          tokenData.wsUrl ||
-          `${tokenData.wsBase}/v3/ws?sample_rate=16000&speech_model=u3-rt-pro&format_turns=true&speaker_labels=true&max_speakers=${Math.max(2, session?.speakerCount || 2)}&token=${encodeURIComponent(tokenData.token)}`,
+        wsUrl: `${websocketProtocol}//${window.location.host}/api/realtime/transcription?max_speakers=${Math.max(2, session?.speakerCount || 2)}`,
         onTurn: (turn) => {
           updateLiveSpeaker(latestAttributedSpeakerLabel(turn), turn.endOfTurn);
           if (turn.endOfTurn) {

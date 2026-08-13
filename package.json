@@ -5,9 +5,9 @@
   "license": "AGPL-3.0-only",
   "description": "Critique HUD — A shared cognitive mirror for Design Thinking critiques",
   "scripts": {
-    "dev": "next dev -p 3000",
+    "dev": "node server.mjs",
     "build": "next build",
-    "start": "next start -p 3000",
+    "start": "NODE_ENV=production node server.mjs",
     "lint": "next lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
     "db:generate": "prisma generate",

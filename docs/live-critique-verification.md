@@ -174,13 +174,13 @@ consent-driven.
 Run the focused checks against a local stubbed server or the deployed app:
 
 ```bash
-BASE_URL=https://huddle-ti5ikw.fly.dev \
+BASE_URL=https://your-deployment.example \
 npx playwright test e2e/critique-hud.spec.ts \
   --project=chromium-desktop \
   --grep 'long live transcript|live HUD repeats|camera preview' \
   --retries=0
 
-BASE_URL=https://huddle-ti5ikw.fly.dev \
+BASE_URL=https://your-deployment.example \
 npx playwright test e2e/critique-hud.spec.ts \
   --project=iphone \
   --grep 'iPhone Live Critique' \
@@ -204,7 +204,7 @@ speech-evaluation endpoint.
 
 ```bash
 RUN_PRODUCTION_LIVE=1 \
-BASE_URL=https://huddle-ti5ikw.fly.dev \
+BASE_URL=https://your-deployment.example \
 PRODUCTION_LIVE_SCENARIO_ID=<approved-scenario-id> \
 PRODUCTION_LIVE_AUDIO_FILE=<absolute-path-to-approved-wav> \
 npx playwright test e2e/production-live.spec.ts \

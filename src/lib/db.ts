@@ -84,6 +84,12 @@ async function initializeDatabase(client: PrismaClient): Promise<void> {
     await client.$executeRawUnsafe(
       `CREATE INDEX IF NOT EXISTS "VisualEvidence_sessionId_capturedAtMs_idx" ON "VisualEvidence"("sessionId", "capturedAtMs")`,
     );
+    await client.$executeRawUnsafe(
+      `CREATE TABLE IF NOT EXISTS "ProviderUsageWindow" ("id" TEXT PRIMARY KEY NOT NULL, "provider" TEXT NOT NULL, "operation" TEXT NOT NULL, "windowKind" TEXT NOT NULL, "windowStart" INTEGER NOT NULL, "count" INTEGER NOT NULL DEFAULT 0, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+    );
+    await client.$executeRawUnsafe(
+      `CREATE INDEX IF NOT EXISTS "ProviderUsageWindow_provider_windowKind_windowStart_idx" ON "ProviderUsageWindow"("provider", "windowKind", "windowStart")`,
+    );
   } catch (e: any) {
     console.error("DB additive migration error:", e.message);
     throw e;

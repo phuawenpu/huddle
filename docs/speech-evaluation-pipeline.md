@@ -62,7 +62,7 @@ terminates cleanly, requests a score, and applies quality gates.
 
 ```bash
 RUN_PRODUCTION_LIVE=1 \
-BASE_URL=https://huddle-ti5ikw.fly.dev \
+BASE_URL=https://your-deployment.example \
 PRODUCTION_LIVE_SCENARIO_ID=<approved-scenario-id> \
 PRODUCTION_LIVE_AUDIO_FILE=<absolute-path-to-16khz-mono-wav> \
 npx playwright test e2e/production-live.spec.ts --project=chromium-desktop
@@ -119,7 +119,7 @@ the complete realized scenario timeline:
 
 ```bash
 curl -fsS \
-  "https://huddle-ti5ikw.fly.dev/api/sessions/<session-id>/speech-evaluation?collarMs=250"
+  "https://your-deployment.example/api/sessions/<session-id>/speech-evaluation?collarMs=250"
 ```
 
 For a partial capture, set the reference-aligned boundary explicitly so that
@@ -127,7 +127,7 @@ unplayed future dialogue is not counted as deleted speech:
 
 ```bash
 curl -fsS \
-  "https://huddle-ti5ikw.fly.dev/api/sessions/<session-id>/speech-evaluation?startMs=0&endMs=126188&collarMs=250"
+  "https://your-deployment.example/api/sessions/<session-id>/speech-evaluation?startMs=0&endMs=126188&collarMs=250"
 ```
 
 Available query parameters are `startMs`, `endMs`, `collarMs`,

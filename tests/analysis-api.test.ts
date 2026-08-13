@@ -189,8 +189,9 @@ describe("OpenAI analysis request compatibility", () => {
     };
     const prompt = generatePrompt(result, config);
 
-    expect(body.messages[0].content.indexOf("turn-first")).toBeLessThan(
-      body.messages[0].content.indexOf("turn-latest"),
+    expect(body.messages[0].content).not.toContain("turn-first");
+    expect(body.messages[1].content.indexOf("turn-first")).toBeLessThan(
+      body.messages[1].content.indexOf("turn-latest"),
     );
     expect(result.supportingTurnIds).toEqual(["turn-latest", "turn-first"]);
     expect(prompt).toMatchObject({

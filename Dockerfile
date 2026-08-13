@@ -19,18 +19,20 @@ RUN apk add --no-cache ffmpeg
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/server.mjs ./server.mjs
 
 # Sprite workspaces use restrictive source modes. Public assets must remain
 # readable after the container drops privileges to the nextjs user.
-RUN chown -R nextjs:nodejs /app/public && chmod -R u=rwX,go=rX /app/public
+RUN chown -R nextjs:nodejs /app/public /app/server.mjs && \
+    chmod -R u=rwX,go=rX /app/public && chmod 0444 /app/server.mjs
 
 USER nextjs
 EXPOSE 3000
 ENV NODE_ENV=production
 ENV PORT=3000
 
-CMD ["sh", "-c", "mkdir -p /data/audio /data/ir && node server.js"]
+CMD ["sh", "-c", "mkdir -p /data/audio /data/ir && node server.mjs"]

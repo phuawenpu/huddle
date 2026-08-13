@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { STUB_ASR_PORT } from "@/lib/stubs/assemblyai";
+import { assertProviderBudget } from "@/lib/provider-budget";
+import { secureStringEqual } from "@/lib/auth-session";
 
 const DEFAULT_SPEECH_MODEL = "u3-rt-pro";
 
@@ -9,9 +11,17 @@ const DEFAULT_SPEECH_MODEL = "u3-rt-pro";
  * In production, calls the AssemblyAI token API with the API key.
  */
 export async function GET(request: NextRequest) {
+  const internalSecret = process.env.HUD_INTERNAL_PROXY_SECRET;
+  const suppliedSecret = request.headers.get("x-huddle-internal-proxy") || "";
+  if (
+    !internalSecret ||
+    !(await secureStringEqual(suppliedSecret, internalSecret))
+  ) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   const isStub = process.env.ASR_STUB === "1";
   const requestedSpeakers = Number(
-    request.nextUrl.searchParams.get("max_speakers") || "6"
+    request.nextUrl.searchParams.get("max_speakers") || "6",
   );
   const maxSpeakers = Number.isFinite(requestedSpeakers)
     ? Math.max(2, Math.min(10, Math.round(requestedSpeakers)))
@@ -42,28 +52,40 @@ export async function GET(request: NextRequest) {
   const apiKey = process.env.ASSEMBLYAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
-      { error: "ASSEMBLYAI_API_KEY not configured" },
-      { status: 500 }
+      { error: "Live transcription is not configured." },
+      { status: 503 },
     );
   }
 
   try {
-    const tokenRes = await fetch(
-      "https://streaming.assemblyai.com/v3/token?expires_in_seconds=60&max_session_duration_seconds=7200",
-      { headers: { Authorization: apiKey } }
-    );
+    await assertProviderBudget("assemblyai", "streaming-session");
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10_000);
+    let tokenRes: Response;
+    try {
+      tokenRes = await fetch(
+        "https://streaming.assemblyai.com/v3/token?expires_in_seconds=60&max_session_duration_seconds=7200",
+        {
+          headers: { Authorization: apiKey },
+          cache: "no-store",
+          redirect: "error",
+          signal: controller.signal,
+        },
+      );
+    } finally {
+      clearTimeout(timer);
+    }
 
     if (!tokenRes.ok) {
       return NextResponse.json(
-        { error: "Failed to get AssemblyAI token" },
-        { status: 502 }
+        { error: "Failed to start live transcription." },
+        { status: 502 },
       );
     }
 
     const { token } = (await tokenRes.json()) as { token: string };
     connectionParams.set("token", token);
-    const wsBase =
-      process.env.ASR_WS_BASE || "wss://streaming.assemblyai.com";
+    const wsBase = process.env.ASR_WS_BASE || "wss://streaming.assemblyai.com";
 
     return NextResponse.json({
       token,
@@ -76,8 +98,8 @@ export async function GET(request: NextRequest) {
     });
   } catch {
     return NextResponse.json(
-      { error: "AssemblyAI token request failed" },
-      { status: 502 }
+      { error: "Live transcription is temporarily unavailable." },
+      { status: 502 },
     );
   }
 }

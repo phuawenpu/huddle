@@ -697,16 +697,11 @@ test.describe("Critique HUD — E2E", () => {
       const statusIndicator = page.locator("[class*='rounded-full']").first();
       await expect(statusIndicator).toBeVisible();
 
-      // Should have Participation panel
-      await expect(page.getByText("Participation")).toBeVisible({
-        timeout: 5000,
-      });
-      // Critique-specific intelligence is a first-class surface, not a generic summary.
-      await expect(page.getByText("Critique Radar")).toBeVisible();
-      await expect(page.getByText("Source Map")).toBeVisible();
-      await expect(
-        page.getByText("Source-linked signals, never participant scores"),
-      ).toBeVisible();
+      // The shared canvas exposes the current critique flow and conversation.
+      await expect(page.getByText("Understand", { exact: true })).toBeVisible();
+      await expect(page.getByText("Explore", { exact: true })).toBeVisible();
+      await expect(page.getByText("Commit", { exact: true })).toBeVisible();
+      await expect(page.getByText("CONVERSATION NOW")).toBeVisible();
     }
   });
 
@@ -833,10 +828,7 @@ test.describe("Critique HUD — E2E", () => {
     const token = await request.get(
       "/api/providers/assemblyai/token?max_speakers=3",
     );
-    const tokenBody = await token.json();
-    expect(tokenBody.wsUrl).toContain("speech_model=u3-rt-pro");
-    expect(tokenBody.wsUrl).toContain("speaker_labels=true");
-    expect(tokenBody.wsUrl).toContain("max_speakers=3");
+    expect(token.status()).toBe(404);
 
     const scenarioId = await createRenderedFixture(request);
     const created = await request.post("/api/sessions", {

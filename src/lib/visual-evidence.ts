@@ -1,4 +1,6 @@
 import type { VisualEvidenceAnalysis, VisualEvidenceData } from "./types";
+import { openAiFetch } from "./openai-client";
+import { UNTRUSTED_INPUT_POLICY } from "./prompt-security";
 
 export interface VisualEvidenceContext {
   objective: string;
@@ -20,12 +22,11 @@ export async function analyzeVisualEvidence(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 30_000);
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await openAiFetch("/v1/chat/completions", {
       method: "POST",
       signal: controller.signal,
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
         model:
@@ -36,7 +37,7 @@ export async function analyzeVisualEvidence(
           {
             role: "system",
             content:
-              "Describe only visible, discussion-relevant evidence in this deliberately captured frame. Do not identify people, infer sensitive traits, read hidden information, or treat the image as proof of a spoken claim. Return JSON: {caption, observations: string[], relevance, confidence}.",
+              `${UNTRUSTED_INPUT_POLICY}\n\nDescribe only visible, discussion-relevant evidence in this deliberately captured frame. Do not identify people, infer sensitive traits, read hidden information, or treat the image as proof of a spoken claim. Return JSON: {caption, observations: string[], relevance, confidence}.`,
           },
           {
             role: "user",
@@ -64,7 +65,7 @@ export async function analyzeVisualEvidence(
         max_completion_tokens: 700,
         reasoning_effort: process.env.ANALYSIS_REASONING_EFFORT || "minimal",
       }),
-    });
+    }, { operation: "visual-analysis", timeoutMs: 30_000 });
     if (!response.ok) {
       throw new Error(`visual analysis provider returned ${response.status}`);
     }

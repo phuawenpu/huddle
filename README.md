@@ -2,8 +2,6 @@
 
 A shared cognitive mirror for Design Thinking critiques — a Next.js web application that provides real-time speaker-attributed transcription, discussion mapping, and AI-powered facilitation prompts.
 
-**Deployed:** [huddle-ti5ikw.fly.dev](https://huddle-ti5ikw.fly.dev)
-
 **License:** [GNU AGPLv3](LICENSE.md) — free and open source, including for
 commercial use, with attribution and copyleft (share-back) obligations for
 distributed and hosted deployments. Commercial licenses without copyleft are
@@ -213,21 +211,20 @@ Key runtime guarantees:
 
 ## Current Status
 
-**Active development — live capture, overlap-aware scenario authoring, natural-audio simulation, repeatable whole-transcript intent analysis, deliberate visual evidence capture, and source-linked critique extraction are implemented. Human disposition, artifact revision linkage, broader real-device evaluation, access control, and production governance remain next.**
+**Active development — live capture, overlap-aware scenario authoring, natural-audio simulation, repeatable whole-transcript intent analysis, deliberate visual evidence capture, source-linked critique extraction, private deployment authentication, provider request budgets, and same-origin provider proxies are implemented. Human disposition, artifact revision linkage, broader real-device evaluation, role-based identity, and production governance remain next.**
 
-| Metric            | Value                                            |
-| ----------------- | ------------------------------------------------ |
-| TypeScript        | 0 errors                                         |
-| Unit tests        | 116/116 passing                                  |
-| Live audio E2E    | Mic + recorded pipelines pass locally and on Fly |
-| API routes        | 44 endpoints operational                         |
-| Frontend pages    | 9 routes functional                              |
-| DB schema         | 13 models, SQLite via Prisma                     |
-| Production data   | 12/12 scenarios at quality score 100             |
-| Scenario audit    | 0 errors, warnings, or exact duplicate lines     |
-| Fly.io deployment | 1/1 health checks passing                        |
-| API secrets       | `ASSEMBLYAI_API_KEY` + `OPENAI_API_KEY` deployed |
-| Dependency audit  | 3 high transitive findings; major fix pending    |
+| Metric           | Value                                          |
+| ---------------- | ---------------------------------------------- |
+| TypeScript       | 0 errors                                       |
+| Unit tests       | 134/134 passing                                |
+| Live audio E2E   | Mic + recorded pipelines pass locally          |
+| API routes       | 46 endpoints operational                       |
+| Frontend pages   | 10 routes functional                           |
+| DB schema        | 14 models, SQLite via Prisma                   |
+| Production data  | 12/12 scenarios at quality score 100           |
+| Scenario audit   | 0 errors, warnings, or exact duplicate lines   |
+| Provider secrets | Server-side environment configuration required |
+| Dependency audit | 3 high transitive findings; major fix pending  |
 
 ### Build Stage Progress
 
@@ -259,8 +256,8 @@ Key runtime guarantees:
   `07250e7`; the portrait waveform, Now Lens, mobile browser assertions, and
   chronological rolling-analysis evidence test are present on `main`.
 - Focused unit/type checks and the earlier portrait-browser slice passed. Full
-  unit, build, six-profile browser, Fly redeployment, and production live-session
-  checks are now in progress; deployment is not yet claimed complete.
+  unit, build, six-profile browser, and production live-session checks are now
+  in progress; deployment is not yet claimed complete.
 
 #### Multi-speaker waveform completion — 2026-08-10T23:24Z
 
@@ -273,19 +270,18 @@ Key runtime guarantees:
   returned by streaming diarization.
 - Late `SpeakerRevision` events are persisted to matching segmented transcript
   turns and broadcast through SSE. Unit, type, production-build, focused desktop
-  audio/revision browser, portrait-browser, Fly health, and HTTP checks passed;
-  see the final continuation handoff for exact commit and release identifiers.
+  audio/revision browser, portrait-browser, and HTTP checks passed.
 
-| Stage                         | Status         | Summary                                                                                                                                                                                                                                   |
-| ----------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **1 — Speech proof**          | ✅ Implemented | AudioWorklet PCM16 resampler, `useAudioCapture` hook (getUserMedia + analyser meter + settings readback), ASR WebSocket client (AssemblyAI v3 protocol), wake lock, sendBeacon termination                                                |
-| **2 — Diarization**           | 🟡 Partial     | Idempotent turn ingest, word-level provider speaker runs, UNKNOWN/PENDING normalization, overlap hints, mappings, and durable late SpeakerRevision correction work; broader real-room acoustic validation remains pending.                 |
-| **3 — Scenarios + stubs**     | ✅ Implemented | Versioned rich transcripts, one-to-three-pass LLM revision, quality gates, ASR/LLM/TTS stubs, realistic overlap fixtures, and recorded-audio injection through the live Worklet/ASR path work.                                            |
-| **4 — HUD**                   | 🟡 Partial     | Bounded two-way transcript navigation, controlled auto-follow, live waveform, compact synthesis graphs, whole-transcript intent snapshots, deliberate visual context, SSE, simulation badge, and reconnect work; durable event replay is not implemented.          |
-| **5 — TTS + mixing**          | ✅ Implemented | Cached per-turn OpenAI TTS, explicit tone fixtures in stub mode, ffmpeg overlap scheduling/mixing, WAV + MP3 output, manifests, and independent ASR validation.                                                                           |
-| **6 — Critique intelligence** | 🟡 Partial     | Batched turn/window analysis, exhaustive whole-transcript synthesis, exact source-quote validation, Critique Radar, criterion coverage, open loops, commitments, and source-linked items work; semantic verification and human disposition remain next.              |
-| **7 — Facilitation**          | 🟡 Partial     | Facilitators can revise intent and rerun persisted analysis while audio continues; single-prompt restraint and a lexical guard exist. Correction audit and participant-aware guards remain incomplete.                                      |
-| **8 — Evaluation**            | 🟡 Partial     | Playwright covers six device profiles; mic and recorded pipelines have passed local and deployed E2E checks with real ASR. Some reported metrics remain proxies, and a broader physical-device/acoustic matrix is still pending.          |
+| Stage                         | Status         | Summary                                                                                                                                                                                                                                                   |
+| ----------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1 — Speech proof**          | ✅ Implemented | AudioWorklet PCM16 resampler, `useAudioCapture` hook (getUserMedia + analyser meter + settings readback), ASR WebSocket client (AssemblyAI v3 protocol), wake lock, sendBeacon termination                                                                |
+| **2 — Diarization**           | 🟡 Partial     | Idempotent turn ingest, word-level provider speaker runs, UNKNOWN/PENDING normalization, overlap hints, mappings, and durable late SpeakerRevision correction work; broader real-room acoustic validation remains pending.                                |
+| **3 — Scenarios + stubs**     | ✅ Implemented | Versioned rich transcripts, one-to-three-pass LLM revision, quality gates, ASR/LLM/TTS stubs, realistic overlap fixtures, and recorded-audio injection through the live Worklet/ASR path work.                                                            |
+| **4 — HUD**                   | 🟡 Partial     | Bounded two-way transcript navigation, controlled auto-follow, live waveform, compact synthesis graphs, whole-transcript intent snapshots, deliberate visual context, SSE, simulation badge, and reconnect work; durable event replay is not implemented. |
+| **5 — TTS + mixing**          | ✅ Implemented | Cached per-turn OpenAI TTS, explicit tone fixtures in stub mode, ffmpeg overlap scheduling/mixing, WAV + MP3 output, manifests, and independent ASR validation.                                                                                           |
+| **6 — Critique intelligence** | 🟡 Partial     | Batched turn/window analysis, exhaustive whole-transcript synthesis, exact source-quote validation, Critique Radar, criterion coverage, open loops, commitments, and source-linked items work; semantic verification and human disposition remain next.   |
+| **7 — Facilitation**          | 🟡 Partial     | Facilitators can revise intent and rerun persisted analysis while audio continues; single-prompt restraint and a lexical guard exist. Correction audit and participant-aware guards remain incomplete.                                                    |
+| **8 — Evaluation**            | 🟡 Partial     | Playwright covers six device profiles; mic and recorded pipelines have passed local and deployed E2E checks with real ASR. Some reported metrics remain proxies, and a broader physical-device/acoustic matrix is still pending.                          |
 
 ## Research and system-design study
 
@@ -324,14 +320,14 @@ POST /api/uploads                        — Upload audio files (WAV, MP3, M4A, 
 
 ### New Frontend Features
 
-| Page                       | Features                                                                                                                                                                                                        |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/sessions/new`            | Three audio source modes: Live Mic, Upload File, Past Recording. Browse and select from synthesized scenarios.                                                                                                  |
+| Page                       | Features                                                                                                                                                                                                                      |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/sessions/new`            | Three audio source modes: Live Mic, Upload File, Past Recording. Browse and select from synthesized scenarios.                                                                                                                |
 | `/facilitator/[sessionId]` | Mic/recorded AudioWorklet capture, bounded transcript with pauseable auto-follow, waveform, compact signal HUD, repeatable full-transcript intent analysis, speaker mapping, corrections, and consent-driven visual evidence. |
-| `/display/[sessionId]`     | SSE-driven shared HUD with recent turns, Critique Radar, talk share, source-linked discussion map, latest intent synthesis/phase graph, visual context, prompt banner, and SIMULATION badge.                              |
-| `/simulator/[runId]`       | Playback controller with speed control (0.5×–2.0×), progress bar, current speaker/turn display, WAV download.                                                                                                   |
-| `/scenarios`               | Quality-scored library with duplicate, delete, and launch-to-simulator actions.                                                                                                                                 |
-| `/scenarios/[scenarioId]`  | Timed transcript, quality diagnostics, 1–3-pass LLM workshop, synthesis, preflight, approval, and launch controls.                                                                                              |
+| `/display/[sessionId]`     | SSE-driven shared HUD with recent turns, Critique Radar, talk share, source-linked discussion map, latest intent synthesis/phase graph, visual context, prompt banner, and SIMULATION badge.                                  |
+| `/simulator/[runId]`       | Playback controller with speed control (0.5×–2.0×), progress bar, current speaker/turn display, WAV download.                                                                                                                 |
+| `/scenarios`               | Quality-scored library with duplicate, delete, and launch-to-simulator actions.                                                                                                                                               |
+| `/scenarios/[scenarioId]`  | Timed transcript, quality diagnostics, 1–3-pass LLM workshop, synthesis, preflight, approval, and launch controls.                                                                                                            |
 
 ## Known Issues
 
@@ -403,26 +399,50 @@ npx prisma generate
 DATABASE_URL=file:./data/app.db npx prisma db push
 
 # Start development server with explicit zero-cost provider stubs
-DATABASE_URL=file:./data/app.db ASR_STUB=1 LLM_STUB=1 TTS_STUB=1 npm run dev
+DATABASE_URL=file:./data/app.db AUTH_DISABLED=1 ASR_STUB=1 LLM_STUB=1 TTS_STUB=1 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
 ## Configuration
 
-| Variable                    | Purpose                                  | Default                  |
-| --------------------------- | ---------------------------------------- | ------------------------ |
-| `ASSEMBLYAI_API_KEY`        | AssemblyAI streaming ASR                 | (required for live mode) |
-| `OPENAI_API_KEY`            | OpenAI for analysis, generation, TTS     | (required for non-stub)  |
-| `DATABASE_URL`              | SQLite database path                     | `file:./data/app.db`     |
-| `LLM_STUB`                  | Use deterministic stubs when set to `1`  | unset/off                |
-| `ANALYSIS_TIMEOUT_MS`       | Provider deadline before safe fallback   | `12000`                  |
-| `ANALYSIS_REASONING_EFFORT` | GPT reasoning effort for live extraction | `minimal`                |
-| `SCENARIO_MODEL`            | Structured scenario generation model     | `gpt-5.6-terra`          |
-| `SCENARIO_EDIT_MODEL`       | Structured transcript revision model     | `SCENARIO_MODEL`         |
-| `TTS_STUB`                  | Use tone-based TTS when set to `1`       | unset/off                |
-| `ASR_STUB`                  | Use in-process ASR when set to `1`       | unset/off                |
-| `ASSEMBLYAI_SPEECH_MODEL`   | Streaming diarization model              | `u3-rt-pro`              |
+| Variable                         | Purpose                                      | Default                  |
+| -------------------------------- | -------------------------------------------- | ------------------------ |
+| `ASSEMBLYAI_API_KEY`             | AssemblyAI streaming ASR                     | (required for live mode) |
+| `OPENAI_API_KEY`                 | OpenAI for analysis, generation, TTS         | (required for non-stub)  |
+| `DATABASE_URL`                   | SQLite database path                         | `file:./data/app.db`     |
+| `HUD_ACCESS_CODE`                | Private deployment sign-in code (12+ chars)  | (required in production) |
+| `HUD_SESSION_SECRET`             | HMAC session secret (32+ random chars)       | (required in production) |
+| `HUD_API_TOKEN`                  | Optional automation bearer token (32+ chars) | unset                    |
+| `OPENAI_DAILY_REQUEST_LIMIT`     | Hard daily upstream request budget           | `1500`                   |
+| `ASSEMBLYAI_DAILY_SESSION_LIMIT` | Hard daily streaming-session budget          | `100`                    |
+| `LLM_STUB`                       | Use deterministic stubs when set to `1`      | unset/off                |
+| `ANALYSIS_TIMEOUT_MS`            | Provider deadline before safe fallback       | `12000`                  |
+| `ANALYSIS_REASONING_EFFORT`      | GPT reasoning effort for live extraction     | `minimal`                |
+| `SCENARIO_MODEL`                 | Structured scenario generation model         | `gpt-5.6-terra`          |
+| `SCENARIO_EDIT_MODEL`            | Structured transcript revision model         | `SCENARIO_MODEL`         |
+| `TTS_STUB`                       | Use tone-based TTS when set to `1`           | unset/off                |
+| `ASR_STUB`                       | Use in-process ASR when set to `1`           | unset/off                |
+| `ASSEMBLYAI_SPEECH_MODEL`        | Streaming diarization model                  | `u3-rt-pro`              |
+
+`AUTH_DISABLED=1` is accepted only outside production and is intended for local
+stub development. Production fails closed when the access code or session secret
+is absent or too short. Generate independent random values, store them as
+deployment secrets, and never commit them. Browser users receive a signed,
+12-hour, `HttpOnly`, `Secure`, `SameSite=Strict` cookie after sign-in. Unsafe API
+requests are same-origin only. Controlled automation can use `HUD_API_TOKEN` as a
+Bearer token instead of a browser cookie.
+
+All paid-provider calls originate on the server. Browser HTTP traffic reaches
+only local `/api/...` routes, and live audio uses the same-origin
+`/api/realtime/transcription` WebSocket bridge. The upstream transcription URL,
+temporary token, permanent provider keys, and model endpoints are never returned
+to browser code. Provider calls pass through endpoint allowlists, hard timeouts,
+minute-level burst limits, and SQLite-backed daily budgets.
+
+The deployment configuration deliberately sets `auto_start_machines = false`
+and `min_machines_running = 0`. An operator must explicitly start a machine only
+after authentication and provider-budget secrets have been configured.
 
 ## Routes
 
@@ -447,7 +467,7 @@ npm run build              # production Next.js build
 npm run test:e2e           # cross-browser UI suite plus Chromium mic/recording pipeline cases
 
 # Explicitly authorized deployed mic/recording verification
-RUN_PRODUCTION_LIVE=1 BASE_URL=https://huddle-ti5ikw.fly.dev \
+RUN_PRODUCTION_LIVE=1 BASE_URL=https://your-deployment.example \
   PRODUCTION_LIVE_SCENARIO_ID=<approved-scenario-id> \
   PRODUCTION_LIVE_AUDIO_FILE=<absolute-wav-path> \
   npx playwright test e2e/production-live.spec.ts --project=chromium-desktop
@@ -471,15 +491,6 @@ visual-evidence acceptance procedure.
 - **SSE** with `src/lib/pubsub.ts` in-memory pub/sub, 15s heartbeat, `Last-Event-ID` reconnect
 - **Two external providers:** AssemblyAI (ASR) and OpenAI (LLM + TTS)
 - **Stub mode:** All three providers have in-process stubs for zero-cost development
-
-## Deployment
-
-Deployed at `huddle-ti5ikw.fly.dev` via fly.io (Singapore region, shared-cpu-1x, 512MB).
-
-```bash
-flyctl deploy --app huddle-ti5ikw
-flyctl secrets list --app huddle-ti5ikw   # verify keys deployed
-```
 
 ## Design Principles
 
@@ -525,10 +536,6 @@ latest work from chat history.
 - The latest functional application commit is `870daac` (`fix: complete
   multi-speaker waveform flow`) on `main` in `phuawenpu/huddle`. This README
   handoff is a documentation-only follow-up to that runtime revision.
-- Commit `870daac` is deployed to Fly app `huddle-ti5ikw` as release `v46`, image
-  `deployment-01KZPZN2GHXZQB1WXC08NQS1TV`, in region `sin`. At handoff the
-  machine is started with `1/1` health check passing, and both `/` and
-  `/api/time` return HTTP 200.
 - Sprite checkpoint `v6` preserves the verified implementation before the Git
   commit and deployment.
 - GitHub commit `717fdb7` captured the interrupted work and also added the HUD
@@ -571,8 +578,8 @@ latest work from chat history.
   passed, including `A → B → C` active-speaker transitions and distinct colors.
 - iPhone portrait regression: speaker waveform, analysis HUD, semantic compass,
   transcript, and human controls stayed reachable within the viewport contract.
-- The managed `critique-hud-dev` service was restarted successfully. GitHub push,
-  Fly release `v46`, `1/1` health, `/`, and `/api/time` were verified afterward.
+- The managed `critique-hud-dev` service was restarted successfully. GitHub push
+  and local HTTP behavior were verified afterward.
 
 The focused browser audio tests use the repository's in-process ASR stub. They
 prove the application state flow, durable revision path, audio analyzer, and
@@ -583,10 +590,8 @@ separation. The UI now exposes that uncertainty instead of inventing C/D labels.
 
 ### Continue from here
 
-1. Run `git status --short --branch`, `git log -3 --oneline`, and `fly status
-   --app huddle-ti5ikw` before changing anything. Treat `origin/main` as the
-   source of truth; a documentation-only commit should immediately follow
-   functional commit `870daac`.
+1. Run `git status --short --branch` and `git log -3 --oneline` before changing
+   anything. Treat `origin/main` as the source of truth.
 2. Perform the next meaningful acceptance test on the deployed app with three or
    four physically distinct speakers and a shared room microphone. Confirm the
    top active state, colored spectral bars, detected/total speaker count, history

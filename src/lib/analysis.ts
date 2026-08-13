@@ -11,6 +11,8 @@ import type {
   PromptData,
 } from "./types";
 import { normalizeTurnAnalysis } from "./critique-intelligence";
+import { openAiFetch } from "./openai-client";
+import { UNTRUSTED_INPUT_POLICY } from "./prompt-security";
 
 export interface AnalysisConfig {
   sessionObjective: string;
@@ -67,6 +69,7 @@ function configuredAnalysisTimeoutMs(): number {
 async function fetchAnalysis(
   input: string,
   init: RequestInit,
+  operation: "turn-analysis" | "window-analysis",
 ): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(
@@ -74,7 +77,11 @@ async function fetchAnalysis(
     configuredAnalysisTimeoutMs(),
   );
   try {
-    return await fetch(input, { ...init, signal: controller.signal });
+    return await openAiFetch(
+      input,
+      { ...init, signal: controller.signal },
+      { operation, timeoutMs: configuredAnalysisTimeoutMs() },
+    );
   } finally {
     clearTimeout(timer);
   }
@@ -140,10 +147,9 @@ export async function analyzeTurnBatch(
       text: t.text,
     }));
 
-    const prompt = `Analyze these Design Thinking critique turns. Session context:
-Objective: ${config.sessionObjective}
-Phase: ${config.sessionPhase}
-Criteria: ${config.sessionCriteria.join(", ")}
+    const prompt = `${UNTRUSTED_INPUT_POLICY}
+
+Analyze the Design Thinking critique turns supplied in the user message.
 
 For each turn, determine:
 - category: one of "evidence", "questions", "positions", "decisions", "actions", "themes"
@@ -166,27 +172,37 @@ For each turn, determine:
 Return JSON: { "analyses": [{ "id": "<turn_id>", ... }] }`;
 
     const res = await fetchAnalysis(
-      "https://api.openai.com/v1/chat/completions",
+      "/v1/chat/completions",
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
           model: process.env.ANALYSIS_MODEL || "gpt-5-mini-2025-08-07",
           messages: [
             { role: "system", content: prompt },
-            { role: "user", content: JSON.stringify({ turns: turnContexts }) },
+            {
+              role: "user",
+              content: JSON.stringify({
+                session: {
+                  objective: config.sessionObjective,
+                  phase: config.sessionPhase,
+                  criteria: config.sessionCriteria,
+                },
+                turns: turnContexts,
+              }),
+            },
           ],
           response_format: { type: "json_object" },
           max_completion_tokens: 2000,
           reasoning_effort: process.env.ANALYSIS_REASONING_EFFORT || "minimal",
         }),
       },
+      "turn-analysis",
     );
 
-    if (!res.ok) throw new Error(`OpenAI API error: ${res.status}`);
+    if (!res.ok) throw new Error(`Model service returned ${res.status}`);
 
     const data = await res.json();
     const content = data.choices?.[0]?.message?.content;
@@ -262,21 +278,20 @@ export async function analyzeWindow(
 
   try {
     const res = await fetchAnalysis(
-      "https://api.openai.com/v1/chat/completions",
+      "/v1/chat/completions",
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         },
         body: JSON.stringify({
           model: process.env.ANALYSIS_MODEL || "gpt-5-mini-2025-08-07",
           messages: [
             {
               role: "system",
-              content: `Analyze this window of a Design Thinking critique discussion.
-Session: ${config.sessionObjective} (${config.sessionPhase})
-Recent turns: ${JSON.stringify(recentTurns.map((t) => ({ id: t.id, speaker: t.speakerLabel, text: t.text, category: t.category })))}
+              content: `${UNTRUSTED_INPUT_POLICY}
+
+Analyze this window of a Design Thinking critique discussion.
 
 Return JSON with:
 - theme: overarching theme of this window
@@ -290,12 +305,29 @@ Return JSON with:
 - minorityPosition: a minority view that should be preserved, or null
 - supportingTurnIds: up to 3 supplied turn IDs that most directly support the current state/open question. Never invent an ID.`,
             },
+            {
+              role: "user",
+              content: JSON.stringify({
+                session: {
+                  objective: config.sessionObjective,
+                  phase: config.sessionPhase,
+                  criteria: config.sessionCriteria,
+                },
+                recentTurns: recentTurns.map((turn) => ({
+                  id: turn.id,
+                  speaker: turn.speakerLabel,
+                  text: turn.text,
+                  category: turn.category,
+                })),
+              }),
+            },
           ],
           response_format: { type: "json_object" },
           max_completion_tokens: 1500,
           reasoning_effort: process.env.ANALYSIS_REASONING_EFFORT || "minimal",
         }),
       },
+      "window-analysis",
     );
 
     if (!res.ok) throw new Error(`Window analysis failed: ${res.status}`);

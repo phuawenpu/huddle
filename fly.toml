@@ -1,7 +1,6 @@
 # fly.toml — Critique HUD deployment configuration
 # See https://fly.io/docs/reference/configuration/ for details
 
-app = "huddle-ti5ikw"
 primary_region = "sin"
 
 [build]
@@ -21,8 +20,10 @@ primary_region = "sin"
   internal_port = 3000
   force_https = true
   auto_stop_machines = false
-  auto_start_machines = true
-  min_machines_running = 1
+  # Security default: deployments stay stopped until an operator explicitly
+  # starts a machine after configuring authentication and provider budgets.
+  auto_start_machines = false
+  min_machines_running = 0
 
   [[http_service.checks]]
     interval = "30s"

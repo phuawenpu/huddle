@@ -108,7 +108,7 @@ test.describe("Production live audio verification", () => {
   );
 
   test.beforeAll(() => {
-    expect(BASE_URL).toBe("https://huddle-ti5ikw.fly.dev");
+    expect(new URL(BASE_URL).protocol).toBe("https:");
     expect(SCENARIO_ID).toMatch(/^[0-9a-f-]{36}$/i);
   });
 

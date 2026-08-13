@@ -75,7 +75,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            "Transcript revision is unavailable because OPENAI_API_KEY is not configured.",
+            "Transcript revision is unavailable because the model service is not configured.",
         },
         { status: 503 },
       );
@@ -111,7 +111,6 @@ export async function POST(
             turns: unknown[];
             changeSummary: string;
           }>({
-            apiKey: apiKey!,
             model:
               process.env.SCENARIO_EDIT_MODEL ||
               process.env.SCENARIO_MODEL ||
@@ -119,6 +118,7 @@ export async function POST(
             system: prompts.system,
             user: prompts.user,
             schema: EDITABLE_TRANSCRIPT_JSON_SCHEMA,
+            operation: "scenario-revision",
           });
       turns = turnsFromEditableTranscript(revised, speakers);
       summaries.push(

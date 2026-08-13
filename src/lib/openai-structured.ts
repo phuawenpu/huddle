@@ -1,5 +1,7 @@
+import { openAiFetch } from "./openai-client";
+import { UNTRUSTED_INPUT_POLICY } from "./prompt-security";
+
 export interface StructuredJsonRequest {
-  apiKey: string;
   model: string;
   system: string;
   user: string;
@@ -9,6 +11,7 @@ export interface StructuredJsonRequest {
     schema: Record<string, unknown>;
   };
   maxCompletionTokens?: number;
+  operation?: "scenario-generation" | "scenario-revision";
 }
 
 export async function requestStructuredJson<T>(
@@ -16,16 +19,15 @@ export async function requestStructuredJson<T>(
 ): Promise<T> {
   let lastError = "Structured model request failed";
   for (let attempt = 0; attempt < 2; attempt++) {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await openAiFetch("/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${request.apiKey}`,
       },
       body: JSON.stringify({
         model: request.model,
         messages: [
-          { role: "system", content: request.system },
+          { role: "system", content: `${UNTRUSTED_INPUT_POLICY}\n\n${request.system}` },
           { role: "user", content: request.user },
         ],
         response_format: {
@@ -37,7 +39,7 @@ export async function requestStructuredJson<T>(
           ? { reasoning_effort: "medium" }
           : {}),
       }),
-    });
+    }, { operation: request.operation || "scenario-generation", timeoutMs: 90_000 });
     if (response.ok) {
       const body = await response.json();
       const choice = body?.choices?.[0];
@@ -56,8 +58,8 @@ export async function requestStructuredJson<T>(
         throw new Error("The model returned malformed structured transcript JSON.");
       }
     }
-    const detail = await response.text();
-    lastError = `Model request returned ${response.status}: ${detail.slice(0, 400)}`;
+    await response.text();
+    lastError = `Model request returned ${response.status}.`;
     if (response.status !== 429 && response.status < 500) break;
     await new Promise((resolve) =>
       setTimeout(resolve, 750 * 2 ** attempt + Math.random() * 200)
