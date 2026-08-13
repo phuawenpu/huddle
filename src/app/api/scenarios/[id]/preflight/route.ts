@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { prisma } from "@/lib/db";
+import { isDurationInRange } from "@/lib/budget";
 import type { ScenarioSpeaker } from "@/lib/types";
 
 function audioRoot() {
@@ -10,13 +11,16 @@ function audioRoot() {
 
 export async function POST(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
   try {
     const scenario = await prisma.scenario.findUnique({ where: { id } });
     if (!scenario) {
-      return NextResponse.json({ error: "Scenario not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Scenario not found" },
+        { status: 404 },
+      );
     }
 
     const speakers = safeParse<ScenarioSpeaker[]>(scenario.speakersJson, []);
@@ -25,6 +29,12 @@ export async function POST(
       existsSync(join(scenarioDir, "mixed.wav")) &&
       existsSync(join(scenarioDir, "manifest.json"));
     const validation = safeReadJson(join(scenarioDir, "validation.json"));
+    const manifest = safeReadJson(join(scenarioDir, "manifest.json"));
+    const targetDurationMs = scenario.durationMinutes * 60_000;
+    const realizedDurationMs = Number(manifest?.durationMs) || 0;
+    const durationWithinTolerance =
+      realizedDurationMs > 0 &&
+      isDurationInRange(targetDurationMs, realizedDurationMs);
     const mergedPairs: Array<[number, number]> = [];
 
     for (let left = 0; left < speakers.length; left++) {
@@ -45,19 +55,23 @@ export async function POST(
     const speechValidationPassed =
       process.env.TTS_STUB === "1"
         ? validation?.method === "tone_fixture"
-        : validation?.method === "independent_asr" && validation?.passed === true;
+        : validation?.method === "independent_asr" &&
+          validation?.passed === true;
     const reason = !audioAvailable
       ? "The mixed WAV and manifest must exist before preflight."
       : !speechValidationPassed
         ? "Independent audio-to-transcript validation has not passed."
-      : mergedPairs.length
-        ? "The current voice cast is not acoustically separated enough."
-        : undefined;
+        : !durationWithinTolerance
+          ? `Rendered audio is ${(realizedDurationMs / 60_000).toFixed(1)} minutes versus a ${scenario.durationMinutes}-minute target; revise the transcript length before approval.`
+          : mergedPairs.length
+            ? "The current voice cast is not acoustically separated enough."
+            : undefined;
     const passed =
       speakers.length === scenario.speakerCount &&
       speakers.length >= 3 &&
       audioAvailable &&
       speechValidationPassed &&
+      durationWithinTolerance &&
       mergedPairs.length === 0;
     const preflight = {
       passed,
@@ -67,6 +81,9 @@ export async function POST(
         return collided ? 0.45 : 0.9;
       }),
       audioAvailable,
+      targetDurationMs,
+      realizedDurationMs,
+      durationWithinTolerance,
       checkedAt: new Date().toISOString(),
       reason,
       speechValidation: validation
@@ -95,7 +112,7 @@ export async function POST(
     console.error("Preflight failed:", error?.message || error);
     return NextResponse.json(
       { error: error?.message || "Preflight failed" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

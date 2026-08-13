@@ -38,6 +38,7 @@ export async function POST(
     validateTranscriptForRevision(turns, speakers, {
       targetDurationMinutes: scenario.durationMinutes,
       crossTalkLevel: scenario.crossTalkLevel,
+      requireTargetDurationFit: true,
     });
 
     await prisma.scenario.update({

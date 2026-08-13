@@ -19,6 +19,8 @@ describe("discussion generation contract", () => {
     expect(system).toContain("People should not speak in round-robin order");
     expect(system).toContain("Ban empty phrases");
     expect(system).toContain("one repaired misunderstanding");
+    expect(system).toContain("spoken main-discussion words");
+    expect(system).toContain("actually fill 5 minutes");
     expect(budget.targetTurns).toBeGreaterThan(30);
   });
 
@@ -33,10 +35,23 @@ describe("discussion generation contract", () => {
         { name: "C", role: "operator" },
       ],
       turns: [
-        { speakerIndex: 0, text: "I am A and I will listen for evidence from patrons." },
-        { speakerIndex: 1, text: "I am B and I will watch how the flow recovers from mistakes." },
-        { speakerIndex: 2, text: "I am C and I will focus on what staff need during busy periods." },
-        { speakerIndex: 1, text: "The confirmation disappears before I can check the total.", expectedCategory: "evidence" },
+        {
+          speakerIndex: 0,
+          text: "I am A and I will listen for evidence from patrons.",
+        },
+        {
+          speakerIndex: 1,
+          text: "I am B and I will watch how the flow recovers from mistakes.",
+        },
+        {
+          speakerIndex: 2,
+          text: "I am C and I will focus on what staff need during busy periods.",
+        },
+        {
+          speakerIndex: 1,
+          text: "The confirmation disappears before I can check the total.",
+          expectedCategory: "evidence",
+        },
         {
           speakerIndex: 0,
           text: "Wait—the disappearing message, or the receipt itself?",
@@ -59,8 +74,12 @@ describe("discussion generation contract", () => {
       "marin",
       "sage",
     ]);
-    expect(new Set(result.speakers.map((speaker) => speaker.instructions)).size).toBe(3);
-    expect(result.turns.slice(0, 3).every((turn) => turn.isCalibration)).toBe(true);
+    expect(
+      new Set(result.speakers.map((speaker) => speaker.instructions)).size,
+    ).toBe(3);
+    expect(result.turns.slice(0, 3).every((turn) => turn.isCalibration)).toBe(
+      true,
+    );
     expect(result.turns[4].expected?.reactsToTurnId).toBe("t3");
     expect(result.turns[4].overlap?.startBeforeEndMs).toBe(1500);
     expect(result.turns[4].overlap?.resolution).toBe("yield");

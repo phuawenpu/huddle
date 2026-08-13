@@ -2,6 +2,8 @@ import { estimateBudget, expectedOverlapCount } from "./budget";
 import { createDefaultCasting } from "./voice-casting";
 import {
   analyzeTranscriptQuality,
+  MAX_PLANNED_WORDS_PER_MINUTE,
+  MIN_PLANNED_WORDS_PER_MINUTE,
   normalizeScenarioTurns,
 } from "./scenario-transcript";
 import type {
@@ -302,6 +304,7 @@ OUTPUT SHAPE
 TARGETS
 - ${budget.targetTurns} main turns plus ${input.speakerCount} calibration turns.
 - About ${budget.targetCharacters} main-discussion characters, within 15%.
+- Supply ${input.durationMinutes * MIN_PLANNED_WORDS_PER_MINUTE}–${input.durationMinutes * MAX_PLANNED_WORDS_PER_MINUTE} spoken main-discussion words so the transcript can actually fill ${input.durationMinutes} minutes; do not substitute long silent pauses for missing dialogue.
 - At least ${budget.minTurnsPerSpeaker} main turns per speaker.
 - Aim for about ${overlapCount} motivated overlap starts and about ${backchannelCount} non-substantive backchannels; do not place them at regular intervals.
 - Overlap only the immediately preceding main turn, never the first two main turns, never the same speaker, 120–1500 ms before the anchor ends, and no consecutive overlap starts.

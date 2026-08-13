@@ -216,7 +216,7 @@ Key runtime guarantees:
 | Metric           | Value                                          |
 | ---------------- | ---------------------------------------------- |
 | TypeScript       | 0 errors                                       |
-| Unit tests       | 138/138 passing                                |
+| Unit tests       | 144/144 passing                                |
 | Live audio E2E   | Mic + recorded pipelines pass locally          |
 | API routes       | 46 endpoints operational                       |
 | Frontend pages   | 10 routes functional                           |
@@ -392,14 +392,18 @@ as production-secure.
 
 The ten reusable examples live in
 `src/lib/preconfigured-scenarios.ts`, rather than only in a deployment database.
-Database startup inserts any missing case using stable `preset-v1-*` IDs,
-refreshes catalogue-owned duration and budget metadata, and never overwrites an
-existing transcript or rendered mix. The catalogue is therefore restored
-automatically on a fresh SQLite volume and startup is idempotent.
+Database startup inserts any missing case using stable `preset-v1-*` IDs and
+refreshes catalogue-owned metadata. A catalog revision can replace a built-in
+script and reset its stale preparation state once; subsequent restarts preserve
+newly rendered audio. Duplicate a preset before custom editing. The catalogue is
+therefore restored automatically on a fresh SQLite volume and startup remains
+idempotent.
 
 The source file enforces a hard maximum of ten cases, while tests check unique
 IDs, valid casts and transcripts, meeting/domain diversity, reaction links,
-quality gates, and all supported overlap forms. Creating the catalogue makes no
+duration-fit gates, and all supported overlap forms. The scenario creator accepts
+whole-minute audio targets from three to eight minutes and scales transcript
+turn, character, and spoken-word budgets to match. Creating the catalogue makes no
 OpenAI or AssemblyAI request. Provider calls happen only after an authenticated
 user explicitly requests transcript revision, speech synthesis, validation, or
 a live session. Duplicate a preconfigured case before making experimental edits;

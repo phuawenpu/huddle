@@ -13,6 +13,7 @@ import { createDefaultCasting } from "./voice-casting";
 
 export const PRECONFIGURED_SCENARIO_LIMIT = 10;
 export const PRECONFIGURED_SCENARIO_PREFIX = "preset-v1-";
+export const PRECONFIGURED_CATALOG_REVISION = 2;
 
 type OverlapKind = "interruption" | "eager_agreement" | "backchannel";
 type BlueprintCategory = DiscussionCategory | "constraints" | "alternatives";
@@ -413,6 +414,33 @@ const BLUEPRINTS: ScenarioBlueprint[] = [
         text: "We still have no answer for urgent symptoms disclosed after the connection drops. The next test must include that escalation, not only routine appointment recovery.",
         signal: "Post-disconnection urgent escalation remains unresolved.",
       },
+      {
+        speakerIndex: 2,
+        category: "evidence",
+        text: "Patients told us urgency is hardest to judge when they are already frightened. A red emergency label alone may make them abandon the handoff entirely.",
+        signal:
+          "Escalation language must support frightened patients without causing abandonment.",
+      },
+      {
+        speakerIndex: 1,
+        category: "alternatives",
+        text: "Then ask about change, not diagnosis: are symptoms suddenly worse, is breathing harder, or can they safely wait for a callback?",
+        signal:
+          "Change-based questions offer a safer escalation path than patient self-diagnosis.",
+      },
+      {
+        speakerIndex: 3,
+        category: "constraints",
+        text: "Those answers must enter the clinic queue visibly. If they arrive as another note, staff may discover urgency only when opening the record later.",
+        signal:
+          "Urgent fallback answers require visible queue placement rather than passive notes.",
+      },
+      {
+        speakerIndex: 0,
+        category: "actions",
+        text: "I’ll add a dropped-call escalation branch and test whether patients understand it, complete it, and receive a credible response time.",
+        signal: "The service designer owns a measurable escalation-path test.",
+      },
     ],
     expectedWindowOutcome: {
       tensions: [
@@ -593,6 +621,61 @@ const BLUEPRINTS: ScenarioBlueprint[] = [
         category: "questions",
         text: "I’ll support that decision, but we have not addressed outdoor lunch areas or transport home. Our heat plan still begins and ends at the classroom door.",
         signal: "Heat exposure outside classrooms remains unresolved.",
+      },
+      {
+        speakerIndex: 0,
+        category: "evidence",
+        text: "The bus queue is where students described headaches most often. There is no shade, and late buses turn a ten-minute wait into forty.",
+        signal:
+          "Student evidence extends heat exposure into the transport queue.",
+      },
+      {
+        speakerIndex: 4,
+        category: "constraints",
+        text: "We cannot rebuild the transport area this term because the land belongs to the council, but we can change supervision and dismissal timing ourselves.",
+        signal:
+          "Property ownership limits construction while school-controlled changes remain possible.",
+      },
+      {
+        speakerIndex: 3,
+        category: "alternatives",
+        text: "A temporary shade sail and a temperature-triggered indoor waiting option would test demand before either organisation commits to permanent construction.",
+        signal:
+          "Temporary shade and indoor waiting provide a reversible transport experiment.",
+      },
+      {
+        speakerIndex: 2,
+        category: "questions",
+        text: "Indoor waiting helps only if announcements are visual as well as spoken. Otherwise deaf students may miss the bus while using the safer space.",
+        signal:
+          "Accessible announcements are required for an indoor waiting option.",
+      },
+      {
+        speakerIndex: 1,
+        category: "positions",
+        text: "I can install a portable display beside the hall entrance, but live bus data is unreliable. Staff may need a simple manual departure control.",
+        signal:
+          "A manual accessible departure display may be more reliable than live data.",
+      },
+      {
+        speakerIndex: 0,
+        category: "questions",
+        text: "Who gets permission to wait inside? If students must prove they are heat-sensitive, the policy recreates the same disclosure problem as cooled classrooms.",
+        signal:
+          "Eligibility rules could create harmful disclosure requirements.",
+      },
+      {
+        speakerIndex: 4,
+        category: "decisions",
+        text: "No individual proof. On trigger days the hall becomes an open waiting area, with visual departures and supervised movement to each bus.",
+        signal: "The school chooses universal indoor waiting on trigger days.",
+      },
+      {
+        speakerIndex: 3,
+        category: "actions",
+        text: "I’ll bring the council into the shade test and compare queue temperature, indoor uptake, missed departures, and student comfort across the hottest school days.",
+        signal:
+          "The climate consultant owns a measurable outdoor and indoor waiting experiment.",
       },
     ],
     expectedWindowOutcome: {
@@ -937,6 +1020,34 @@ const BLUEPRINTS: ScenarioBlueprint[] = [
         signal:
           "Inclusion of agency staff remains an unresolved process concern.",
       },
+      {
+        speakerIndex: 2,
+        category: "evidence",
+        text: "Agency staff also rotate zones more often. A queue tied only to the person who logged an issue may become invisible as soon as they move.",
+        signal:
+          "Rotating assignments make person-owned issue queues unreliable.",
+      },
+      {
+        speakerIndex: 3,
+        category: "alternatives",
+        text: "Attach each open condition to both a zone and a temporary owner, then require reassignment rather than silently dropping ownership at logout.",
+        signal:
+          "Dual zone and person ownership preserves conditions across staff rotation.",
+      },
+      {
+        speakerIndex: 1,
+        category: "constraints",
+        text: "Reassignment cannot become another end-of-shift form. The outgoing lead needs one view showing only unresolved hazards and blocked replenishment.",
+        signal:
+          "The handover view must stay focused enough to avoid administrative overhead.",
+      },
+      {
+        speakerIndex: 0,
+        category: "actions",
+        text: "I’ll test that view with agency pickers on both shifts and record what they notice, what they miss, and whether ownership survives reassignment.",
+        signal:
+          "Night-shift staff own inclusive testing of the revised handover view.",
+      },
     ],
     expectedWindowOutcome: {
       tensions: [
@@ -1028,7 +1139,7 @@ const BLUEPRINTS: ScenarioBlueprint[] = [
         text: "That distinction matters.",
         signal:
           "The access consultant acknowledges the predictive-information distinction.",
-        overlap: "backchannel",
+        pauseBeforeMs: 180,
       },
       {
         speakerIndex: 1,
@@ -1064,6 +1175,14 @@ const BLUEPRINTS: ScenarioBlueprint[] = [
         category: "themes",
         text: "Decision points fit the observations better. Families often paused at thresholds, negotiated what was manageable, and then split or changed direction without asking staff.",
         signal: "Threshold negotiation is a recurring behavioural pattern.",
+      },
+      {
+        speakerIndex: 1,
+        category: "themes",
+        text: "That pattern matters.",
+        signal:
+          "The designer acknowledges threshold negotiation as a design signal.",
+        overlap: "backchannel",
       },
       {
         speakerIndex: 2,
@@ -1121,6 +1240,62 @@ const BLUEPRINTS: ScenarioBlueprint[] = [
         text: "We still lack evidence from visitors who do not read English or standard pictograms. The prototype should expose that gap, not present the symbols as universal.",
         signal:
           "Language and symbol comprehension remain unresolved research gaps.",
+      },
+      {
+        speakerIndex: 2,
+        category: "evidence",
+        text: "In the last access walk, two visitors followed the colour band but interpreted the ear symbol as an audio-guide point, not a quieter route.",
+        signal:
+          "Existing symbols create a specific and consequential interpretation error.",
+      },
+      {
+        speakerIndex: 1,
+        category: "positions",
+        text: "Then more pictograms may increase confidence without understanding. The route needs redundant cues that visitors can learn from the space itself.",
+        signal:
+          "Spatial redundancy is preferred over a denser symbolic vocabulary.",
+      },
+      {
+        speakerIndex: 3,
+        category: "constraints",
+        text: "Staff can point to landmarks, but those change with temporary exhibitions. Spoken directions must survive a gallery change without retraining everyone.",
+        signal:
+          "Changing exhibitions make landmark-dependent guidance fragile.",
+      },
+      {
+        speakerIndex: 0,
+        category: "alternatives",
+        text: "Could we test stable floor texture, numbered thresholds, and a take-away card together, then observe which cue people use and compare hesitation when one becomes ambiguous?",
+        signal:
+          "A redundant multi-cue prototype can reveal recovery from ambiguity.",
+      },
+      {
+        speakerIndex: 2,
+        category: "questions",
+        text: "Only if the floor texture is detectable by cane and does not become a trip edge. Include mobility access in the same trial.",
+        signal:
+          "Tactile navigation must be evaluated alongside mobility safety.",
+      },
+      {
+        speakerIndex: 1,
+        category: "decisions",
+        text: "Agreed. We’ll prototype one threshold at full scale rather than spreading untested cues across the route, and retain the staffed choice point beside it.",
+        signal:
+          "The team narrows the test to one full-scale supported threshold.",
+      },
+      {
+        speakerIndex: 3,
+        category: "actions",
+        text: "I’ll schedule the trial across a school-group morning and a quieter afternoon, recording requests for repetition, escort, exit, and re-entry.",
+        signal:
+          "Front-of-house owns observation across contrasting operating conditions.",
+      },
+      {
+        speakerIndex: 0,
+        category: "questions",
+        text: "We should still recruit across languages directly. Observing confusion after opening cannot replace involving those visitors before we settle the cue set and staff guidance across quiet and crowded operating periods before launch in practice.",
+        signal:
+          "Direct multilingual participation remains necessary before finalizing cues.",
       },
     ],
     expectedWindowOutcome: {
@@ -1300,6 +1475,62 @@ const BLUEPRINTS: ScenarioBlueprint[] = [
         category: "questions",
         text: "I support the test, but success cannot be average agreement alone. We still need a plan for small groups whose harms disappear inside aggregate metrics.",
         signal: "Subgroup evaluation with sparse data remains unresolved.",
+      },
+      {
+        speakerIndex: 4,
+        category: "positions",
+        text: "The review record must preserve disagreement, not just the final disposition. Otherwise an appeal cannot show which uncertainty the decision-maker accepted.",
+        signal:
+          "Accountability requires preserving reviewer disagreement and accepted uncertainty.",
+      },
+      {
+        speakerIndex: 3,
+        category: "constraints",
+        text: "Hiring managers will resist another narrative field if every candidate requires an essay. We need structure without turning judgment into a hidden score.",
+        signal:
+          "Review documentation must balance accountability with operational effort.",
+      },
+      {
+        speakerIndex: 0,
+        category: "alternatives",
+        text: "Use three prompts: evidence relied on, uncertainty remaining, and reason for advancing or declining. Answers can be short, but none can be blank.",
+        signal:
+          "Three mandatory prompts provide concise, inspectable human reasoning.",
+      },
+      {
+        speakerIndex: 2,
+        category: "questions",
+        text: "Where does accommodation information sit? It must change the process when relevant without becoming evidence against the person in the hiring decision.",
+        signal:
+          "Accommodation data needs strict separation from evaluative evidence.",
+      },
+      {
+        speakerIndex: 4,
+        category: "decisions",
+        text: "Accommodation requests stay in a separate access workflow. The review tool may confirm an adjustment occurred, but cannot expose the request or diagnosis.",
+        signal:
+          "The team separates accommodation operations from candidate evaluation.",
+      },
+      {
+        speakerIndex: 1,
+        category: "evidence",
+        text: "That separation improves the offline test too. We can evaluate criterion evidence without feeding sensitive accommodation text into the model or its logs.",
+        signal:
+          "Data separation reduces model exposure while improving evaluation validity.",
+      },
+      {
+        speakerIndex: 3,
+        category: "actions",
+        text: "I’ll run the structured review with two panels and compare completion time, disagreement visibility, corrections, and decisions changed after source checking.",
+        signal:
+          "The hiring manager owns a panel-based evaluation of the review record.",
+      },
+      {
+        speakerIndex: 2,
+        category: "questions",
+        text: "Include an appeal exercise with deliberately ambiguous evidence. We still need to learn whether a rejected applicant can meaningfully challenge the recorded reason.",
+        signal:
+          "Meaningful appeal remains an explicit unresolved evaluation requirement.",
       },
     ],
     expectedWindowOutcome: {
@@ -1652,6 +1883,33 @@ const BLUEPRINTS: ScenarioBlueprint[] = [
         text: "That helps planned releases. We still have no equivalent for emergency changes, where there is no room, fewer people, and much less time.",
         signal: "Emergency-change decision design remains unresolved.",
       },
+      {
+        speakerIndex: 0,
+        category: "questions",
+        text: "What is the minimum evidence an emergency decision still needs? If we cannot name it now, urgency will erase the record when risk is highest.",
+        signal:
+          "The team must define a minimum emergency evidence set before the next incident.",
+      },
+      {
+        speakerIndex: 4,
+        category: "alternatives",
+        text: "Require impact observed, rollback path, decision owner, and one dissent channel. Everything else can follow after stabilization with incident timestamps.",
+        signal:
+          "A four-part emergency record preserves essential evidence without delaying response.",
+      },
+      {
+        speakerIndex: 3,
+        category: "constraints",
+        text: "The dissent channel cannot mean waiting for every team. Product can name customer impact quickly, but the incident commander must retain authority to act.",
+        signal:
+          "Emergency consultation must not blur incident-command authority.",
+      },
+      {
+        speakerIndex: 1,
+        category: "actions",
+        text: "I’ll add that minimum record to the emergency-change drill and test whether remote warnings remain visible without slowing rollback or confusing command.",
+        signal: "Release engineering owns a timed emergency-decision drill.",
+      },
     ],
     expectedWindowOutcome: {
       tensions: [
@@ -1831,6 +2089,34 @@ const BLUEPRINTS: ScenarioBlueprint[] = [
         text: "Please keep evening lighting open. Brighter light may feel safe to some residents, but glare into ground-floor homes has not been discussed with those tenants.",
         signal: "Lighting safety and residential glare remain unresolved.",
       },
+      {
+        speakerIndex: 4,
+        category: "constraints",
+        text: "We can trial shielded, lower fittings without new trenches, but someone must inspect them after dark. Daytime checks will miss the actual problem.",
+        signal:
+          "A lighting trial requires after-dark inspection rather than daytime assumptions.",
+      },
+      {
+        speakerIndex: 3,
+        category: "alternatives",
+        text: "Let residents carry simple light cards on an evening walk: too dark, comfortable, or glare. That maps different routes without pretending one level fits everyone.",
+        signal:
+          "Resident-led evening walks can map conflicting lighting needs.",
+      },
+      {
+        speakerIndex: 0,
+        category: "actions",
+        text: "I’ll recruit ground-floor tenants as well as path users, and we’ll publish the map before choosing any permanent fitting or brightness.",
+        signal:
+          "Resident organisers own an inclusive lighting evidence process.",
+      },
+      {
+        speakerIndex: 2,
+        category: "questions",
+        text: "Please test rain and winter darkness too. A comfortable summer walk may tell us little about reflections, puddles, or confidence later in the year.",
+        signal:
+          "Seasonal and wet-weather lighting performance remains unresolved.",
+      },
     ],
     expectedWindowOutcome: {
       tensions: [
@@ -1855,21 +2141,50 @@ export const PRECONFIGURED_SCENARIOS: PreconfiguredScenario[] =
   BLUEPRINTS.map(buildScenario);
 
 /**
- * Inserts missing catalogue cases and refreshes safe display/budget metadata
- * without overwriting a rendered mix or local transcript edits. The stable IDs
- * make startup safe to run repeatedly.
+ * Inserts missing catalogue cases, refreshes safe metadata, and applies each
+ * source-script revision once. Stable IDs and the stored revision marker make
+ * subsequent startups idempotent.
  */
 export async function seedPreconfiguredScenarios(
   client: PrismaClient,
 ): Promise<void> {
   for (const scenario of PRECONFIGURED_SCENARIOS) {
-    await client.scenario.upsert({
+    const existing = await client.scenario.findUnique({
       where: { id: scenario.id },
-      update: {
-        durationMinutes: scenario.durationMinutes,
-        budgetJson: JSON.stringify(scenario.budget),
-      },
-      create: {
+      select: { expectedWindowOutcomeJson: true },
+    });
+    const expectedWindowOutcomeJson = JSON.stringify({
+      ...scenario.expectedWindowOutcome,
+      _catalogRevision: PRECONFIGURED_CATALOG_REVISION,
+    });
+    if (existing) {
+      const storedRevision = readCatalogRevision(
+        existing.expectedWindowOutcomeJson,
+      );
+      const refreshTranscript = storedRevision < PRECONFIGURED_CATALOG_REVISION;
+      await client.scenario.update({
+        where: { id: scenario.id },
+        data: {
+          durationMinutes: scenario.durationMinutes,
+          budgetJson: JSON.stringify(scenario.budget),
+          expectedWindowOutcomeJson,
+          ...(refreshTranscript
+            ? {
+                speakersJson: JSON.stringify(scenario.speakers),
+                turnsJson: JSON.stringify(scenario.turns),
+                status: "draft",
+                realizedDurationMs: null,
+                overlapRatioPct: null,
+                preflightJson: null,
+                approvedAt: null,
+              }
+            : {}),
+        },
+      });
+      continue;
+    }
+    await client.scenario.create({
+      data: {
         id: scenario.id,
         title: scenario.title,
         description: scenario.description,
@@ -1888,12 +2203,19 @@ export async function seedPreconfiguredScenarios(
         budgetJson: JSON.stringify(scenario.budget),
         speakersJson: JSON.stringify(scenario.speakers),
         turnsJson: JSON.stringify(scenario.turns),
-        expectedWindowOutcomeJson: JSON.stringify(
-          scenario.expectedWindowOutcome,
-        ),
+        expectedWindowOutcomeJson,
         status: scenario.status,
       },
     });
+  }
+}
+
+function readCatalogRevision(value: string | null): number {
+  try {
+    const revision = Number(JSON.parse(value || "{}")?._catalogRevision);
+    return Number.isInteger(revision) ? revision : 0;
+  } catch {
+    return 0;
   }
 }
 

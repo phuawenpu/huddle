@@ -9,7 +9,10 @@ import {
 } from "@/lib/scenario-generation";
 import type { CrossTalkLevel } from "@/lib/types";
 import { requestStructuredJson } from "@/lib/openai-structured";
-import { analyzeTranscriptQuality } from "@/lib/scenario-transcript";
+import {
+  analyzeTranscriptQuality,
+  transcriptDurationFitError,
+} from "@/lib/scenario-transcript";
 
 export async function POST(request: NextRequest) {
   try {
@@ -71,7 +74,27 @@ export async function POST(request: NextRequest) {
         crossTalkLevel: input.crossTalkLevel,
       });
       const generated = normalizeGeneratedScenario(raw, input, prompts.budget);
-      return NextResponse.json({ ...generated, stubbed: true });
+      const quality = analyzeTranscriptQuality(
+        generated.turns,
+        generated.speakers,
+        {
+          targetDurationMinutes: input.durationMinutes,
+          crossTalkLevel: input.crossTalkLevel,
+        },
+      );
+      const durationError = transcriptDurationFitError(quality);
+      if (quality.errors.length || durationError) {
+        throw new Error(
+          [...quality.errors, ...(durationError ? [durationError] : [])].join(
+            " ",
+          ),
+        );
+      }
+      return NextResponse.json({
+        ...generated,
+        transcriptQuality: quality,
+        stubbed: true,
+      });
     }
 
     const apiKey = process.env.OPENAI_API_KEY;
@@ -108,14 +131,17 @@ export async function POST(request: NextRequest) {
           crossTalkLevel: input.crossTalkLevel,
         },
       );
-      if (!quality.errors.length) {
+      const durationError = transcriptDurationFitError(quality);
+      const durationErrors = durationError ? [durationError] : [];
+      const rejectionReasons = [...quality.errors, ...durationErrors];
+      if (!rejectionReasons.length) {
         return NextResponse.json({
           ...generated,
           transcriptQuality: quality,
           stubbed: false,
         });
       }
-      qualityFeedback = `\n\nThe previous draft was rejected. Regenerate the complete scenario and fix these exact issues: ${quality.errors.join(" ")}`;
+      qualityFeedback = `\n\nThe previous draft was rejected. Regenerate the complete scenario and fix these exact issues: ${rejectionReasons.join(" ")}`;
     }
     throw new Error(
       "The dialogue model could not produce a transcript that passed realism checks after two attempts.",

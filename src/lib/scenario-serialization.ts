@@ -12,6 +12,11 @@ export function serializeScenarioRecord(scenario: any) {
     safeParseJson<ScenarioTurn[]>(scenario.turnsJson, []),
     speakers.length || scenario.speakerCount || 0,
   );
+  const expectedWindowOutcome = safeParseJson<Record<string, unknown> | null>(
+    scenario.expectedWindowOutcomeJson,
+    null,
+  );
+  if (expectedWindowOutcome) delete expectedWindowOutcome._catalogRevision;
   return {
     ...scenario,
     isPreconfigured: isPreconfiguredScenarioId(String(scenario.id || "")),
@@ -27,10 +32,7 @@ export function serializeScenarioRecord(scenario: any) {
             crossTalkLevel: scenario.crossTalkLevel,
           })
         : null,
-    expectedWindowOutcome: safeParseJson(
-      scenario.expectedWindowOutcomeJson,
-      null,
-    ),
+    expectedWindowOutcome,
     preflight: safeParseJson(scenario.preflightJson, null),
     createdAt: scenario.createdAt?.toISOString(),
     updatedAt: scenario.updatedAt?.toISOString(),

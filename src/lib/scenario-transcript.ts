@@ -9,6 +9,8 @@ import type {
 } from "./types";
 
 export const TRANSCRIPT_FORMAT_VERSION = 2;
+export const MIN_PLANNED_WORDS_PER_MINUTE = 105;
+export const MAX_PLANNED_WORDS_PER_MINUTE = 185;
 
 const CATEGORIES: DiscussionCategory[] = [
   "evidence",
@@ -460,7 +462,8 @@ export function analyzeTranscriptQuality(
   if (
     mainTurns.length >= 8 &&
     plannedWordsPerMinute !== null &&
-    (plannedWordsPerMinute < 105 || plannedWordsPerMinute > 185)
+    (plannedWordsPerMinute < MIN_PLANNED_WORDS_PER_MINUTE ||
+      plannedWordsPerMinute > MAX_PLANNED_WORDS_PER_MINUTE)
   ) {
     warnings.push(
       `Planned dialogue density is ${plannedWordsPerMinute} words per requested minute; target roughly 105–185 after allowing for pauses.`,
@@ -519,6 +522,7 @@ export function validateTranscriptForRevision(
   context: {
     targetDurationMinutes?: number | null;
     crossTalkLevel?: string;
+    requireTargetDurationFit?: boolean;
   } = {},
 ): TranscriptQualityReport {
   if (turns.length < 3)
@@ -535,12 +539,29 @@ export function validateTranscriptForRevision(
     }
   }
   const report = analyzeTranscriptQuality(turns, speakers, context);
-  if (report.errors.length) {
+  const durationError = transcriptDurationFitError(report);
+  const durationErrors =
+    context.requireTargetDurationFit && durationError ? [durationError] : [];
+  const errors = [...report.errors, ...durationErrors];
+  if (errors.length) {
     throw new Error(
-      `Transcript revision failed quality checks: ${report.errors.join(" ")}`,
+      `Transcript revision failed quality checks: ${errors.join(" ")}`,
     );
   }
   return report;
+}
+
+export function transcriptDurationFitError(
+  report: TranscriptQualityReport,
+): string | null {
+  if (
+    report.plannedWordsPerMinute === null ||
+    (report.plannedWordsPerMinute >= MIN_PLANNED_WORDS_PER_MINUTE &&
+      report.plannedWordsPerMinute <= MAX_PLANNED_WORDS_PER_MINUTE)
+  ) {
+    return null;
+  }
+  return `Transcript density is ${report.plannedWordsPerMinute} spoken words per requested minute; it must be ${MIN_PLANNED_WORDS_PER_MINUTE}–${MAX_PLANNED_WORDS_PER_MINUTE} so the rendered audio can match the target length.`;
 }
 
 export function transcriptFingerprint(

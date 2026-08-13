@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@prisma/client";
 import { validateScenarioParams } from "@/lib/budget";
 import {
+  PRECONFIGURED_CATALOG_REVISION,
   PRECONFIGURED_SCENARIO_LIMIT,
   PRECONFIGURED_SCENARIO_PREFIX,
   PRECONFIGURED_SCENARIOS,
@@ -51,11 +52,19 @@ describe("preconfigured scenario catalogue", () => {
         {
           targetDurationMinutes: scenario.durationMinutes,
           crossTalkLevel: scenario.crossTalkLevel,
+          requireTargetDurationFit: true,
         },
       );
       expect(report.errors, scenario.title).toEqual([]);
       expect(report.reactionCoverage, scenario.title).toBe(1);
-      expect(report.score, scenario.title).toBeGreaterThanOrEqual(96);
+      expect(
+        report.plannedWordsPerMinute,
+        scenario.title,
+      ).toBeGreaterThanOrEqual(105);
+      expect(report.plannedWordsPerMinute, scenario.title).toBeLessThanOrEqual(
+        185,
+      );
+      expect(report.score, scenario.title).toBe(100);
     }
   });
 
@@ -107,25 +116,58 @@ describe("preconfigured scenario catalogue", () => {
     );
   });
 
-  it("seeds with idempotent upserts and never invokes a provider", async () => {
-    const upsert = vi.fn().mockResolvedValue({});
+  it("seeds idempotently without repeatedly resetting transcript state", async () => {
+    const stored = new Map<string, { expectedWindowOutcomeJson: string }>();
+    const findUnique = vi.fn(
+      async ({ where }: any) => stored.get(where.id) || null,
+    );
+    const create = vi.fn(async ({ data }: any) => {
+      stored.set(data.id, {
+        expectedWindowOutcomeJson: data.expectedWindowOutcomeJson,
+      });
+      return data;
+    });
+    const update = vi.fn().mockResolvedValue({});
     const client = {
-      scenario: { upsert },
+      scenario: { findUnique, create, update },
     } as unknown as PrismaClient;
 
     await seedPreconfiguredScenarios(client);
     await seedPreconfiguredScenarios(client);
 
-    expect(upsert).toHaveBeenCalledTimes(20);
-    for (const call of upsert.mock.calls) {
-      expect(call[0].where.id.startsWith(PRECONFIGURED_SCENARIO_PREFIX)).toBe(
-        true,
-      );
-      expect(call[0].update).toEqual({
-        durationMinutes: call[0].create.durationMinutes,
-        budgetJson: call[0].create.budgetJson,
-      });
-      expect(call[0].create.status).toBe("draft");
+    expect(create).toHaveBeenCalledTimes(10);
+    expect(update).toHaveBeenCalledTimes(10);
+    for (const call of create.mock.calls) {
+      expect(call[0].data.status).toBe("draft");
+      expect(
+        JSON.parse(call[0].data.expectedWindowOutcomeJson)._catalogRevision,
+      ).toBe(PRECONFIGURED_CATALOG_REVISION);
+    }
+    for (const call of update.mock.calls) {
+      expect(call[0].data.turnsJson).toBeUndefined();
+    }
+  });
+
+  it("applies a newer catalog transcript once and resets stale preparation", async () => {
+    const update = vi.fn().mockResolvedValue({});
+    const client = {
+      scenario: {
+        findUnique: vi.fn().mockResolvedValue({
+          expectedWindowOutcomeJson: JSON.stringify({ _catalogRevision: 1 }),
+        }),
+        create: vi.fn(),
+        update,
+      },
+    } as unknown as PrismaClient;
+
+    await seedPreconfiguredScenarios(client);
+
+    expect(update).toHaveBeenCalledTimes(10);
+    for (const call of update.mock.calls) {
+      expect(call[0].data.turnsJson).toBeTruthy();
+      expect(call[0].data.status).toBe("draft");
+      expect(call[0].data.realizedDurationMs).toBeNull();
+      expect(call[0].data.preflightJson).toBeNull();
     }
   });
 

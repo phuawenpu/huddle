@@ -5,6 +5,7 @@ import {
   toEditableTranscript,
   transcriptFingerprint,
   turnsFromEditableTranscript,
+  validateTranscriptForRevision,
 } from "@/lib/scenario-transcript";
 import { createDefaultCasting } from "@/lib/voice-casting";
 import type { ScenarioTurn } from "@/lib/types";
@@ -184,6 +185,30 @@ describe("version-2 scenario transcripts", () => {
     expect(report.warnings).toContain(
       `Planned dialogue density is ${report.plannedWordsPerMinute} words per requested minute; target roughly 105–185 after allowing for pauses.`,
     );
+  });
+
+  it("can enforce target duration before provider-backed synthesis", () => {
+    const turns: ScenarioTurn[] = Array.from({ length: 9 }, (_, index) => ({
+      id: `short-${index}`,
+      index,
+      speakerIndex: [0, 1, 1, 2, 0, 2, 2, 1, 0][index],
+      text: `Brief but substantive point number ${index} for this discussion.`,
+      expectedCategory: "positions",
+      expected: {
+        substantive: true,
+        category: "positions",
+        reactsToTurnId: index ? `short-${index - 1}` : undefined,
+      },
+      pauseBeforeMs: 350,
+    }));
+
+    expect(() =>
+      validateTranscriptForRevision(turns, speakers, {
+        targetDurationMinutes: 8,
+        crossTalkLevel: "none",
+        requireTargetDurationFit: true,
+      }),
+    ).toThrow("so the rendered audio can match the target length");
   });
 
   it("fingerprints authored audio inputs but ignores measured timestamps", () => {

@@ -10,16 +10,23 @@ interface TopicSuggestion {
 }
 
 const WORKSHOP_TYPES = [
-  "concept_critique", "user_research_synthesis", "prototype_review",
-  "service_design_critique", "problem_framing", "ideation_review",
-  "prioritization", "retrospective",
+  "concept_critique",
+  "user_research_synthesis",
+  "prototype_review",
+  "service_design_critique",
+  "problem_framing",
+  "ideation_review",
+  "prioritization",
+  "retrospective",
 ] as const;
 
 export default function NewScenarioPage() {
   const router = useRouter();
   const [topic, setTopic] = useState("");
-  const [topicSuggestions, setTopicSuggestions] = useState<TopicSuggestion[]>([]);
-  const [durationMinutes, setDurationMinutes] = useState(8);
+  const [topicSuggestions, setTopicSuggestions] = useState<TopicSuggestion[]>(
+    [],
+  );
+  const [durationMinutes, setDurationMinutes] = useState(5);
   const [speakerCount, setSpeakerCount] = useState(4);
   const [difficulty, setDifficulty] = useState("realistic");
   const [crossTalkLevel, setCrossTalkLevel] = useState("occasional");
@@ -32,8 +39,8 @@ export default function NewScenarioPage() {
   // Load topic suggestions
   useEffect(() => {
     fetch("/api/scenarios/topic-suggestions")
-      .then(r => r.json())
-      .then(data => {
+      .then((r) => r.json())
+      .then((data) => {
         if (data.suggestions) setTopicSuggestions(data.suggestions);
       })
       .catch(() => {});
@@ -46,8 +53,8 @@ export default function NewScenarioPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ durationMinutes, speakerCount, crossTalkLevel }),
     })
-      .then(r => r.json())
-      .then(data => {
+      .then((r) => r.json())
+      .then((data) => {
         if (data.budget) setEstimate(data.budget);
       })
       .catch(() => {});
@@ -67,7 +74,12 @@ export default function NewScenarioPage() {
           difficulty,
           crossTalkLevel,
           workshopType,
-          disagreementLevel: difficulty === "clean" ? "low" : difficulty === "stress_test" ? "high" : "moderate",
+          disagreementLevel:
+            difficulty === "clean"
+              ? "low"
+              : difficulty === "stress_test"
+                ? "high"
+                : "moderate",
           evidenceQuality: difficulty === "clean" ? "strong" : "mixed",
           facilitationQuality: "light",
           seed: Date.now(),
@@ -111,7 +123,11 @@ export default function NewScenarioPage() {
 
   const selectTopic = (suggestion: TopicSuggestion) => {
     setTopic(suggestion.topic);
-    setWorkshopType(suggestion.description?.includes("retro") ? "retrospective" : "concept_critique");
+    setWorkshopType(
+      suggestion.description?.includes("retro")
+        ? "retrospective"
+        : "concept_critique",
+    );
   };
 
   return (
@@ -126,14 +142,18 @@ export default function NewScenarioPage() {
             ←
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-hud-text">Generate Scenario</h1>
+            <h1 className="text-2xl font-bold text-hud-text">
+              Generate Scenario
+            </h1>
             <p className="text-hud-muted text-sm">Simulated critique setup</p>
           </div>
         </header>
 
         {/* Topic Suggestions */}
         <div>
-          <label className="block text-sm font-medium text-hud-text mb-2">Choose a Topic</label>
+          <label className="block text-sm font-medium text-hud-text mb-2">
+            Choose a Topic
+          </label>
           <div className="flex flex-wrap gap-2 mb-3">
             {topicSuggestions.map((s, i) => (
               <button
@@ -153,7 +173,7 @@ export default function NewScenarioPage() {
           <input
             type="text"
             value={topic}
-            onChange={e => setTopic(e.target.value)}
+            onChange={(e) => setTopic(e.target.value)}
             placeholder="Or type your own topic…"
             className="w-full px-4 py-3 bg-hud-surface border border-hud-border rounded-xl text-hud-text placeholder:text-hud-muted
               focus:outline-none focus:border-hud-accent transition-colors text-sm"
@@ -163,26 +183,32 @@ export default function NewScenarioPage() {
 
         {/* Duration */}
         <div>
-          <label className="block text-sm font-medium text-hud-text mb-1">
-            Duration: {durationMinutes} min
+          <label
+            htmlFor="scenario-duration"
+            className="block text-sm font-medium text-hud-text mb-1"
+          >
+            Audio duration in minutes
           </label>
-          <div className="flex gap-2">
-            {[3, 5, 8, 10, 12, 15].map(n => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setDurationMinutes(n)}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all touch-manipulation ${
-                  durationMinutes === n
-                    ? "bg-hud-accent text-white border-hud-accent"
-                    : "bg-hud-surface text-hud-text border-hud-border hover:border-hud-accent"
-                }`}
-                style={{ minHeight: 40 }}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
+          <input
+            id="scenario-duration"
+            type="number"
+            min={3}
+            max={8}
+            step={1}
+            inputMode="numeric"
+            value={durationMinutes}
+            onChange={(event) =>
+              setDurationMinutes(
+                Math.min(8, Math.max(3, Number(event.target.value) || 3)),
+              )
+            }
+            className="w-full px-4 py-3 bg-hud-surface border border-hud-border rounded-xl text-hud-text
+              focus:outline-none focus:border-hud-accent transition-colors"
+            style={{ minHeight: 44 }}
+          />
+          <p className="mt-1 text-xs text-hud-muted">
+            3–8 minutes. Transcript turn and word budgets scale with this value.
+          </p>
         </div>
 
         {/* Speakers */}
@@ -191,7 +217,7 @@ export default function NewScenarioPage() {
             Speakers: {speakerCount}
           </label>
           <div className="flex gap-2">
-            {[3, 4, 5, 6].map(n => (
+            {[3, 4, 5, 6].map((n) => (
               <button
                 key={n}
                 type="button"
@@ -211,9 +237,11 @@ export default function NewScenarioPage() {
 
         {/* Difficulty */}
         <div>
-          <label className="block text-sm font-medium text-hud-text mb-1">Difficulty</label>
+          <label className="block text-sm font-medium text-hud-text mb-1">
+            Difficulty
+          </label>
           <div className="grid grid-cols-4 gap-2">
-            {["clean", "realistic", "challenging", "stress_test"].map(d => (
+            {["clean", "realistic", "challenging", "stress_test"].map((d) => (
               <button
                 key={d}
                 type="button"
@@ -233,9 +261,11 @@ export default function NewScenarioPage() {
 
         {/* Cross-talk */}
         <div>
-          <label className="block text-sm font-medium text-hud-text mb-1">Cross-talk Level</label>
+          <label className="block text-sm font-medium text-hud-text mb-1">
+            Cross-talk Level
+          </label>
           <div className="grid grid-cols-3 gap-2">
-            {(["none", "occasional", "frequent"] as const).map(l => (
+            {(["none", "occasional", "frequent"] as const).map((l) => (
               <button
                 key={l}
                 type="button"
@@ -255,16 +285,20 @@ export default function NewScenarioPage() {
 
         {/* Workshop Type */}
         <div>
-          <label className="block text-sm font-medium text-hud-text mb-1">Workshop Type</label>
+          <label className="block text-sm font-medium text-hud-text mb-1">
+            Workshop Type
+          </label>
           <select
             value={workshopType}
-            onChange={e => setWorkshopType(e.target.value)}
+            onChange={(e) => setWorkshopType(e.target.value)}
             className="w-full px-4 py-3 bg-hud-surface border border-hud-border rounded-xl text-hud-text
               focus:outline-none focus:border-hud-accent transition-colors"
             style={{ minHeight: 44 }}
           >
-            {WORKSHOP_TYPES.map(wt => (
-              <option key={wt} value={wt}>{wt.replace(/_/g, " ")}</option>
+            {WORKSHOP_TYPES.map((wt) => (
+              <option key={wt} value={wt}>
+                {wt.replace(/_/g, " ")}
+              </option>
             ))}
           </select>
         </div>
@@ -272,19 +306,27 @@ export default function NewScenarioPage() {
         {/* Estimate */}
         {estimate && (
           <div className="bg-hud-surface border border-hud-border rounded-xl p-4">
-            <h3 className="text-xs font-semibold text-hud-muted uppercase mb-2">Estimate</h3>
+            <h3 className="text-xs font-semibold text-hud-muted uppercase mb-2">
+              Estimate
+            </h3>
             <div className="grid grid-cols-3 gap-3 text-sm">
               <div>
                 <span className="text-hud-muted text-xs">Turns</span>
-                <p className="text-hud-text font-mono">{estimate.estimatedTurns}</p>
+                <p className="text-hud-text font-mono">
+                  {estimate.estimatedTurns}
+                </p>
               </div>
               <div>
                 <span className="text-hud-muted text-xs">Characters</span>
-                <p className="text-hud-text font-mono">{estimate.estimatedCharacters?.toLocaleString()}</p>
+                <p className="text-hud-text font-mono">
+                  {estimate.estimatedCharacters?.toLocaleString()}
+                </p>
               </div>
               <div>
                 <span className="text-hud-muted text-xs">Est. Cost</span>
-                <p className="text-hud-text font-mono">${estimate.estimatedCostUsd?.toFixed(2)}</p>
+                <p className="text-hud-text font-mono">
+                  ${estimate.estimatedCostUsd?.toFixed(2)}
+                </p>
               </div>
             </div>
           </div>

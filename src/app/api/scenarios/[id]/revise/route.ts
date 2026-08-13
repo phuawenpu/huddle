@@ -131,6 +131,7 @@ export async function POST(
     const quality = validateTranscriptForRevision(turns, speakers, {
       targetDurationMinutes: scenario.durationMinutes,
       crossTalkLevel: scenario.crossTalkLevel,
+      requireTargetDurationFit: true,
     });
     const updated = await prisma.scenario.update({
       where: { id },

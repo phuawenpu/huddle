@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { validateScenarioParams, estimateBudget, isDurationInRange } from "@/lib/budget";
+import {
+  validateScenarioParams,
+  estimateBudget,
+  isDurationInRange,
+} from "@/lib/budget";
 
 describe("validateScenarioParams", () => {
   it("accepts valid params", () => {
@@ -19,17 +23,29 @@ describe("validateScenarioParams", () => {
       crossTalkLevel: "occasional",
     });
     expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.includes("Duration"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("Duration"))).toBe(true);
   });
 
-  it("rejects duration above 15", () => {
+  it("rejects duration above 8", () => {
     const result = validateScenarioParams({
-      durationMinutes: 20,
+      durationMinutes: 9,
       speakerCount: 4,
       crossTalkLevel: "occasional",
     });
     expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.includes("Duration"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("Duration"))).toBe(true);
+  });
+
+  it("rejects fractional minutes", () => {
+    const result = validateScenarioParams({
+      durationMinutes: 4.5,
+      speakerCount: 4,
+      crossTalkLevel: "occasional",
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((error) => error.includes("whole number"))).toBe(
+      true,
+    );
   });
 
   it("rejects speaker count below 3", () => {
@@ -39,7 +55,7 @@ describe("validateScenarioParams", () => {
       crossTalkLevel: "occasional",
     });
     expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.includes("Speaker"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("Speaker"))).toBe(true);
   });
 
   it("rejects speaker count above 6", () => {
@@ -49,7 +65,7 @@ describe("validateScenarioParams", () => {
       crossTalkLevel: "occasional",
     });
     expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.includes("Speaker"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("Speaker"))).toBe(true);
   });
 
   it("rejects invalid cross-talk level", () => {
@@ -59,7 +75,7 @@ describe("validateScenarioParams", () => {
       crossTalkLevel: "extreme" as any,
     });
     expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.includes("cross-talk"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("cross-talk"))).toBe(true);
   });
 
   it("accepts all valid cross-talk levels", () => {
@@ -86,7 +102,7 @@ describe("estimateBudget", () => {
 
   it("longer durations produce more turns", () => {
     const short = estimateBudget(3, 4, "none");
-    const long = estimateBudget(15, 4, "none");
+    const long = estimateBudget(8, 4, "none");
     expect(long.estimatedTurns).toBeGreaterThan(short.estimatedTurns);
     expect(long.estimatedCharacters).toBeGreaterThan(short.estimatedCharacters);
   });
